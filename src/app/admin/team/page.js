@@ -11,6 +11,8 @@ import { X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, RankBars, HotTile } from "@/components/VetroCharts";
 import { confirmDialog } from "@/components/AppDialogs";
 
 const ctl = { padding: "7px 10px", background: CP.surface, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, fontSize: 13, fontFamily: FONTS.body };
@@ -21,6 +23,8 @@ export default function TeamsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [newTeamId, setNewTeamId] = useState("");
+  const inVetro = useInVetro();
+  const glass = inVetro ? "vt-glass" : undefined;
 
   const load = async () => {
     setLoading(true);
@@ -76,7 +80,27 @@ export default function TeamsAdminPage() {
       {data?.error && <Notice danger>{String(data.error)}</Notice>}
       {loading && !data && <div style={{ color: CP.textMuted, fontSize: 14, marginBottom: 14 }}>Caricamento…</div>}
 
-      {data && !data.error && (
+      {data && !data.error && inVetro && (
+        <div className="vt-row21" style={{ marginBottom: 18 }}>
+          <Panel title={`${fmtInt(teams.length)} team · ${fmtInt(assigned)} persone`} aside="quante persone ha ogni team · clic = il team" i={0}>
+            {teams.length
+              ? <RankBars format={fmtInt} limit={teams.length} total={0}
+                  items={[...teams].sort((a, b) => (b.members || []).length - (a.members || []).length).map((t) => ({
+                    label: t.teamId, value: (t.members || []).length,
+                    href: `#team-${encodeURIComponent(t.teamId)}`,
+                  }))} />
+              : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun team ancora: creane uno qui sotto.</div>}
+          </Panel>
+          <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+            <HotTile i={1} lvl={unassigned.length ? "ink" : "0"} label="Senza team" value={fmtInt(unassigned.length)}
+              sub={unassigned.length ? "finché non hanno un team, nessun lead vede le loro sessioni" : "tutti hanno un team"}
+              onClick={unassigned.length ? () => document.getElementById("team-senza")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+            <HotTile i={2} label="Team senza lead" value={fmtInt(teams.filter((t) => !t.lead).length)}
+              sub={teams.some((t) => !t.lead) ? teams.filter((t) => !t.lead).map((t) => t.teamId).join(", ") : "ogni team ha il suo lead"} />
+          </div>
+        </div>
+      )}
+      {data && !data.error && !inVetro && (
         <HeroMetric
           label="Persone senza team"
           value={fmtInt(unassigned.length)}
@@ -96,7 +120,7 @@ export default function TeamsAdminPage() {
       )}
 
       {/* Nuovo team */}
-      <section style={{ ...card, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+      <section className={glass} style={{ ...card, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 13, color: CP.textSecondary, flex: "1 1 240px" }}>
           Nuovo team (nome breve, senza spazi)
           <input value={newTeamId} onChange={(e) => setNewTeamId(e.target.value)} placeholder="es. team-alessia" style={{ ...ctl, fontSize: 14, padding: "8px 12px" }} />
@@ -120,7 +144,7 @@ export default function TeamsAdminPage() {
       {!loading && teams.map((t) => {
         const leadName = t.lead ? (t.members.find((m) => m.userId === t.lead)?.name || t.lead) : null;
         return (
-          <section key={t.teamId} style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+          <section key={t.teamId} id={`team-${encodeURIComponent(t.teamId)}`} className={glass} style={{ ...card, padding: "16px 18px", marginBottom: 14, scrollMarginTop: 80 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: CP.textPrimary }}>{t.teamId}</h2>
@@ -175,11 +199,11 @@ export default function TeamsAdminPage() {
 
       {/* Senza team */}
       {!loading && unassigned.length > 0 && (
-        <div style={{ marginTop: 24 }}>
+        <div id="team-senza" style={{ marginTop: 24, scrollMarginTop: 80 }}>
           <SectionTitle aside={teams.length ? "Scegli il team dal menu accanto al nome." : "Crea prima un team qui sopra."}>Senza team · {unassigned.length}</SectionTitle>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
             {unassigned.map((m) => (
-              <div key={m.userId} style={{ ...card, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", flexWrap: "wrap" }}>
+              <div key={m.userId} className={glass} style={{ ...card, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 120px", minWidth: 0 }}>
                   <div style={{ fontSize: 14, color: CP.textPrimary, overflowWrap: "anywhere" }}>{m.name}</div>
                   <div style={{ fontSize: 12, color: CP.textMuted, overflowWrap: "anywhere" }}>{m.role}{idTail(m)}</div>

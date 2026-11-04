@@ -4,6 +4,8 @@ import useSWR from "swr";
 import { CheckCircle2, Circle, Lock } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, HeroMetric, SectionTitle, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, GoalRing, Gauge } from "@/components/VetroCharts";
 import { tierLabel, tierColor } from "@/lib/tier-label";
 import { useStyle } from "@/lib/theme-client";
 
@@ -46,10 +48,54 @@ const monthStatus = (m) => (m.gap || m.score == null ? "non lavorato" : m.counts
 
 const fmtScore = (v) => (v == null ? "—" : Number(v).toLocaleString("it-IT", { maximumFractionDigits: 1 }));
 
+/*
+ * Vetro: «quanto mi manca al prossimo livello?» — un anello per passaggio (mesi che contano
+ * sui mesi richiesti), accanto lo score dell'ultimo mese con la tacca della soglia più vicina.
+ * Clic su un anello = il riquadro del passaggio, sotto.
+ */
+function LadderTop({ data }) {
+  const gates = data.gates || [];
+  const open = gates.find((g) => !g.performance?.performance_met && g.performance?.min_score != null);
+  const cur = data.current;
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title="A che punto sei" aside="mesi che contano su quelli richiesti" i={0}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+          {gates.map((g, k) => {
+            const p = g.performance || {};
+            const met = !!p.performance_met;
+            const hits = Math.min(Number(p.hits) || 0, Number(p.needed) || 0);
+            return (
+              <GoalRing key={g.id} i={k + 1} href={`#passaggio-${g.id}`} title={g.label}
+                pct={met ? 1 : p.needed ? hits / p.needed : 0} center={met ? "fatto" : p.needed ? `${hits} di ${p.needed}` : "—"}
+                tone={met ? "good" : hits > 0 ? "near" : undefined}
+                sub={met ? "performance raggiunta" : !p.evaluable ? "ancora pochi mesi" : p.min_score != null ? `mesi sopra ${p.min_score}` : ""} />
+            );
+          })}
+        </div>
+      </Panel>
+      {cur && (
+        <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+          <Panel title={cur.period_id === curMonth() ? "Mese in corso" : "Ultimo mese valutato"} aside={monthLabel(cur.period_id)} i={1}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <Gauge value={Number(cur.score) / 100} mark={open ? open.performance.min_score / 100 : null} markName="soglia del passaggio" size={132} center={fmtScore(cur.score)} centerSub="Mestiere" label="Score mestiere dell'ultimo mese" />
+              <div style={{ fontSize: 12.5, color: CP.textSecondary, lineHeight: 1.5 }}>
+                {cur.tier ? <span style={{ color: tierColor(cur.tier) }}>{tierLabel(cur.tier)}</span> : null}
+                {open ? <><br />La tacca è la soglia di «{open.label}»: {open.performance.min_score}.</> : null}
+              </div>
+            </div>
+          </Panel>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MyLadderPage() {
   const { data, error, isLoading } = useSWR("/api/me/ladder", fetcher, { revalidateOnFocus: false });
   const [st] = useStyle();
   const v3 = st === "v3";
+  const inVetro = useInVetro();
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -74,7 +120,8 @@ export default function MyLadderPage() {
       {data?.linked && Array.isArray(data.gates) && data.gates.length > 0 && (
         <>
           <p style={{ fontSize: 13, color: CP.textMuted, margin: "0 0 12px", lineHeight: 1.55, maxWidth: 760 }}>Il percorso di carriera guarda lo score <b style={{ fontWeight: 500, color: CP.textSecondary }}>Mestiere</b> (come lavori in chat). Le <b style={{ fontWeight: 500, color: CP.textSecondary }}>Vendite</b> contano per il compenso e per le revisioni mensili: sono due misure diverse, non una contro l&apos;altra.</p>
-          {data.current && (
+          {inVetro && <LadderTop data={data} />}
+          {!inVetro && data.current && (
             <HeroMetric
               label={`${data.current.period_id === curMonth() ? "Mese in corso (non ancora valutato)" : "Ultimo mese valutato"} · ${monthLabel(data.current.period_id)}`}
               value={fmtScore(data.current.score)}
@@ -91,7 +138,7 @@ export default function MyLadderPage() {
           {data.gates.map((g) => {
             const perf = g.performance || {};
             return (
-              <section key={g.id} style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+              <section key={g.id} id={`passaggio-${g.id}`} className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "16px 18px", marginBottom: 14, scrollMarginTop: 80 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 500, color: CP.textPrimary, margin: 0 }}>{g.label}</h3>
                   {perf.performance_met ? (

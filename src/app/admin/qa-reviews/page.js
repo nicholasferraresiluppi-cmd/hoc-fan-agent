@@ -6,6 +6,8 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, RankBars, GoalRing, HotTile } from "@/components/VetroCharts";
 
 /**
  * /admin/qa-reviews — QA conversazionale (CAREER_LADDER §8.1).
@@ -79,6 +81,12 @@ export default function QaReviewsPage() {
   const reviews = data?.reviews || [];
   const passN = reviews.filter((r) => r.pass && !r.compliance_fail).length;
   const failCompliance = reviews.filter((r) => r.compliance_fail).length;
+  const inVetro = useInVetro();
+  // media di ogni voce sulle review mostrate, dalla più bassa (1-4, la soglia del pass è 3)
+  const dimAvg = dims.map((d) => {
+    const v = reviews.map((r) => Number(r.scores?.[d.key])).filter((x) => Number.isFinite(x));
+    return { label: d.label, value: v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null };
+  }).filter((x) => x.value != null).sort((a, b) => a.value - b.value);
   const canSubmit = allScored && employee && convRef;
   const missing = [!employee && "operatore", !convRef && "riferimento della conversazione", !allScored && "un voto per ogni voce"].filter(Boolean);
 
@@ -99,7 +107,19 @@ export default function QaReviewsPage() {
         <Notice danger>Riservata a chi vede i dati di tutti (admin, sales manager, QA): il team lead diretto da solo non può valutare i suoi operatori. {String(forbidden)}</Notice>
       )}
 
-      {!forbidden && data && !isLoading && reviews.length > 0 && (
+      {!forbidden && data && !isLoading && reviews.length > 0 && inVetro && (
+        <div className="vt-row21" style={{ marginBottom: 18 }}>
+          <Panel title={`${fmtInt(reviews.length)} review registrate`} aside="media di ogni voce, dalla più bassa · scala da 1 a 4" i={0}>
+            <RankBars items={dimAvg} format={(v) => v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 2 })} limit={dimAvg.length} mark={3} markLabel="3: la media che serve per superare la review" />
+          </Panel>
+          <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+            <GoalRing i={1} pct={reviews.length ? passN / reviews.length : 0} title="Superate" sub={`${fmtInt(passN)} su ${fmtInt(reviews.length)}`} />
+            <HotTile i={2} lvl={failCompliance ? "2" : "0"} label="Compliance violata" value={fmtInt(failCompliance)}
+              sub={failCompliance ? "un 1 in compliance blocca le promozioni in corso" : "nessuna regola violata"} />
+          </div>
+        </div>
+      )}
+      {!forbidden && data && !isLoading && reviews.length > 0 && !inVetro && (
         <HeroMetric label="Review registrate" value={fmtInt(reviews.length)} compare="Tra le ultime mostrate qui sotto.">
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Metric label="Superate" value={fmtInt(passN)} />
@@ -109,7 +129,7 @@ export default function QaReviewsPage() {
       )}
 
       {!forbidden && (
-        <section style={{ ...card, padding: "18px 20px", marginBottom: 24 }}>
+        <section className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "18px 20px", marginBottom: 24 }}>
           <SectionTitle>Nuova review</SectionTitle>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 14 }}>
             <div>

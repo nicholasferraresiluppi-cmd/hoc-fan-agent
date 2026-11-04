@@ -28,6 +28,7 @@ const int = (n) => (n == null || !Number.isFinite(Number(n)) ? "—" : Math.roun
 const pct = (v, d = 2) => (v == null || !Number.isFinite(Number(v)) ? "—" : `${(Number(v) * 100).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d })}%`);
 // orari in UTC come in Looker: i giorni dei filtri sono giorni UTC, così una riga delle 23:59 resta nel suo giorno
 const dt = (s) => (s ? new Date(s).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "—");
+const shortDay = (s) => (s ? new Date(`${s}T12:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "UTC" }) : "—");
 const dtLocal = (s) => (s ? new Date(s).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const dshort = (s) => (s ? new Date(`${s}T00:00:00Z`).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }) : "—");
 function Delta({ v }) {
@@ -236,15 +237,16 @@ function CreatorDetail({ d, onBack, onDati }) {
         </section>
       )}
 
-      {(d.welcome.length > 0 || d.welcomeMissing.length > 0) && (
+      {(d.welcome.length > 0 || d.welcomeUnpaid?.length > 0) && (
         <section style={{ display: "grid", gap: 6 }}>
-          <SectionTitle>Messaggio di benvenuto a pagamento</SectionTitle>
+          <SectionTitle aside={<a href="/admin/benvenuto" style={{ fontSize: 13, color: CP.accentSoftText }}>Benvenuto a pagamento ›</a>}>Messaggio di benvenuto a pagamento</SectionTitle>
           {d.welcome.map((w) => (
-            <div key={`${w.name}-${w.amount}`} style={{ fontSize: 14, color: CP.textSecondary }}>
-              <span style={{ color: CP.textPrimary }}>{w.name}</span> a {money(w.amount)}: sbloccato da {int(w.unlocks)} nuovi abbonati su {int(w.subs)} ({pct(w.subs ? w.unlocks / w.subs : 0, 1)}), {money(w.revenue)}.
+            <div key={w.key} style={{ fontSize: 14, color: CP.textSecondary }}>
+              <span style={{ color: CP.textPrimary }}>{w.name}</span> a {money(w.amount)}{d.welcome.filter((x) => x.creator_id === w.creator_id).length > 1 ? ` (${shortDay(w.from)}–${shortDay(w.to)})` : ""}: sbloccato da {int(w.unlocks)} nuovi abbonati su {int(w.subs)} ({pct(w.cr || 0, 1)}), {money(w.revenue)}
+              {w.origin === "manual" ? ` · prezzo inserito a mano${w.tool ? ` (${w.tool})` : ""}` : ""}{w.maturing ? " · gli iscritti degli ultimi 3 giorni possono ancora sbloccare" : ""}.
             </div>
           ))}
-          {d.welcomeMissing.length > 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun prezzo welcome registrato per {d.welcomeMissing.join(", ")}: gli sblocchi non si possono misurare.</div>}
+          {d.welcomeUnpaid?.length > 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>Nessun benvenuto a pagamento nelle chat di {d.welcomeUnpaid.join(", ")}. Se lo mandate con un altro strumento, inserite il prezzo in Benvenuto a pagamento.</div>}
         </section>
       )}
 

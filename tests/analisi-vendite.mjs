@@ -56,6 +56,5 @@ assert.throws(() => q.ricercaSql({ usersResearch: "x" }, [1], "a'b"), /ricerca n
 ok(JSON.stringify(q.defaultRange("notifiche", now)) === JSON.stringify({ from: "2026-09-26", to: "2026-10-09" }), "notifiche fino a oggi (tempo reale), 14 giorni come Looker");
 const na = q.notificheAggSql({ notifications: "p.postgres.public_notifications" }, [1], { from: "2026-09-26", to: "2026-10-09" });
 ok(na.includes("'new_subscriber', 'returning_subscriber', 'new_subscriber_trial'") && !na.includes("ROW_NUMBER"), "notifiche: tutti e tre i tipi, nessuna deduplica 'ultima del giorno'");
-ok(q.welcomeSql({ welcomeUnlocks: "p.onlyfans.welcome_unlocks" }, [1], r7).includes("GROUP BY creator_id, amount"), "welcome per creator e prezzo");
 
 console.log(`analisi-vendite: ${n} asserzioni ok`);

@@ -10,6 +10,8 @@ import useSWR from "swr";
 import { Copy, Check, Undo2, HeartHandshake } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, FilterChip, Notice, card } from "@/components/ds";
+import VetroScope, { useVetro, VetroSwitch, useInVetro } from "@/components/VetroScope";
+import { GoalRing, RankBars, MixBar } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -26,6 +28,7 @@ export default function FanDaRecuperarePage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/recupero", fetcher, { revalidateOnFocus: false });
   const [who, setWho] = useState(null); // persona scelta
   const [show, setShow] = useState("todo"); // todo | done | all
+  const [vetro, setVetro] = useVetro();
 
   const list = data?.list || [];
   const states = data?.states || {};
@@ -45,9 +48,11 @@ export default function FanDaRecuperarePage() {
     .filter((g) => g.fans.length);
 
   return (
+    <VetroScope on={vetro}>
     <div style={{ display: "grid", gap: 20, maxWidth: 1600, margin: "0 auto", padding: "8px 0 40px" }}>
       <PageHead crumbs={[{ label: "Performance" }]} title="Fan da recuperare"
-        subtitle="Chi spendeva bene e si è fermato. Scrivigli una cosa sua, non un saluto." />
+        subtitle="Chi spendeva bene e si è fermato. Scrivigli una cosa sua, non un saluto."
+        actions={<VetroSwitch on={vetro} set={setVetro} />} />
 
       {error && <Notice danger>{error.message}</Notice>}
       {isLoading && <div style={{ ...card, padding: 24, color: CP.textMuted, fontSize: 14 }}>Carico la lista…</div>}
@@ -66,7 +71,7 @@ export default function FanDaRecuperarePage() {
             <span style={{ color: CP.textPrimary }}>{money(value)}</span>. Lavorati {done.length}.
           </div>
 
-          <Outcome o={data.outcome} />
+          {vetro ? <VetroTop list={list} states={states} all={all} done={done} outcome={data.outcome} who={who} setWho={setWho} /> : <Outcome o={data.outcome} />}
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <FilterChip label="Da fare" active={show === "todo"} onClick={() => setShow("todo")} />
@@ -98,6 +103,79 @@ export default function FanDaRecuperarePage() {
         </>
       )}
     </div>
+    </VetroScope>
+  );
+}
+
+// Stile vetro (29/10/2026): la domanda della pagina è «quanto c'è da lavorare oggi, dove, e funziona?».
+// Quanti ne hai lavorati (anello), dove c'è più da recuperare (classifica per creator dei fan ancora da
+// fare, clic = filtro), da quanto si sono fermati (prima i più freschi, più facili da riprendere) e il
+// confronto contattati / non contattati. Stessi numeri della pagina, nessuna richiesta nuova.
+const STOP_BUCKETS = [
+  { label: "7-14 gg", max: 14, color: "var(--vt-c0)" },
+  { label: "15-30 gg", max: 30, color: "var(--vt-c1)" },
+  { label: "Oltre 30 gg", max: Infinity, color: "var(--vt-c2)" },
+];
+const H2 = { margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary };
+function VetroTop({ list, states, all, done, outcome, who, setWho }) {
+  const todo = all.filter((f) => !states[f.key]);
+  const rate = all.length ? done.length / all.length : 0;
+  const byCreator = list
+    .map((g) => {
+      const left = g.fans.filter((f) => !states[f.key]);
+      return { label: g.person, value: left.reduce((s, f) => s + f.spent60, 0), n: left.length, onClick: () => setWho(who === g.person ? null : g.person) };
+    })
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.value - a.value);
+  const buckets = STOP_BUCKETS.map((b) => ({ ...b, value: 0 }));
+  for (const f of todo) (buckets.find((b) => (f.days_since_buy ?? 99) <= b.max) || buckets[2]).value += 1;
+  return (
+    <div className="vt-row21" style={{ gap: 12 }}>
+      <div style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <section className="vt-glass" style={{ "--vt-i": 0, borderRadius: 20, padding: "16px 18px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <h2 style={H2}>Dove c&apos;è più da recuperare</h2>
+            <span style={{ fontSize: 12.5, color: CP.textMuted }}>speso in 60 giorni dai fan ancora da lavorare · tocca una creator per filtrare</span>
+          </div>
+          {byCreator.length ? <RankBars items={byCreator} format={money} limit={8} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Lavorati tutti. Domattina arriva la lista nuova.</div>}
+        </section>
+        {todo.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 20, padding: "16px 18px", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              <h2 style={H2}>Da quanto hanno smesso di comprare</h2>
+              <span style={{ fontSize: 12.5, color: CP.textMuted }}>chi si è fermato da poco si riprende più facilmente</span>
+            </div>
+            <MixBar items={buckets} format={(v) => `${v} fan`} height={28} />
+          </section>
+        )}
+      </div>
+      <div style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <GoalRing i={2} pct={rate} tone={todo.length === 0 ? "good" : "near"} size={112} title="Lavorati oggi"
+          sub={`${done.length} su ${all.length} fan · ${money(todo.reduce((s, f) => s + f.spent60, 0))} ancora da lavorare`} />
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 20, padding: "16px 18px", display: "grid", gap: 10, minWidth: 0 }}>
+          <h2 style={H2}>Funziona?</h2>
+          {!outcome?.ready ? (
+            <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>Il primo risultato arriva 7 giorni dopo i primi contatti segnati: qui vedrai quanti hanno ricomprato.</div>
+          ) : (
+            <>
+              {[{ label: "Ricontattati", x: outcome.sent, c: CP.accentGreen }, { label: "In lista, non contattati", x: outcome.not_sent, c: "var(--vt-cx)" }].map((r) => (
+                <div key={r.label} style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>
+                    <span>{r.label}</span>
+                    <span><b style={{ color: CP.textPrimary, fontWeight: 600 }}>{pct(r.x.rate)}</b> · {r.x.rebought} su {r.x.fans}</span>
+                  </div>
+                  <div style={{ height: 12, borderRadius: 6, background: CP.track, overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, (r.x.rate || 0) * 100)}%`, height: "100%", borderRadius: 6, background: r.c }} />
+                  </div>
+                </div>
+              ))}
+              <div style={{ fontSize: 12.5, color: CP.textSecondary }}>Chi è stato ricontattato ha ricomprato per {money(outcome.sent.revenue)} (liste degli ultimi 30 giorni, acquisti entro {outcome.days} giorni).</div>
+              <div style={{ fontSize: 12, color: CP.textMuted }}>Confronto indicativo: a chi scrivere lo sceglie chi lavora la lista, non è un esperimento a caso.</div>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -120,11 +198,12 @@ function Outcome({ o }) {
 
 function FanCard({ f, st, onMark }) {
   const [copied, setCopied] = useState(false);
+  const inVetro = useInVetro();
   const copy = async () => {
     try { await window.navigator.clipboard.writeText(f.messaggio); setCopied(true); window.setTimeout(() => setCopied(false), 1800); } catch { /* il testo resta selezionabile */ }
   };
   return (
-    <div style={{ ...card, padding: 16, display: "grid", gap: 10, opacity: st ? 0.7 : 1 }}>
+    <div className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: 16, display: "grid", gap: 10, opacity: st ? 0.7 : 1 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{f.username ? `@${f.username}` : `fan ${f.user_id}`}</span>
         <span style={{ fontSize: 12, color: CP.textMuted }}>{f.page}</span>

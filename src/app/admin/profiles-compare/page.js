@@ -8,6 +8,8 @@ import CompNav from "@/components/CompNav";
 import { PageHead, HeroMetric, Metric, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
 import { fmt$, fmtSigned$, fmtInt, fmtPct as fmtPctIt, MONTHS_IT } from "@/lib/format";
 import HowToRead from "@/components/HowToRead";
+import { useInVetro } from "@/components/VetroScope";
+import { RankBars, Panel, HotTile } from "@/components/VetroCharts";
 
 /**
  * /admin/profiles-compare — Scaglioni a confronto cross-creator.
@@ -118,6 +120,7 @@ export default function ProfilesComparePage() {
   const minCost = costs.length ? Math.min(...costs) : null;
   const maxCost = costs.length ? Math.max(...costs) : null;
   const withMismatch = (data?.creators || []).filter((c) => c.mismatches > 0).length;
+  const inVetro = useInVetro();
 
   const columns = data ? [
     { key: "alias", label: "Creator", render: (c) => <span style={{ fontWeight: 500 }}>{c.alias}</span> },
@@ -215,6 +218,9 @@ export default function ProfilesComparePage() {
 
       {data && data.creators_count > 0 && (
         <>
+          {inVetro ? (
+            <ScaglioniTop creators={data.creators} periodId={data.period_id} costAvg={costAvg} minCost={minCost} maxCost={maxCost} totals={data.totals} />
+          ) : (
           <HeroMetric
             label="Pagato agli operatori sul venduto · media di tutte le creator"
             value={costAvg != null ? fmtPct(costAvg) : "—"}
@@ -227,6 +233,7 @@ export default function ProfilesComparePage() {
               <Metric label="Creator nel mese" value={fmtInt(data.creators_count)} />
             </div>
           </HeroMetric>
+          )}
 
           {missingPhaseB > 0 && (
             <Notice>
@@ -323,6 +330,53 @@ export default function ProfilesComparePage() {
           </Disclosure>
         </>
       )}
+    </div>
+  );
+}
+
+// Vetro (30/10/2026): la domanda è «quanto pesa il costo degli operatori, creator per creator, e
+// quali profili vanno uniformati?». Le creator in fila per % di costo con la tacca della media; accanto
+// il numero dell'agenzia con l'intervallo tra la più bassa e la più alta, e la scheda «Fuori scaglione»
+// con le creator che hanno turni pagati con una % diversa (link al loro Calendario).
+const RANK_MAX = 12;
+function ScaglioniTop({ creators, periodId, costAvg, minCost, maxCost, totals }) {
+  const cal = (a) => `/admin/comp-calendar?creator=${encodeURIComponent(a)}&period_id=${periodId}`;
+  const ranked = creators.filter((c) => c.cost_pct != null && c.sales > 0).sort((a, b) => b.cost_pct - a.cost_pct);
+  const items = ranked.slice(0, RANK_MAX).map((c) => ({ label: c.alias, value: c.cost_pct, href: cal(c.alias) }));
+  const off = creators.filter((c) => c.mismatches > 0).sort((a, b) => b.mismatches - a.mismatches);
+  const p = (v) => fmtPct(v);
+  const span = maxCost != null && minCost != null ? maxCost - minCost : null;
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14 }}>
+      <Panel i={0} title="Quanto pesa il costo, creator per creator" aside={`pagato agli operatori sul venduto${ranked.length > RANK_MAX ? ` · le ${RANK_MAX} più care su ${ranked.length}` : ""} · tocca per il Calendario`}>
+        <RankBars items={items} format={p} limit={RANK_MAX} mark={costAvg ?? undefined} markLabel={costAvg != null ? `Media di tutte le creator: ${p(costAvg)}` : undefined} />
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={1}>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>Pagato agli operatori sul venduto · media</div>
+          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", ...NUM }}>{costAvg != null ? p(costAvg) : "—"}</div>
+          {span != null && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ position: "relative", height: 12, borderRadius: 6, background: CP.track }}>
+                <span style={{ position: "absolute", left: `${(minCost / maxCost) * 100}%`, right: 0, top: 0, bottom: 0, borderRadius: 6, background: alpha(CP.accent, "40") }} />
+                {costAvg != null && <span style={{ position: "absolute", left: `${(costAvg / maxCost) * 100}%`, top: -3, bottom: -3, width: 2, marginLeft: -1, background: CP.textPrimary }} />}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: CP.textMuted, marginTop: 4, ...NUM }}><span>la più bassa {p(minCost)}</span><span>la più alta {p(maxCost)}</span></div>
+            </div>
+          )}
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>Venduto {fmt$(totals.sales)} · pagato {fmt$(totals.earn_attr)} · {fmtInt(creators.length)} creator</div>
+        </Panel>
+        <HotTile i={2} lvl={off.length ? "2" : "0"} label="Fuori scaglione" value={fmtInt(off.length)}
+          sub={off.length ? "creator con turni pagati con una % diversa da quella prevista:" : "tutti i turni controllati rispettano gli scaglioni"}>
+          {off.length > 0 && (
+            <span style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+              {off.slice(0, 6).map((c) => (
+                <Link key={c.alias} href={cal(c.alias)} style={{ fontSize: 12.5, color: CP.textPrimary, background: "rgba(255,255,255,.16)", borderRadius: 999, padding: "3px 10px", textDecoration: "none", ...NUM }}>{c.alias} · {c.mismatches} su {c.checked}</Link>
+              ))}
+            </span>
+          )}
+        </HotTile>
+      </div>
     </div>
   );
 }

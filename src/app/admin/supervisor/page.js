@@ -15,7 +15,9 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Check, Copy, Eye, EyeOff, ExternalLink, Plus, Trash2, Upload, X, Search, KeyRound } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, NUM, BTN_PRIMARY } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, Tabs, card, NUM, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
 import { fmtInt, fmtAgo } from "@/lib/format";
 import {
   ENUMS, PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, SECRET_FIELDS, linkGroups, mapHeaders,
@@ -389,12 +391,45 @@ function auditText(e) {
 
 const STATUS_COLS = [["ok", "Attivi"], ["suspended", "Sospesi"], ["not_recommended", "Non raccomandati"]];
 
+/*
+ * Vetro: «gli account stanno bene, e cosa c'è da sistemare?» — lo stato degli account vivi in una
+ * barra (stessi stati della tabella sotto), la creazione in corso, e accanto «Da sistemare»
+ * (rosso se c'è qualcosa di critico) che porta all'elenco trovato dal sistema.
+ */
+function SupTop({ data }) {
+  const s = data.stats;
+  const byStatus = STATUS_COLS.map(([k, l]) => ({ label: l, value: Object.entries(s.grid).filter(([key]) => key.endsWith(`|${k}`)).reduce((a, [, n]) => a + n, 0), color: k === "ok" ? CP.accentGreen : undefined }));
+  const crit = data.issues.some((i) => i.severity === "critical");
+  const nIss = data.issues.reduce((a, i) => a + (i.count || 0), 0);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title={`${fmtInt(s.liveTotal)} account vivi`} aside={`${fmtInt(s.retired)} ritirati`} i={0}>
+        {s.liveTotal ? <MixBar items={byStatus} format={fmtInt} /> : <div style={{ fontSize: 13, ...muted }}>Ancora nessun account.</div>}
+        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 14, fontSize: 13, color: CP.textSecondary, ...NUM }}>
+          <span>Da creare <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.to_do)}</b></span>
+          <span>In creazione <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.in_progress)}</b></span>
+          <span>In riscaldamento <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.warming)}</b></span>
+          <span>Telefoni <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.devices.total)}</b>{s.devices.unassigned ? ` (${fmtInt(s.devices.unassigned)} senza publisher)` : ""}</span>
+          <span>Caselle mail <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.mailboxes)}</b></span>
+        </div>
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={!data.issues.length ? "0" : crit ? "2" : "ink"} label="Da sistemare" value={fmtInt(data.issues.length)}
+          sub={data.issues.length ? `${fmtInt(nIss)} righe in tutto · trovate dal sistema` : "niente da sistemare"}
+          onClick={data.issues.length ? () => document.getElementById("sup-issues")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+      </div>
+    </div>
+  );
+}
+
 function Overview({ data, goAccounts, goIssue }) {
   const s = data.stats;
   const owners = [["agency", "agenzia"], ["creator", "creator"]];
+  const inVetro = useInVetro();
   return (
     <>
-      <div style={{ ...card, padding: "16px 18px", display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 18 }}>
+      {inVetro && <SupTop data={data} />}
+      {!inVetro && <div style={{ ...card, padding: "16px 18px", display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 18 }}>
         <Metric label="Account attivi" value={fmtInt(s.activeTotal)} note={`${fmtInt(s.liveTotal)} creati, ${fmtInt(s.retired)} ritirati`} />
         <Metric label="Da creare" value={fmtInt(s.creation.to_do)} />
         <Metric label="In creazione" value={fmtInt(s.creation.in_progress)} />
@@ -402,11 +437,11 @@ function Overview({ data, goAccounts, goIssue }) {
         <Metric label="Doppioni" value={fmtInt(s.duplicates)} danger={s.duplicates > 0} />
         <Metric label="Telefoni" value={fmtInt(s.devices.total)} note={`${fmtInt(s.devices.unassigned)} senza publisher`} />
         <Metric label="Caselle mail" value={fmtInt(s.mailboxes)} />
-      </div>
+      </div>}
 
       <SectionTitle aside="clic su un numero per vedere gli account">Account per piattaforma e stato</SectionTitle>
       {s.platforms.length === 0 ? <Notice>Ancora nessun account. Parti da «Importa» (telefoni, poi mail, poi account) o crea il primo a mano.</Notice> : (
-        <div className="ds-tbl-wrap" style={{ ...card, overflow: "auto", marginBottom: 22 }}>
+        <div className="vt-glass" style={{ ...card, overflow: "auto", marginBottom: 22 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 460 }}>
             <thead><tr>
               <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 12, fontWeight: 500, color: CP.textMuted }}>Piattaforma</th>
@@ -431,6 +466,7 @@ function Overview({ data, goAccounts, goIssue }) {
         </div>
       )}
 
+      <div id="sup-issues" style={{ scrollMarginTop: 80 }} />
       <SectionTitle aside={data.issues.length ? "trovate dal sistema, si aprono con un clic" : null}>Da sistemare</SectionTitle>
       {data.issues.length === 0 ? <p style={{ fontSize: 13, ...muted }}>Niente da sistemare.</p> : (
         <div style={{ ...card }}>
@@ -726,16 +762,14 @@ export default function SupervisorPage() {
   const newKind = tab === "telefoni" ? "device" : tab === "mail" ? "mailbox" : "account";
 
   return (
-    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "24px 24px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "24px 24px 60px", fontFamily: FONTS.body, color: CP.textPrimary }}>
       <PageHead crumbs={[{ label: "Marketing" }, { label: "Account social" }]} title="Account social"
         subtitle="Gli account di promozione per creator e alterego, i telefoni dei publisher e le caselle mail. Le password si vedono una alla volta e restano nel registro."
         actions={data && !["registro", "importa", "link"].includes(tab) ? <button type="button" style={btnPrimary} onClick={() => open(newKind)}><Plus size={14} />{newKind === "device" ? "Nuovo telefono" : newKind === "mailbox" ? "Nuova casella" : "Nuovo account"}</button> : null} />
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-        {TABS.map(([k, l]) => {
-          const n = !data ? null : k === "account" ? data.accounts.filter((a) => !a.retired).length : k === "telefoni" ? data.devices.length : k === "mail" ? data.mailboxes.length : k === "panoramica" && data.issues.length ? data.issues.length : null;
-          return <FilterChip key={k} label={n != null ? `${l} · ${fmtInt(n)}` : l} attn={k === "panoramica" && n > 0 && tab !== k} active={tab === k} onClick={() => go(k)} />;
-        })}
-      </div>
+      <Tabs value={tab} onChange={go} items={TABS.map(([k, l]) => {
+        const n = !data ? null : k === "account" ? data.accounts.filter((a) => !a.retired).length : k === "telefoni" ? data.devices.length : k === "mail" ? data.mailboxes.length : k === "panoramica" && data.issues.length ? data.issues.length : null;
+        return [k, l, n != null ? fmtInt(n) : null];
+      })} />
       {error && <Notice danger>{error.message}</Notice>}
       {!data && !error && <p style={{ fontSize: 13, ...muted }}>Carico…</p>}
       {data && (

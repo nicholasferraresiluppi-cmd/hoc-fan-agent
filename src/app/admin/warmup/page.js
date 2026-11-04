@@ -8,6 +8,7 @@
 //  - le spunte si salvano una per una: due persone sullo stesso profilo non si cancellano il lavoro;
 //  - cambiare la situazione (shadowban, sospeso, bannato) aggiorna anche lo stato in Account social.
 
+import { PlanCard } from "@/components/piani/PlanView";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Check, ChevronRight, Flag, Pencil, Plus, Trash2, Undo2, UserRound, ExternalLink } from "lucide-react";
@@ -21,6 +22,7 @@ import {
 import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
 import ClipRadar from "@/components/warmup/clip-radar";
+import TrendModelle from "@/components/warmup/trend-modelle";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
@@ -814,7 +816,8 @@ export default function WarmupPage() {
       const bits = g.rows.map((r) => ({ ...r, ...taskBits(r.a, r.item, r.done, tk) }));
       return { ...g, bits, open: bits.filter((b) => !b.on).length };
     });
-    const req = all.filter((g) => !g.item.opt && g.open).sort((x, y) => y.open - x.open);
+    // Ordine del piano, fisso: una card scende tra le «già fatte» solo quando è spuntata su TUTTI i profili.
+    const req = all.filter((g) => !g.item.opt && g.open);
     const opt = all.filter((g) => g.item.opt && g.open);
     const doneAll = all.filter((g) => !g.open);
     const rich = (item) => Boolean(item.timer) || Boolean(pubKindOfTask(item.id));
@@ -856,8 +859,8 @@ export default function WarmupPage() {
             {extras.map((x) => <div key={x.a.id} style={{ ...cardBox, padding: 0, marginBottom: 10 }}><div style={{ padding: "10px 14px 0", fontSize: 14, fontWeight: 500 }}>{x.a.username}</div>{x.el}</div>)}
           </>
         )}
-        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
         {doneAll.length > 0 && <Fold title={`${doneAll.length} ${doneAll.length === 1 ? "azione già fatta" : "azioni già fatte"} su tutti i profili`}>{doneAll.map(card)}</Fold>}
+        {opt.length > 0 && <Fold title={`${opt.length} ${opt.length === 1 ? "azione facoltativa" : "azioni facoltative"}`}>{opt.map(card)}</Fold>}
       </>
     );
   }
@@ -895,6 +898,8 @@ export default function WarmupPage() {
               {accs.length > 1 && <Segmented label="Vista" items={[["azione", "Per azione"], ["prof", "Per profilo"]]} value={vista} onChange={setOggiVista} />}
             </> : null} />
         ) : null}
+        {/* il piano di lavoro in corso (30/10): le prossime voci di chi apre la pagina */}
+        <PlanCard area="social" />
         {!ACC.length && <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: "0 0 6px", fontWeight: 500 }}>Nessun profilo {PLATS[plat].label}</h3><p style={{ ...hint, margin: "0 0 14px" }}>Registra il primo profilo dalla scheda Account.</p><button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setForm({}); }}><Plus size={15} />Nuovo profilo</button></div>}
         {urg.length > 0 && (
           <>
@@ -1666,6 +1671,7 @@ export default function WarmupPage() {
     else if (tab === "admin" && admin) body = viewAdmin();
     else if (tab === "xrefs" && plat === "x") body = <XRefs />;
     else if (tab === "radar") body = <ClipRadar />;
+    else if (tab === "trend") body = <TrendModelle />;
     else if (tab === "guide") body = <>{plat === "x"
       ? <HeroHead eyebrow="Guida" title="Come si lavora un profilo" accent="X" sub="Il riassunto del documento Account X: perché conta, i numeri di riferimento, cosa dipende da noi."
           numbers={<><BigNum label="Visualizzazioni a post con Premium" value={600} strong /><BigNum label="Follower attivi per le prime sub" value={500} /></>} />
@@ -1677,12 +1683,12 @@ export default function WarmupPage() {
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
   // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
-  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ["trend", "Trend modelle"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
   const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
-      <PageHead crumbs={[{ label: "Marketing" }, { label: "Social" }]} title="Social"
+      <PageHead crumbs={[{ label: "Marketing" }, { label: "Clipping" }]} title="Clipping"
         subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
       <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}

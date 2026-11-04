@@ -11,15 +11,15 @@
 // il mese che sale contro il mese prima e il ritmo del goal, il venduto per ecosistema. Col vetro spento
 // la pagina è quella di prima. Anche qui niente rosso per chi è indietro: verde solo per «ci arriva».
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
-import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
+import { RefreshCw, Pencil, Check, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Plus } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { PageHead, Notice, card } from "@/components/ds";
 import { liveFetcher } from "@/components/LiveCreatorPicker";
 import { MONTHS_IT } from "@/lib/format";
-import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { MonthArea, Gauge, GaugeKey, GoalRing } from "@/components/VetroCharts";
+import VetroScope, { useVetro, VetroSwitch } from "@/components/VetroScope";
 
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const ok = (v) => v != null && Number.isFinite(Number(v));
@@ -67,13 +67,13 @@ export default function BilancioPage() {
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "8px 16px 56px", fontFamily: FONTS.body }}>
       <PageHead
         title="Bilancio del mese"
-        subtitle="Tutte le creator dello split, ognuna misurata sul suo goal, divise per ecosistema."
+        subtitle="Come il foglio Bilancio_unico_LIVE: andamento per paese, la giornata contro il target, il quadro per creator."
         actions={(
           <>
             <VetroSwitch on={vetro} set={setVetro} />
             {data?.canEdit && (
               <button onClick={() => setEditing((v) => !v)} style={btn(editing)}>
-                {editing ? <Check size={14} /> : <Pencil size={14} />} {editing ? "Fatto" : "Goal ed ecosistemi"}
+                {editing ? <Check size={14} /> : <Pencil size={14} />} {editing ? "Fatto" : "Goal, AM/SM ed ecosistemi"}
               </button>
             )}
             {data && (
@@ -91,23 +91,14 @@ export default function BilancioPage() {
 
       {data && (
         <div style={{ opacity: isLoading ? 0.55 : 1, transition: "opacity .15s" }}>
-          <Summary data={data} />
-          <Charts data={data} mine={mine} />
-          {editing && <GroupEditor data={data} onSaved={() => mutate()} />}
-          <div style={{ display: "grid", gap: 16 }}>
-            {data.groups.map((g) => <Ecosystem key={g.id} g={g} data={data} mine={mine} editing={editing} onSaved={() => mutate()} />)}
-          </div>
+          <Sheet data={data} go={go} mine={mine} editing={editing} onSaved={() => mutate()} />
+          {editing && <div style={{ marginTop: 22 }}><GroupEditor data={data} onSaved={() => mutate()} /></div>}
           {!ok(data.totals.goal) && <div style={{ marginTop: 12 }}><Notice>Nessun goal messo per {monthLabel(data.month)}: senza goal non c'è classifica, solo il venduto.</Notice></div>}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16, marginTop: 28, alignItems: "start" }}>
-            <TheDay data={data} />
-            <Days data={data} go={go} />
-          </div>
           <Explain data={data} />
           <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>Dati del warehouse aggiornati alle {hm(data.updated_at)}{data.live ? " · si aggiornano da soli ogni 10 minuti" : ""}.</div>
         </div>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{BIL_CSS + `@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
     </VetroScope>
   );
@@ -129,13 +120,15 @@ function DayNav({ data, go }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "-4px 0 18px" }}>
       <button aria-label="Giorno prima" onClick={() => go(addDays(data.asOf, -1))} style={iconBtn(false)}><ChevronLeft size={16} /></button>
-      <label style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.surface, cursor: "pointer", fontSize: 14.5, fontWeight: 500, color: CP.textPrimary }}>
-        <CalendarDays size={15} color={CP.textSecondary} />
-        <span>{cap(dayLabel(data.asOf))}</span>
-        {data.live && <span style={{ fontSize: 12, fontWeight: 500, color: CP.accentGreen }}>· in corso</span>}
-        <input type="date" value={data.asOf} max={data.today} onChange={(e) => e.target.value && go(e.target.value)}
-          aria-label="Scegli il giorno" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%" }} />
-      </label>
+      <DayPicker data={data} go={go} trigger={({ open, toggle }) => (
+        <button type="button" onClick={toggle} aria-expanded={open} aria-label="Scegli il giorno"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, border: `1px solid ${open ? CP.accent : CP.border}`, background: CP.surface, cursor: "pointer", fontSize: 14.5, fontWeight: 500, color: CP.textPrimary }}>
+          <CalendarDays size={15} color={open ? CP.accent : CP.textSecondary} />
+          <span>{cap(dayLabel(data.asOf))}</span>
+          {data.live && <span style={{ fontSize: 12, fontWeight: 500, color: CP.accentGreen }}>· in corso</span>}
+          <ChevronDown size={14} color={CP.textMuted} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+        </button>
+      )} />
       <button aria-label="Giorno dopo" disabled={atToday} onClick={() => !atToday && go(addDays(data.asOf, 1))} style={iconBtn(atToday)}><ChevronRight size={16} /></button>
       {!atToday && <button onClick={() => go(null)} style={{ ...btn(false), padding: "6px 12px", fontSize: 13 }}>Torna a oggi</button>}
       <span style={{ fontSize: 13, color: CP.textMuted }}>
@@ -145,251 +138,450 @@ function DayNav({ data, go }) {
   );
 }
 
-// ─── In cima: venduto, goal, arrivo, mese prima ─────────────────────────────
+// ─── Calendario per scegliere il giorno (30/10/2026) ────────────────────────
+// Nicholas: «anche in web app si possa selezionare un giorno specifico, nel modo più aesthetic
+// possibile» (nel foglio c'è la tendina «Giorno attuale»). Al posto del calendario di sistema: un
+// riquadro con il mese a griglia, ogni giorno con il suo venduto sotto il numero e un puntino verde
+// quando ha preso il target del giorno; frecce per i mesi passati, scorciatoie Oggi / Ieri.
+// Si apre dalla data in alto e dalla casella «Giorno» della testata, come la tendina del foglio.
 
-function Summary({ data }) {
-  const t = data.totals;
-  const items = [
-    { label: "Venduto del mese", value: usd(t.mtd), note: ok(t.goal) ? `${pct(t.pctActual)} del goal · ritmo ideale ${pct(data.idealPct)}` : null, noteColor: ok(t.pctActual) && t.pctActual >= data.idealPct ? CP.accentGreen : CP.textSecondary },
-    { label: "Goal del mese", value: usd(t.goal), note: ok(t.targetDay) ? `${usd(t.targetDay)} al giorno` : "nessun goal messo" },
-    { label: data.daysLeft ? "Arrivo previsto" : "Chiuso a", value: usd(data.daysLeft ? t.projection : t.mtd), note: <StatusText r={t} closed={!data.daysLeft} />, noteColor: CP.textSecondary },
-    { label: "Mese precedente", value: usd(t.prev), note: ok(t.deltaPrev) ? `${t.deltaPrev >= 0 ? "+" : "−"}$${group(t.deltaPrev)}${data.daysLeft ? " nella proiezione" : ""}` : null, noteColor: ok(t.deltaPrev) && t.deltaPrev >= 0 ? CP.accentGreen : CP.textSecondary },
-  ];
-  // Col vetro i quattro numeri stanno dentro il riquadro della quota (Charts), accanto all'arco.
-  if (useInVetro()) return null;
+const WD_SHORT = ["L", "M", "M", "G", "V", "S", "D"];
+const shiftMonth = (m, k) => { const [y, mm] = m.split("-").map(Number); const d = new Date(Date.UTC(y, mm - 1 + k, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+const kShort = (v) => (!ok(v) || !v ? "" : v >= 1e4 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : v >= 1e3 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : `$${Math.round(v)}`);
+
+function DayPicker({ data, go, trigger, block = false }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const [view, setView] = useState(data.month);
+  const ref = useRef(null);
+  const popRef = useRef(null);
+  useEffect(() => { if (open) setView(data.month); }, [open, data.month]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current?.contains(e.target) || popRef.current?.contains(e.target)) return; setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    // fisso sullo schermo (la testata ha overflow nascosto): si ricolloca se la pagina scorre
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = Math.min(360, window.innerWidth - 32);
+      // il riquadro vive in <body> (sopra il vetro, che crea contesti propri): si porta dietro le variabili
+      // di colore del punto in cui si apre, così resta nei colori della pagina
+      const cs = getComputedStyle(ref.current);
+      const vars = {};
+      for (let i = 0; i < cs.length; i++) { const k = cs[i]; if (k.startsWith("--")) vars[k] = cs.getPropertyValue(k); }
+      setPos({ top: r.bottom + 8, left: Math.max(16, Math.min(r.left, window.innerWidth - w - 16)), width: w, vars });
+    };
+    place();
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  const todayMonth = data.today.slice(0, 7);
+  const minMonth = shiftMonth(todayMonth, -24);
+  const [y, m] = view.split("-").map(Number);
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // lunedì = 0
+  const sameMonth = view === data.month;
+  const byDay = sameMonth ? new Map(data.days.map((d) => [d.day, d])) : new Map();
+  const target = sameMonth ? data.totals?.targetDay : null;
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: dim }, (_, i) => i + 1)];
+  const pick = (iso) => { setOpen(false); go(iso); };
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 24 }}>
-      {items.map((x) => (
-        <div key={x.label} style={{ ...card, padding: "12px 14px", minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, color: CP.textSecondary }}>{x.label}</div>
-          <div style={{ fontSize: "clamp(20px, 5vw, 26px)", fontWeight: 500, color: CP.textPrimary, marginTop: 4, ...NUM }}>{x.value}</div>
-          {x.note && <div style={{ fontSize: 12.5, color: x.noteColor || CP.textSecondary, marginTop: 4, ...NUM }}>{x.note}</div>}
-        </div>
-      ))}
+    <div ref={ref} style={{ position: "relative", display: block ? "block" : "inline-block" }}>
+      {trigger({ open, toggle: () => setOpen((v) => !v) })}
+      {open && pos && createPortal(
+        <div ref={popRef} role="dialog" aria-label="Scegli il giorno" style={{
+          ...pos.vars, fontFamily: FONTS.body,
+          position: "fixed", top: pos.top, left: pos.left, zIndex: 1000, width: pos.width,
+          background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 18, padding: 14,
+          boxShadow: "0 18px 50px rgba(20,23,31,.18), 0 2px 8px rgba(20,23,31,.08)", animation: "bilPop .14s ease-out",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button type="button" aria-label="Mese prima" disabled={view <= minMonth} onClick={() => setView(shiftMonth(view, -1))} style={iconBtn(view <= minMonth)}><ChevronLeft size={16} /></button>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{monthLabel(view)}</div>
+            <button type="button" aria-label="Mese dopo" disabled={view >= todayMonth} onClick={() => setView(shiftMonth(view, 1))} style={iconBtn(view >= todayMonth)}><ChevronRight size={16} /></button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {WD_SHORT.map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: i >= 5 ? CP.accent : CP.textMuted, padding: "2px 0 4px" }}>{w}</div>)}
+            {cells.map((d, i) => {
+              if (!d) return <div key={`e${i}`} />;
+              const iso = `${view}-${String(d).padStart(2, "0")}`;
+              const future = iso > data.today;
+              const sel = iso === data.asOf;
+              const isToday = iso === data.today;
+              const info = byDay.get(d);
+              const hit = ok(target) && target > 0 && !info?.partial && (info?.total || 0) >= target;
+              const weekend = (lead + d - 1) % 7 >= 5;
+              return (
+                <button key={iso} type="button" disabled={future} onClick={() => pick(iso)} title={future ? undefined : cap(dayLabel(iso))}
+                  className="bil-day"
+                  style={{
+                    position: "relative", height: 48, borderRadius: 12, cursor: future ? "default" : "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                    border: isToday && !sel ? `1.5px solid ${alpha(CP.accent, "88")}` : "1px solid transparent",
+                    background: sel ? CP.accent : "transparent", color: sel ? "#fff" : future ? alpha(CP.textMuted, "88") : weekend ? CP.accent : CP.textPrimary,
+                  }}>
+                  <span style={{ fontSize: 14, fontWeight: sel || isToday ? 600 : 500, ...NUM }}>{d}</span>
+                  {info && !future && <span style={{ fontSize: 9.5, ...NUM, color: sel ? "rgba(255,255,255,.85)" : CP.textMuted }}>{kShort(info.total)}</span>}
+                  {hit && <span style={{ position: "absolute", top: 5, right: 6, width: 5, height: 5, borderRadius: 999, background: sel ? "#fff" : CP.accentGreen }} />}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${CP.borderSoft}` }}>
+            <button type="button" onClick={() => pick(null)} style={{ ...btn(data.asOf === data.today), padding: "6px 12px", fontSize: 13 }}>Oggi</button>
+            <button type="button" onClick={() => pick(addDays(data.today, -1))} style={{ ...btn(data.asOf === addDays(data.today, -1)), padding: "6px 12px", fontSize: 13 }}>Ieri</button>
+            {sameMonth && ok(target) && <span style={{ marginLeft: "auto", fontSize: 11.5, color: CP.textMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 6, height: 6, borderRadius: 999, background: CP.accentGreen }} />target del giorno preso</span>}
+          </div>
+          <style>{`@keyframes bilPop { from { opacity: 0; transform: translateY(-4px) scale(.98) } to { opacity: 1; transform: none } } .bil-day:not(:disabled):hover { background: ${alpha(CP.accent, "14")} !important; }`}</style>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
 
-// Solo col vetro (26/10/2026, «per ogni pagina capiscine l'utilità»). La domanda del Bilancio è «chi arriva
-// al goal?»: in alto il mese dello split contro il mese prima e il ritmo del goal, accanto l'arco della
-// quota (fatto, dove dovremmo essere oggi, arrivo previsto) con i quattro numeri; sotto un anello per
-// creator, in ordine di classifica (proiezione ÷ goal), come gli obiettivi del reel «Savings & Goals».
-// Un clic sull'anello porta all'ecosistema della creator. Le creator senza goal restano fuori dagli anelli.
-function Charts({ data, mine }) {
-  const inVetro = useInVetro();
-  if (!inVetro) return null;
+// ─── Il foglio (30/10/2026) ──────────────────────────────────────────────────
+// Nicholas: «i bilanci che abbiamo in web app li vorrei vedere molto simili a quelli su Sheets».
+// Stessa pianta del foglio Bilancio_unico_LIVE: in cima giorno, venduto del mese e proiezione; poi
+// tre tabelle affiancate — andamento del mese per paese, la giornata contro il target, il quadro
+// per creator (AM, SM, mese e proiezione). Le creator con più paesi prima, una riga per paese e il
+// loro totale; poi i profili singolo paese; in fondo il totale generale. Colori del foglio tenuti
+// leggeri (intestazioni per paese, totali in giallo, verde quando il target del giorno è preso);
+// niente rosso per chi è indietro, come prima: si legge quanto serve al giorno.
+
+const SH = { blue: "#4a7fd4", green: "#3f9b5a", grey: "#8a92a2", amber: "#d9a520", peach: "#e8a76a", navy: "#1f2a44" };
+// 30/10 sera (Nicholas: «mi sembra privo di colori»): le tinte al 15% sul vetro diventavano grigie →
+// i pastelli pieni del foglio (palette standard di Google Sheets), intestazione del quadro blu notte piena.
+// colori del foglio Bilancio_unico_LIVE: col tema chiaro sono quelli del foglio, col tema scuro (vetro notte,
+// 4/11/2026) le stesse tinte velate sul fondo scuro e testo chiaro. Variabili in BIL_CSS.
+const FILL_HEX = { peach: "#fce5cd", blue: "#c9daf8", green: "#d9ead3", grey: "#e6e6e6", yellow: "#fff2cc", yellowStrong: "#ffe599", coral: "#f4cccc", target: "#cfe2f3", hit: "#b6d7a8", navy: "#1f2a44", section: "#e8ebf2", lilac: "#e4dcfb" };
+const FILL = Object.fromEntries(Object.keys(FILL_HEX).map((k) => [k, `var(--bil-${k})`]));
+const BIL_CSS = `:root{${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${v};`).join("")}--bil-ink:#1f2a44;--bil-rule:rgba(31,42,68,.18)}`
+  + `:root:not([data-theme="light"]){${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${k === "navy" ? "#26314f" : `color-mix(in srgb, ${v} ${k === "yellowStrong" || k === "hit" ? 30 : 18}%, transparent)`};`).join("")}--bil-ink:#e8ecf5;--bil-rule:rgba(255,255,255,.12)}`;
+const ECO_DOT = { rosa: "#e58bb5", viola: "#8b6fe0", verde: "#3f9b5a" };
+const COUNTRY_SHORT = { IT: "IT", EN: "ENG", ES: "ESP" };
+const COUNTRY_TINT = { IT: SH.blue, EN: SH.green, ES: SH.grey };
+const COUNTRY_FILL = { IT: FILL.blue, EN: FILL.green, ES: FILL.grey };
+
+/** Le righe come nel foglio: [{ kind:"multi", c, accounts }...], poi [{ kind:"single", c, a }...]. */
+function sheetRows(creators) {
+  const byName = (a, b) => a.name.localeCompare(b.name, "it");
+  const multi = creators.filter((c) => c.accounts.length > 1).sort(byName);
+  const single = creators.filter((c) => c.accounts.length === 1).sort(byName);
+  return { multi, single };
+}
+
+function Sheet({ data, go, mine, editing, onSaved }) {
   const t = data.totals;
-  const cur = data.days.map((d) => d.total || 0);
-  const upto = data.days.filter((d) => !d.future).length;
-  const [y, m] = data.month.split("-").map(Number);
-  const prevDays = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
-  const curName = MONTHS_IT[m - 1], prevName = MONTHS_IT[(m + 10) % 12];
-  const hasGoal = ok(t.goal);
-  const ecoOf = new Map(data.groups.flatMap((g) => g.creators.map((c) => [c.slug, g.id])));
-  const rings = (data.creators || []).filter((c) => ok(c.goal));
-  const noGoal = (data.creators || []).filter((c) => !ok(c.goal)).length;
-  const lines = [
-    ["Venduto", usd(t.mtd), hasGoal ? `di ${usd(t.goal)} di goal` : null],
-    [data.daysLeft ? "Arrivo previsto" : "Chiuso a", usd(data.daysLeft ? t.projection : t.mtd), <StatusText key="s" r={t} closed={!data.daysLeft} />],
-    [data.daysLeft ? "Serve al giorno" : "Al giorno", usd(data.daysLeft ? t.needPerDay : t.perDay), data.daysLeft && ok(t.perDay) ? `oggi ne fa ${usd(t.perDay)}` : null],
-    [cap(prevName), usd(t.prev), ok(t.deltaPrev) ? <span key="d" style={{ color: t.deltaPrev >= 0 ? CP.accentGreen : CP.textMuted }}>{t.deltaPrev >= 0 ? "+" : "−"}${group(t.deltaPrev)}{data.daysLeft ? " nella proiezione" : ""}</span> : null],
-  ];
+  const { multi, single } = useMemo(() => sheetRows(data.creators), [data]);
   return (
     <>
-      <div className="vt-row21" style={{ marginBottom: 16 }}>
-        <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{cap(curName)} di tutto lo split</div>
-            <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno{data.live ? ", oggi in corso" : ""}</div>
-          </div>
-          <MonthArea cur={cur} prev={data.prevDaily || []} days={data.daysInMonth} prevDays={prevDays} upto={upto}
-            goal={hasGoal ? t.goal : null} curLabel={cap(curName)} prevLabel={cap(prevName)} />
-        </section>
-        <section className="vt-glass" data-lvl={t.status === "arriva" ? 0 : undefined} style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0, display: "grid", gap: 12, alignContent: "start" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Il goal dello split</div>
-          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-            {hasGoal && <Gauge value={t.pctActual} mark={data.daysLeft ? data.idealPct : null} proj={data.daysLeft ? t.reach : null} good={t.status === "arriva"}
-              centerSub={`del goal di ${curName}`} label={`Goal dello split a ${curName}`} />}
-            <div style={{ display: "grid", gap: 10, flex: "1 1 150px", minWidth: 0 }}>
-              {lines.map(([k, v, sub]) => (
-                <div key={k} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: CP.textMuted }}>{k}</div>
-                  <div style={{ fontSize: 19, fontWeight: 600, color: CP.textPrimary, ...NUM }}><VetroNum value={v} /></div>
-                  {sub && <div style={{ fontSize: 12, color: CP.textSecondary, ...NUM }}>{sub}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-          {hasGoal && <GaugeKey proj={Boolean(data.daysLeft)} mark={Boolean(data.daysLeft)} good={t.status === "arriva"} />}
-        </section>
+      <div className="vt-glass" style={{ ...card, overflow: "hidden", marginBottom: 18 }}>
+        <div style={{ background: SH.navy, color: "#fff", padding: "12px 18px", fontSize: 16, fontWeight: 600, letterSpacing: 0.2 }}>
+          Bilancio creator · {monthLabel(data.month)} <span style={{ fontWeight: 400, opacity: 0.75 }}>· dati live dal warehouse</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+          <DayPicker block data={data} go={go} trigger={({ open, toggle }) => (
+            <button type="button" onClick={toggle} aria-expanded={open} aria-label="Scegli il giorno" title="Scegli il giorno"
+              style={{ all: "unset", display: "block", width: "100%", height: "100%", boxSizing: "border-box", cursor: "pointer" }}>
+              <HeadCell fill={FILL.yellow} label={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Giorno <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} /></span>}
+                value={`${Number(data.asOf.slice(8))} di ${data.daysInMonth}`} note={data.live ? "in corso" : data.daysLeft ? "a fine giornata" : "mese chiuso"} />
+            </button>
+          )} />
+          <HeadCell fill={FILL.blue} label="Revenue mese ad oggi" value={usd(t.mtd)} note={ok(t.goal) ? `${pct(t.pctActual)} del goal · ideale ${pct(data.idealPct)}` : null} />
+          <HeadCell fill={FILL.green} label={data.daysLeft ? "Proiezione fine mese" : "Chiuso a"} value={usd(data.daysLeft ? t.projection : t.mtd)} note={<StatusText r={t} closed={!data.daysLeft} />} />
+          <HeadCell label="Goal del mese" value={usd(t.goal)} note={ok(t.targetDay) ? `${usd(t.targetDay)} al giorno` : "nessun goal messo"} />
+          <HeadCell label="Mese precedente" value={usd(t.prev)} note={ok(t.deltaPrev) ? <span style={{ color: t.deltaPrev >= 0 ? CP.accentGreen : CP.textSecondary }}>{t.deltaPrev >= 0 ? "+" : "−"}${group(t.deltaPrev)}{data.daysLeft ? " nella proiezione" : ""}</span> : null} last />
+        </div>
       </div>
-      {rings.length > 0 && (
-        <section style={{ marginBottom: 22 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "0 2px 10px" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Chi arriva al goal</div>
-            <div style={{ fontSize: 12.5, color: CP.textMuted }}>in ordine di arrivo previsto sul proprio goal{noGoal ? ` · ${noGoal} senza goal, in fondo alla pagina` : ""}</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
-            {rings.map((c, i) => (
-              <GoalRing key={c.slug} i={Math.min(i, 8)} pct={c.pctActual} mark={data.daysLeft ? data.idealPct : null}
-                tone={c.status === "arriva" ? "good" : c.status === "vicina" ? "near" : null}
-                title={<>{c.rank ? <span style={{ color: CP.textMuted, fontWeight: 400 }}>{c.rank}° </span> : null}{c.name}</>}
-                sub={`${usdShort(c.mtd)} di ${usdShort(c.goal)}`} href={ecoOf.has(c.slug) ? `#eco-${ecoOf.get(c.slug)}` : undefined}
-                highlight={mine.has(c.slug)} badge={<RingBadge r={c} closed={!data.daysLeft} />} />
-            ))}
-          </div>
-        </section>
-      )}
+
+      <div className="bil-grid">
+        <Andamento data={data} go={go} />
+        <Giornata data={data} multi={multi} single={single} />
+        <Quadro data={data} multi={multi} single={single} mine={mine} editing={editing} onSaved={onSaved} />
+        <Ecosistemi data={data} mine={mine} />
+      </div>
+      <style>{`
+        .bil-grid { display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(0, 1fr); }
+        @media (min-width: 1100px) { .bil-grid { grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.9fr); grid-template-areas: "gio qua" "and eco"; } .bil-and { grid-area: and; } .bil-gio { grid-area: gio; } .bil-quadro { grid-area: qua; } .bil-eco { grid-area: eco; } }
+        @media (min-width: 1900px) { .bil-grid { grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.8fr) minmax(0, 1.9fr); grid-template-areas: "and gio qua" "and gio eco"; } }
+      `}</style>
     </>
   );
 }
 
-const usdShort = (v) => (!ok(v) ? "—" : v >= 1e6 ? `$${(v / 1e6).toFixed(1).replace(".", ",")}M` : v >= 1e4 ? `$${Math.round(v / 1e3)}k` : v >= 1e3 ? `$${(v / 1e3).toFixed(1).replace(".", ",")}k` : `$${Math.round(v)}`);
+function HeadCell({ label, value, note, last, fill }) {
+  return (
+    <div style={{ background: fill, padding: "12px 18px", borderRight: last ? "none" : `1px solid ${CP.borderSoft}`, borderTop: `1px solid ${CP.borderSoft}`, minWidth: 0 }}>
+      <div style={{ fontSize: 12, color: CP.textMuted }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color: CP.textPrimary, marginTop: 2, ...NUM }}>{value}</div>
+      {note && <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 2, ...NUM }}>{note}</div>}
+    </div>
+  );
+}
 
-function RingBadge({ r, closed }) {
-  const base = { fontSize: 11.5, fontWeight: 500, padding: "2px 9px", borderRadius: 999, whiteSpace: "nowrap" };
-  if (r.status === "arriva") return <span style={{ ...base, background: alpha(CP.accentGreen, "1f"), color: CP.accentGreen }}>{closed ? "goal raggiunto" : "ci arriva"}</span>;
-  if (closed) return null;
-  if (r.status === "vicina") return <span style={{ ...base, background: alpha(CP.accent, "1f"), color: CP.accent }}>ci è vicina</span>;
-  if (ok(r.perDay) && ok(r.needPerDay)) return <span style={{ ...base, color: CP.textSecondary, fontWeight: 400 }}>+{usdShort(r.needPerDay - r.perDay)} al giorno</span>;
-  return null;
+function Block({ title, color, sub, className, children }) {
+  return (
+    <section className={className} style={{ minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "0 2px 8px", flexWrap: "wrap" }}>
+        <span style={{ width: 5, height: 16, borderRadius: 2, background: color, alignSelf: "center" }} />
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{title}</h2>
+        {sub && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{sub}</span>}
+      </div>
+      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>{children}</div>
+    </section>
+  );
+}
+
+const hd = (fill, align = "right") => ({ ...th, textAlign: align, background: fill, color: fill === FILL.navy ? "#fff" : "var(--bil-ink)", fontWeight: 600, padding: "9px 12px", borderBottom: `1px solid ${fill === FILL.navy ? FILL.navy : "var(--bil-rule)"}` });
+const cell = (extra) => ({ ...td, padding: "7px 12px", textAlign: "right", ...NUM, ...extra });
+const TOTAL_BG = FILL.yellowStrong;
+const SUBTOTAL_BG = FILL.yellow;
+
+function Tag({ country }) {
+  return <span style={{ fontSize: 10.5, fontWeight: 600, padding: "1px 5px", borderRadius: 4, marginLeft: 6, color: "#fff", background: COUNTRY_TINT[country] || CP.textMuted }}>{COUNTRY_SHORT[country] || country}</span>;
+}
+
+function SectionRow({ label, span }) {
+  return (
+    <tr><td colSpan={span} style={{ ...td, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--bil-ink)", background: FILL.section, borderTop: `1px solid ${CP.border}` }}>{label}</td></tr>
+  );
+}
+
+// ─── Andamento del mese (per paese) — clic su un giorno = vai a quel giorno ──
+
+function Andamento({ data, go }) {
+  const cols = data.countries;
+  const tot = { total: 0 };
+  for (const k of cols) tot[k] = 0;
+  for (const d of data.days) if (!d.future) { for (const k of cols) tot[k] += d[k] || 0; tot.total += d.total || 0; }
+  return (
+    <Block className="bil-and" title="Andamento del mese" sub="per paese · tocca un giorno" color={SH.blue}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead><tr>
+          <th style={hd(FILL.peach, "left")}>Giorno</th>
+          {cols.map((k) => <th key={k} style={hd(COUNTRY_FILL[k])}>{COUNTRY_SHORT[k]}</th>)}
+          <th style={hd(FILL.yellowStrong)}>Totale</th>
+        </tr></thead>
+        <tbody>
+          {data.days.map((d) => {
+            const weekend = d.weekday === 0 || d.weekday === 6;
+            const bg = d.selected ? alpha(CP.accent, "18") : null;
+            return (
+              <tr key={d.date} onClick={() => !d.future && go(d.date)} style={{ cursor: d.future ? "default" : "pointer", background: bg }}>
+                <td style={cell({ textAlign: "left", color: d.future ? CP.textMuted : weekend ? CP.accent : CP.textPrimary, fontWeight: d.selected ? 600 : 400 })}>
+                  {cap(WEEKDAYS[d.weekday]).slice(0, 3)} {d.day}{d.partial && <span style={{ color: CP.textMuted, fontSize: 11.5 }}> · in corso</span>}
+                </td>
+                {cols.map((k) => <td key={k} style={cell({ color: CP.textSecondary })}>{d.future ? "" : d[k] ? usd(d[k]) : "–"}</td>)}
+                <td style={cell({ fontWeight: 500 })}>{d.future ? "" : usd(d.total)}</td>
+              </tr>
+            );
+          })}
+          <tr style={{ background: TOTAL_BG }}>
+            <td style={cell({ textAlign: "left", fontWeight: 600 })}>Totale</td>
+            {cols.map((k) => <td key={k} style={cell({ fontWeight: 600 })}>{usd(tot[k])}</td>)}
+            <td style={cell({ fontWeight: 600 })}>{usd(tot.total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </Block>
+  );
+}
+
+// ─── La giornata: entrate contro target ──────────────────────────────────────
+
+function Giornata({ data, multi, single }) {
+  const t = data.totals;
+  return <GiornataBody data={data} t={t} multi={multi} single={single} Row={GRow} />;
+}
+
+const hit = (r) => ok(r.targetDay) && r.targetDay > 0 && r.day >= r.targetDay;
+function GRow({ name, r, strong, bg }) {
+  return (
+    <tr style={{ background: bg }}>
+      <td style={cell({ textAlign: "left", fontWeight: strong ? 600 : 400 })}>{name}</td>
+      <td style={cell({ fontWeight: strong ? 600 : 500, background: hit(r) ? FILL.hit : undefined })}>{usd(r.day)}</td>
+      <td style={cell({ color: CP.textSecondary, fontWeight: strong ? 600 : 400 })}>{usd(r.targetDay)}</td>
+    </tr>
+  );
+}
+
+function GiornataBody({ data, t, multi, single, Row }) {
+  return (
+    <Block className="bil-gio" title={data.live ? "La giornata (oggi)" : "La giornata"} sub={dayLabel(data.asOf)} color={SH.green}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead><tr>
+          <th style={hd(FILL.green, "left")}>Creator</th>
+          <th style={hd(FILL.coral)}>{data.live ? "Entrate oggi" : "Entrate"}</th>
+          <th style={hd(FILL.target)}>{data.live ? "Target oggi" : "Target"}</th>
+        </tr></thead>
+        <tbody>
+          {multi.map((c) => (
+            <Fragment key={c.slug}>
+              {c.accounts.map((a) => <Row key={a.country} name={<>{c.name}<Tag country={a.country} /></>} r={a} />)}
+              <Row name={`${c.name} totale`} r={c} strong bg={SUBTOTAL_BG} />
+            </Fragment>
+          ))}
+          {single.length > 0 && <SectionRow label="Profili singolo paese" span={3} />}
+          {single.map((c) => <Row key={c.slug} name={<>{c.name}<Tag country={c.accounts[0].country} /></>} r={c.accounts[0]} />)}
+          <Row name="Totale generale" r={t} strong bg={TOTAL_BG} />
+        </tbody>
+      </table>
+      <div style={{ fontSize: 12, color: CP.textMuted, padding: "8px 12px 10px" }}>
+        {data.live ? "Oggi cresce fino a mezzanotte (ora UTC, come nel foglio). " : ""}Verde = target del giorno preso.
+      </div>
+    </Block>
+  );
+}
+
+// ─── Quadro per creator: mese + proiezione ───────────────────────────────────
+
+function Quadro({ data, multi, single, mine, editing, onSaved }) {
+  const open = data.daysLeft > 0;
+  const span = open ? 11 : 8;
+  const ctx = { data, open, editing, onSaved };
+  return <QuadroBody data={data} open={open} span={span} multi={multi} single={single} mine={mine} ctx={ctx} />;
+}
+
+function QRow({ name, r, acc, slug, strong, bg, rank, isMine, data, open, editing, onSaved }) {
+    const rowBg = isMine ? alpha(CP.accent, "12") : bg;
+    return (
+      <tr style={{ background: rowBg }}>
+        <td style={cell({ textAlign: "center", color: CP.textMuted, width: 36 })}>{rank ? `${rank}°` : ""}</td>
+        <td style={cell({ textAlign: "left", fontWeight: strong ? 600 : 400, ...stick(false, rowBg) })}>
+          {name}{isMine && <span style={{ fontSize: 11, color: CP.accent, fontWeight: 500, marginLeft: 6 }}>la tua</span>}
+        </td>
+        <td style={cell({ textAlign: "left", color: CP.textSecondary })}>{acc ? (editing ? <EditCell value={acc.am} placeholder="AM" save={(v) => put({ creator: slug, country: acc.country, am: v }, onSaved)} /> : acc.am || "") : ""}</td>
+        <td style={cell({ textAlign: "left", color: CP.textSecondary })}>{acc ? (editing ? <EditCell value={acc.sm} placeholder="SM" save={(v) => put({ creator: slug, country: acc.country, sm: v }, onSaved)} /> : acc.sm || "") : ""}</td>
+        <td style={cell({ fontWeight: strong ? 600 : 500 })}>{usd(r.mtd)}</td>
+        <td style={cell({ color: CP.textSecondary, fontWeight: strong ? 600 : 400 })}>
+          {acc && editing ? <EditCell value={r.goal} numeric save={(v) => put({ creator: slug, country: acc.country, date: data.asOf, goal: v === "" ? null : Number(v) }, onSaved)} /> : usd(r.goal)}
+        </td>
+        <td style={cell({ color: pctColor(r, data.idealPct), fontWeight: strong ? 600 : 400 })}>{pct(r.pctActual)}</td>
+        {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}>{usd(r.projection)}</td>}
+        {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}><Mancano r={r} daysLeft={data.daysLeft} /></td>}
+        {open && <td style={cell({ fontWeight: strong ? 600 : 400 })}><Gap r={r} /></td>}
+        <td style={cell({ color: CP.textMuted })}>{usd(r.prev)}</td>
+      </tr>
+    );
+}
+
+function QuadroBody({ data, open, span, multi, single, mine, ctx }) {
+  const Row = QRow;
+  // 30/10 sera (Nicholas): la posizione è il VENDUTO del mese, per singolo paese — ogni pagina (Fishball IT,
+  // Fishball ENG…) ha il suo posto; i totali per creator non ne hanno. Prima era l'arrivo sul proprio goal.
+  const pos = new Map(
+    data.creators.flatMap((c) => c.accounts).filter((a) => ok(a.mtd) && a.mtd > 0)
+      .sort((a, b) => b.mtd - a.mtd).map((a, i) => [a.creator_id, i + 1]),
+  );
+  return (
+    <Block className="bil-quadro" title="Quadro per creator" sub="mese + proiezione · posizione = venduto del mese, per paese" color={SH.navy}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 860 }}>
+        <thead><tr>
+          <th style={hd(FILL.navy, "center")} title="Classifica per venduto del mese, ogni paese per conto suo">Pos.</th>
+          <th style={{ ...hd(FILL.navy, "left"), ...stick(false, FILL.navy) }}>Creator</th>
+          <th style={hd(FILL.navy, "left")}>AM</th>
+          <th style={hd(FILL.navy, "left")}>SM</th>
+          <th style={hd(FILL.navy)}>Revenue attuale</th>
+          <th style={hd(FILL.navy)}>Goal</th>
+          <th style={hd(FILL.navy)} title={`ritmo ideale ${pct(data.idealPct)}`}>% goal</th>
+          {open && <th style={hd(FILL.navy)}>Proiezione</th>}
+          {open && <th style={hd(FILL.navy)} title="quanto manca al goal da qui a fine mese">Mancano</th>}
+          {open && <th style={hd(FILL.navy)} title="a questo ritmo, quanto sopra o sotto il goal finisce il mese">Gap a fine mese</th>}
+          <th style={hd(FILL.navy)}>Mese prima</th>
+        </tr></thead>
+        <tbody>
+          {multi.map((c) => (
+            <Fragment key={c.slug}>
+              {c.accounts.map((a) => <Row {...ctx} key={a.country} name={<>{c.name}<Tag country={a.country} /></>} r={a} acc={a} slug={c.slug} rank={pos.get(a.creator_id)} isMine={mine.has(c.slug)} />)}
+              <Row {...ctx} name={`${c.name} totale`} r={c} strong bg={SUBTOTAL_BG} isMine={mine.has(c.slug)} />
+            </Fragment>
+          ))}
+          {single.length > 0 && <SectionRow label="Profili singolo paese" span={span} />}
+          {single.map((c) => <Row {...ctx} key={c.slug} name={<>{c.name}<Tag country={c.accounts[0].country} /></>} r={c} acc={c.accounts[0]} slug={c.slug} rank={pos.get(c.accounts[0].creator_id)} isMine={mine.has(c.slug)} />)}
+          <Row {...ctx} name="Totale generale" r={data.totals} strong bg={TOTAL_BG} />
+        </tbody>
+      </table>
+      <div style={{ fontSize: 12, color: CP.textMuted, padding: "8px 12px 10px" }}>
+        % goal verde = pari o sopra il ritmo ideale ({pct(data.idealPct)}).{open ? " Mancano = goal meno venduto (passa il mouse per quanto serve al giorno). Gap = proiezione meno goal." : ""}
+      </div>
+    </Block>
+  );
+}
+
+// ─── Ecosistemi: il totale di squadra contro la somma dei goal ───────────────
+
+function Ecosistemi({ data, mine }) {
+  const open = data.daysLeft > 0;
+  const groups = data.groups.filter((g) => !g.other || data.groups.length > 1);
+  if (!groups.length) return null;
+  return (
+    <Block className="bil-eco" title="Ecosistemi" sub="gruppi di creator che condividono le persone · in ordine di arrivo sul goal" color={CP.accent}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
+          <thead><tr>
+            <th style={hd(FILL.lilac, "center")}>Pos.</th>
+            <th style={hd(FILL.lilac, "left")}>Ecosistema</th>
+            <th style={hd(FILL.lilac)}>Revenue attuale</th>
+            <th style={hd(FILL.lilac)}>Goal</th>
+            <th style={hd(FILL.lilac)}>% goal</th>
+            {open && <th style={hd(FILL.lilac)}>Proiezione</th>}
+            {open && <th style={hd(FILL.lilac)}>Mancano</th>}
+            {open && <th style={hd(FILL.lilac)}>Gap a fine mese</th>}
+          </tr></thead>
+          <tbody>
+            {groups.map((g) => (
+              <tr key={g.id} style={{ background: g.creators.some((c) => mine.has(c.slug)) ? alpha(CP.accent, "12") : null }}>
+                <td style={cell({ textAlign: "center", color: CP.textMuted, width: 36 })}>{g.rank ? `${g.rank}°` : ""}</td>
+                <td style={cell({ textAlign: "left", whiteSpace: "normal" })}>
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{ECO_DOT[g.id] && <span style={{ width: 10, height: 10, borderRadius: 999, background: ECO_DOT[g.id] }} />}{g.name}</div>
+                  <div style={{ fontSize: 12, color: CP.textMuted }}>{g.creators.map((c) => c.name).join(" · ")}</div>
+                </td>
+                <td style={cell({ fontWeight: 500 })}>{usd(g.mtd)}</td>
+                <td style={cell({ color: CP.textSecondary })}>{usd(g.goal)}</td>
+                <td style={cell({ color: pctColor(g, data.idealPct) })}>{pct(g.pctActual)}</td>
+                {open && <td style={cell()}>{usd(g.projection)}</td>}
+                {open && <td style={cell()}><Mancano r={g} daysLeft={data.daysLeft} /></td>}
+                {open && <td style={cell()}><Gap r={g} /></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+    </Block>
+  );
+}
+
+// 30/10 sera (Nicholas: «serve al giorno non è stimolante»): a fine mese diventava un numero enorme e
+// irreale ($78.555 al giorno con 2 giorni). Al suo posto due numeri che si leggono subito: quanto MANCA al
+// goal (scende ogni giorno, si vede il traguardo avvicinarsi) e il GAP previsto a fine mese (dove finisce a
+// questo ritmo). Il «serve al giorno» resta nel tooltip. Sotto il goal: grigio col segno, mai rosso.
+function Mancano({ r, daysLeft }) {
+  if (!ok(r.goal) || !r.goal) return <span style={{ color: CP.textMuted }}>—</span>;
+  const rem = r.goal - (r.mtd || 0);
+  if (rem <= 0) return <span style={{ color: CP.accentGreen, fontWeight: 600 }}>goal preso</span>;
+  return <span title={daysLeft > 0 ? `servono ${usd(rem / daysLeft)} al giorno nei ${daysLeft} giorni che restano` : undefined}>{usd(rem)}</span>;
+}
+
+function Gap({ r }) {
+  if (!ok(r.gap)) return <span style={{ color: CP.textMuted }}>—</span>;
+  if (r.gap >= 0) return <span style={{ color: CP.accentGreen, fontWeight: 600 }}>+{usd(r.gap)}</span>;
+  return <span style={{ color: CP.textSecondary }}>{usd(r.gap)}</span>;
 }
 
 function StatusText({ r, closed }) {
   if (closed) return r.status === "arriva" ? <span style={{ color: CP.accentGreen }}>goal raggiunto</span> : ok(r.pctActual) ? <span>{pct(r.pctActual)} del goal</span> : null;
   if (r.status === "arriva") return <span style={{ color: CP.accentGreen }}>arriva al goal</span>;
   if (r.status === "vicina") return <span style={{ color: CP.accent }}>è vicino al goal</span>;
-  if (r.status === "sotto") return <span>servono {usd(r.needPerDay)} al giorno</span>;
+  if (r.status === "sotto" && ok(r.goal) && ok(r.gap)) return <span>mancano {usd(r.goal - r.mtd)} al goal</span>;
   return null;
-}
-
-function Pill({ r }) {
-  const base = { display: "inline-block", fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap" };
-  if (r.status === "arriva") return <span style={{ ...base, background: alpha(CP.accentGreen, "1f"), color: CP.accentGreen }}>ci arriva</span>;
-  if (r.status === "vicina") return <span style={{ ...base, background: alpha(CP.accent, "1f"), color: CP.accent }}>ci è vicina</span>;
-  if (r.status === "sotto" && ok(r.perDay) && ok(r.needPerDay)) return <span style={{ ...base, padding: "3px 0", color: CP.textSecondary, fontWeight: 400 }}>+{usd(r.needPerDay - r.perDay)} al giorno</span>;
-  return null;
-}
-
-// ─── Un ecosistema: totale di squadra + le sue creator ──────────────────────
-
-function Ecosystem({ g, data, mine, editing, onSaved }) {
-  const pctOfGoal = ok(g.pctActual) ? Math.min(1, g.pctActual) : null;
-  // Una creator da sola: il titolo È la sua riga → niente tabella che ripete gli stessi numeri
-  // (restano le righe per paese se ha più account, e la tabella intera in modifica).
-  const solo = g.creators.length === 1 ? g.creators[0] : null;
-  const showTable = editing || !solo || solo.accounts.length > 1;
-  const soloLine = solo ? [[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ") && `SM ${[...new Set(solo.accounts.map((a) => a.sm).filter(Boolean))].join(" · ")}`, [...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ") && `AM ${[...new Set(solo.accounts.map((a) => a.am).filter(Boolean))].join(" · ")}`].filter(Boolean).join(" · ") : null;
-  const isMine = solo ? mine.has(solo.slug) : false;
-  return (
-    <section id={`eco-${g.id}`} className="vt-glass" data-lvl={g.status === "arriva" ? 0 : undefined} style={{ ...card, overflow: "hidden", scrollMarginTop: 80, ...(isMine ? { borderColor: alpha(CP.accent, "66") } : null) }}>
-      <header style={{ padding: "16px 18px 14px", display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            {g.rank && <span style={{ fontSize: 13, fontWeight: 500, color: CP.textMuted, ...NUM }}>{g.rank}°</span>}
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500, color: CP.textPrimary }}>{g.name}</h2>
-            {isMine && <span style={{ fontSize: 11.5, color: CP.accent, fontWeight: 500 }}>la tua</span>}
-          </div>
-          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 3 }}>{solo ? (soloLine || (solo.name !== g.name ? solo.name : "")) : g.creators.map((c) => c.name).join(" · ")}</div>
-        </div>
-        {ok(g.goal) && (
-          <div style={{ display: "flex", gap: 22, alignItems: "flex-end", flexWrap: "wrap" }}>
-            <Stat label="venduto" value={usd(g.mtd)} sub={`di ${usd(g.goal)}`} />
-            <Stat label="% goal" value={pct(g.pctActual)} color={pctColor(g, data.idealPct)} />
-            {data.daysLeft > 0 && <Stat label="fa · serve al giorno" value={`${usd(g.perDay)} · ${usd(g.needPerDay)}`} />}
-            <div style={{ paddingBottom: 3 }}><Pill r={g} /></div>
-          </div>
-        )}
-      </header>
-      {ok(g.goal) && (
-        <div style={{ position: "relative", height: 6, margin: "0 18px 14px", borderRadius: 999, background: alpha(CP.textPrimary, "0f") }}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(pctOfGoal || 0) * 100}%`, borderRadius: 999, background: g.status === "arriva" ? CP.accentGreen : CP.accent }} />
-          {data.daysLeft > 0 && <div title={`ritmo ideale: ${pct(data.idealPct)}`} style={{ position: "absolute", left: `${data.idealPct * 100}%`, top: -4, bottom: -4, width: 2, borderRadius: 1, background: CP.textSecondary }} />}
-        </div>
-      )}
-      {showTable && <div style={{ overflowX: "auto", borderTop: `1px solid ${CP.borderSoft}` }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 760 }}>
-          <thead>
-            <tr>
-              <th style={{ ...th, textAlign: "left", ...stick(false) }}>Creator</th>
-              <th style={th}>Venduto</th>
-              <th style={th}>Goal</th>
-              <th style={th}>% goal</th>
-              {data.daysLeft > 0 && <th style={th} title="media al giorno sui giorni finiti">Fa al giorno</th>}
-              {data.daysLeft > 0 && <th style={th} title="quanto al giorno da qui a fine mese per arrivare al goal">Serve al giorno</th>}
-              <th style={{ ...th, textAlign: "left", width: 150 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {g.creators.map((c) => <CreatorRows key={c.slug} c={c} data={data} mine={mine.has(c.slug)} editing={editing} onSaved={onSaved} hideMain={Boolean(solo) && !editing} />)}
-          </tbody>
-        </table>
-      </div>}
-    </section>
-  );
-}
-
-function Stat({ label, value, sub, color }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 11.5, color: CP.textMuted }}>{label}</div>
-      <div style={{ fontSize: 17, fontWeight: 500, color: color || CP.textPrimary, ...NUM, whiteSpace: "nowrap" }}>{value}{sub && <span style={{ fontSize: 12.5, fontWeight: 400, color: CP.textMuted }}> {sub}</span>}</div>
-    </div>
-  );
-}
-
-function CreatorRows({ c, data, mine, editing, onSaved, hideMain }) {
-  const multi = c.accounts.length > 1;
-  const single = !multi ? c.accounts[0] : null;
-  const smList = [...new Set(c.accounts.map((a) => a.sm).filter(Boolean))].join(" · ");
-  const rowBg = mine ? alpha(CP.accent, "12") : null;
-  return (
-    <>
-      {!hideMain && <tr style={{ background: rowBg }}>
-        <td style={{ ...td, ...stick(false, rowBg) }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontWeight: 500, color: CP.textPrimary }}>{c.name}</span>
-            {mine && <span style={{ fontSize: 11, color: CP.accent, fontWeight: 500 }}>la tua</span>}
-          </div>
-          {!editing && (smList || single?.am) && <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 1 }}>{[smList && `SM ${smList}`, single?.am && `AM ${single.am}`].filter(Boolean).join(" · ")}</div>}
-          {editing && single && <People a={single} slug={c.slug} onSaved={onSaved} />}
-        </td>
-        <Nums r={c} data={data} strong goalEdit={single && editing ? { slug: c.slug, country: single.country, onSaved } : null} />
-      </tr>}
-      {multi && c.accounts.map((a) => (
-        <tr key={a.country} style={{ background: rowBg }}>
-          <td style={{ ...sub, paddingLeft: 28, ...stick(true, rowBg) }}>
-            {COUNTRY_LONG[a.country] || a.country}
-            {editing && <People a={a} slug={c.slug} onSaved={onSaved} />}
-          </td>
-          <Nums r={a} data={data} isSub showPill={hideMain} goalEdit={editing ? { slug: c.slug, country: a.country, onSaved } : null} />
-        </tr>
-      ))}
-    </>
-  );
-}
-
-function Nums({ r, data, strong, isSub, goalEdit, showPill }) {
-  const base = { ...(isSub ? sub : td), textAlign: "right", ...NUM, ...(strong ? { fontWeight: 500 } : null) };
-  return (
-    <>
-      <td style={base}>{usd(r.mtd)}</td>
-      <td style={{ ...base, color: CP.textSecondary }}>{goalEdit ? <EditCell value={r.goal} numeric save={(v) => put({ creator: goalEdit.slug, country: goalEdit.country, date: data.asOf, goal: v === "" ? null : Number(v) }, goalEdit.onSaved)} /> : usd(r.goal)}</td>
-      <td style={{ ...base, color: pctColor(r, data.idealPct) }}>{pct(r.pctActual)}</td>
-      {data.daysLeft > 0 && <td style={base}>{usd(r.perDay)}</td>}
-      {data.daysLeft > 0 && <td style={{ ...base, color: CP.textSecondary }}>{r.status === "arriva" ? "—" : usd(r.needPerDay)}</td>}
-      <td style={{ ...(isSub ? sub : td), paddingLeft: 16 }}>{(!isSub || showPill) && <Pill r={r} />}</td>
-    </>
-  );
-}
-
-function People({ a, slug, onSaved }) {
-  return (
-    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-      <EditCell value={a.sm} placeholder="SM" save={(v) => put({ creator: slug, country: a.country, sm: v }, onSaved)} />
-      <EditCell value={a.am} placeholder="AM" save={(v) => put({ creator: slug, country: a.country, am: v }, onSaved)} />
-    </div>
-  );
 }
 
 async function put(body, onSaved) {
@@ -486,91 +678,6 @@ function GroupEditor({ data, onSaved }) {
   );
 }
 
-// ─── La giornata scelta ──────────────────────────────────────────────────────
-
-function TheDay({ data }) {
-  const rows = data.creators.flatMap((c) => (c.accounts.length > 1 ? c.accounts.map((a) => ({ name: `${c.name} ${a.country}`, ...a })) : [{ name: c.name, ...c.accounts[0] }]));
-  rows.sort((a, b) => (b.day || 0) - (a.day || 0));
-  const t = data.totals;
-  const prevLabel = data.prevDayDate ? dayLabel(data.prevDayDate).split(" ").slice(0, 2).join(" ") : null;
-  return (
-    <section style={{ minWidth: 0 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 10px", color: CP.textPrimary }}>
-        La giornata <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 13.5 }}>{dayLabel(data.asOf)}{data.live ? " · in corso" : ""}</span>
-      </h2>
-      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-          <thead><tr>
-            <th style={{ ...th, textAlign: "left" }}>Creator</th>
-            {prevLabel && <th style={th}>{prevLabel}</th>}
-            <th style={th}>Entrate</th>
-            <th style={th}>Target</th>
-          </tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.creator_id}>
-                <td style={td}>{r.name}</td>
-                {prevLabel && <td style={{ ...td, textAlign: "right", ...NUM, color: ok(r.targetDay) && r.prevDay >= r.targetDay ? CP.accentGreen : CP.textSecondary }}>{usd(r.prevDay)}</td>}
-                <td style={{ ...td, textAlign: "right", ...NUM, fontWeight: 500, color: ok(r.targetDay) && r.day >= r.targetDay ? CP.accentGreen : CP.textPrimary }}>{usd(r.day)}</td>
-                <td style={{ ...td, textAlign: "right", ...NUM, color: CP.textMuted }}>{usd(r.targetDay)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td style={{ ...td, fontWeight: 500, borderTop: `1px solid ${CP.borderStrong}` }}>Totale</td>
-              {prevLabel && <td style={{ ...td, fontWeight: 500, textAlign: "right", ...NUM, borderTop: `1px solid ${CP.borderStrong}` }}>{usd(t.prevDay)}</td>}
-              <td style={{ ...td, fontWeight: 500, textAlign: "right", ...NUM, borderTop: `1px solid ${CP.borderStrong}` }}>{usd(t.day)}</td>
-              <td style={{ ...td, fontWeight: 500, textAlign: "right", ...NUM, borderTop: `1px solid ${CP.borderStrong}` }}>{usd(t.targetDay)}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={{ fontSize: 12, color: CP.textMuted, padding: "8px 14px 12px" }}>
-          {data.live ? "Oggi è in corso e cresce fino a mezzanotte (ora UTC, come nel foglio). " : ""}Verde = target del giorno raggiunto.
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Andamento del mese (clic su un giorno = vai a quel giorno) ─────────────
-
-function Days({ data, go }) {
-  const cols = data.countries;
-  const days = data.days.filter((d) => !d.future);
-  return (
-    <section style={{ minWidth: 0 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 10px", color: CP.textPrimary }}>
-        Andamento di {monthLabel(data.month).toLowerCase()} <span style={{ color: CP.textMuted, fontWeight: 400, fontSize: 13.5 }}>tocca un giorno per aprirlo</span>
-      </h2>
-      <div className="vt-glass" style={{ ...card, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-          <thead>
-            <tr>
-              <th style={{ ...th, textAlign: "left" }}>Giorno</th>
-              {cols.map((k) => <th key={k} style={th}>{k}</th>)}
-              <th style={th}>Totale</th>
-            </tr>
-          </thead>
-          <tbody>
-            {days.map((d) => {
-              const weekend = d.weekday === 0 || d.weekday === 6;
-              const bg = d.selected ? alpha(CP.accent, "14") : null;
-              return (
-                <tr key={d.date} onClick={() => go(d.date)} style={{ cursor: "pointer", background: bg }}>
-                  <td style={{ ...td, color: weekend ? CP.gold : CP.textPrimary, fontWeight: d.selected ? 500 : 400 }}>
-                    {WEEKDAYS[d.weekday]} {d.day}{d.partial && <span style={{ color: CP.textMuted, fontSize: 12, fontWeight: 400 }}> · in corso</span>}
-                  </td>
-                  {cols.map((k) => <td key={k} style={{ ...td, textAlign: "right", ...NUM, color: CP.textSecondary }}>{d[k] ? usd(d[k]) : "–"}</td>)}
-                  <td style={{ ...td, textAlign: "right", ...NUM, fontWeight: 500 }}>{usd(d.total)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
 // ─── Come si legge ───────────────────────────────────────────────────────────
 
 function Explain({ data }) {
@@ -580,7 +687,7 @@ function Explain({ data }) {
       <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
         <li><b>Venduto</b>: il netto delle vendite dal warehouse, per giorno (ora UTC), fino al giorno scelto. Sono gli stessi numeri dei fogli-creator.</li>
         <li><b>% goal</b>: venduto diviso goal. È verde quando è pari o sopra il ritmo ideale ({pct(data.idealPct)}: {data.closedDays} giorni finiti su {data.daysInMonth}).</li>
-        <li><b>Fa al giorno</b>: la media dei giorni finiti. <b>Serve al giorno</b>: quanto manca al goal diviso i giorni che restano.</li>
+        <li><b>Fa al giorno</b>: la media dei giorni finiti. <b>Mancano</b>: goal meno venduto fino a oggi (passandoci sopra: quanto serve al giorno nei giorni che restano). <b>Gap a fine mese</b>: dove arriva la proiezione rispetto al goal — verde se lo supera.</li>
         <li><b>Ci arriva</b>: a questo ritmo supera il goal. <b>Ci è vicina</b>: fa almeno il 90% di quello che le serve. Altrimenti si legge quanto le serve in più al giorno.</li>
         <li><b>Ecosistemi</b>: gruppi di creator che condividono le persone. Il totale dell'ecosistema si misura sulla somma dei goal; gli ecosistemi sono in ordine di quanto arrivano vicino al loro goal.</li>
         <li><b>Il giorno</b>: con le frecce o il calendario rivedi com'era la situazione a fine di un giorno passato, anche nei mesi chiusi.</li>

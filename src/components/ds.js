@@ -8,7 +8,7 @@
  */
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, HelpCircle, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { useStyle } from "@/lib/theme-client";
 import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
@@ -170,17 +170,33 @@ export const BTN = { display: "inline-flex", alignItems: "center", justifyConten
 export const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
 export const BTN_PRIMARY_OFF = (disabled) => (disabled ? { ...BTN_PRIMARY, background: CP.surfaceAlt, color: CP.textMuted, border: `1px solid ${CP.border}`, cursor: "not-allowed" } : BTN_PRIMARY);
 
+/**
+ * Aspetto di una scheda, condiviso da Tabs, PageTabs e CompNav (30/10/2026, Nicholas: «questi bottoni si
+ * vedono poco»). Resta una scheda — riga sotto, mai pillola — ma si capisce che è cliccabile: area di
+ * clic con margine, fondo tenue al passaggio (classe .hoc-tab in globals.css), quella aperta in viola
+ * con riga spessa e fondo leggero.
+ */
+export function tabStyle(on, { small = false, P = CP } = {}) {
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, whiteSpace: "nowrap", textDecoration: "none", cursor: "pointer",
+    background: on ? alpha(P.accent, "14") : "transparent", border: "none", borderRadius: "8px 8px 0 0",
+    borderBottom: `3px solid ${on ? P.accent : "transparent"}`, marginBottom: -1,
+    padding: small ? "7px 10px 7px" : "9px 14px 9px", fontSize: small ? 14 : 15, fontWeight: 500,
+    color: on ? P.accentSoftText : P.textSecondary, fontFamily: FONTS.body,
+  };
+}
+export const TABS_BAR = { display: "flex", alignItems: "flex-end", gap: 2, borderBottom: `1px solid ${CP.borderStrong}`, overflowX: "auto", scrollbarWidth: "none" };
+
 /** Schede della pagina o di una sezione: testo con la riga sotto quella aperta. items = [[key, label, badge?], …] */
 export function Tabs({ items, value, onChange, aside, small = false, style }) {
   return (
-    <div role="tablist" className="ds-tabs" style={{ display: "flex", alignItems: "flex-end", gap: small ? 16 : 22, borderBottom: `1px solid ${CP.border}`, margin: "0 0 16px", overflowX: "auto", scrollbarWidth: "none", ...style }}>
+    <div role="tablist" className="ds-tabs" style={{ ...TABS_BAR, margin: "0 0 16px", ...style }}>
       {items.map(([k, label, badge]) => {
         const on = value === k;
         return (
-          <button key={k} type="button" role="tab" aria-selected={on} onClick={() => onChange(k)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", borderBottom: `2px solid ${on ? CP.accent : "transparent"}`, marginBottom: -1, padding: small ? "6px 0 8px" : "8px 0 10px", fontSize: small ? 13.5 : 14.5, fontWeight: on ? 500 : 400, color: on ? CP.textPrimary : CP.textSecondary, cursor: "pointer", whiteSpace: "nowrap", fontFamily: FONTS.body }}>
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={() => onChange(k)} className="hoc-tab" style={tabStyle(on, { small })}>
             {label}
-            {badge != null && badge !== "" && <span style={{ fontSize: 12, color: on ? CP.accentSoftText : CP.textMuted, ...NUM }}>{badge}</span>}
+            {badge != null && badge !== "" && <span style={{ fontSize: 12, fontWeight: 400, color: on ? CP.accentSoftText : CP.textMuted, ...NUM }}>{badge}</span>}
           </button>
         );
       })}
@@ -251,6 +267,28 @@ export function Disclosure({ open, onToggle, title, summary, icon, children }) {
       </button>
       {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
     </section>
+  );
+}
+
+/**
+ * Spiegazione a richiesta (30/10/2026, Nicholas: «tanto scritto, devo scorrere per arrivare ai dati»).
+ * Il «come si legge / come si calcola» non sta più aperto sopra i numeri: un tasto «?» lo apre sotto.
+ * In pagina resta solo la frase che dice cosa si vede.
+ */
+export function Spiega({ label = "Come si legge", children, style }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={style}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", padding: "2px 0", cursor: "pointer", fontSize: 13, color: open ? CP.accentSoftText : CP.textMuted, fontFamily: FONTS.body }}>
+        <HelpCircle size={15} />{label}
+      </button>
+      {open && (
+        <div style={{ ...card, padding: "12px 16px", marginTop: 8, display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, maxWidth: 920 }}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 

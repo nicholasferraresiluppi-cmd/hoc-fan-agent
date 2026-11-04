@@ -13,6 +13,8 @@ import { PageHead, Metric, DataTable, Notice, SectionTitle, card, NUM, BTN_PRIMA
 import { Modal } from "@/components/cp-style";
 import { fmtInt, fmtPct } from "@/lib/format";
 import { confirmDialog } from "@/components/AppDialogs";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, RankBars, GoalRing, Bars } from "@/components/VetroCharts";
 
 const API = "/api/admin/telegram-channels";
 const fetcher = (url) =>
@@ -281,6 +283,39 @@ function PendingRow({ p, channels, onDone }) {
   );
 }
 
+// Vetro (30/10/2026): la domanda è «quali canali portano iscritti, e quanti passano su OnlyFans?».
+// I canali in fila per entrati negli ultimi 30 giorni (un tocco apre il canale), sotto le entrate di
+// tutti i canali giorno per giorno; accanto quanti canali hanno il bot dentro (senza, non si conta
+// niente) e la scheda delle creator ancora senza canale in mappa.
+function TelegramTop({ channels, missing, live, joins30, ofSubs30, onOpen }) {
+  const j30 = (c) => c.stats.days.reduce((a, d) => a + d.joins, 0);
+  const items = channels.map((c) => ({ c, v: j30(c) })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v)
+    .map(({ c, v }) => ({ label: `${c.creators.join(", ")} · ${c.title || c.url.replace("https://t.me/", "")}`, value: v, onClick: () => onOpen(c.id) }));
+  const byDay = {};
+  for (const c of channels) for (const d of c.stats.days) byDay[d.d] = (byDay[d.d] || 0) + d.joins;
+  const days = Object.keys(byDay).sort();
+  const of30 = channels.reduce((a, c) => a + (ofSubs30(c) || 0), 0);
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 16 }}>
+      <Panel i={0} title="Chi porta iscritti" aside="entrati negli ultimi 30 giorni, solo canali col bot · tocca per il canale">
+        {items.length ? <RankBars items={items} format={int} limit={8} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Ancora nessuna entrata registrata: si conta da quando il bot è nel canale.</div>}
+        {days.length > 1 && joins30 > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 6 }}>Entrate al giorno, tutti i canali</div>
+            <Bars data={days.map((d) => byDay[d])} labels={days.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`)} height={110} format={(v) => int(v)} unit=" entrate" />
+          </div>
+        )}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <GoalRing i={1} pct={channels.length ? live / channels.length : 0} tone={channels.length && live === channels.length ? "good" : "near"} size={104}
+          title="Canali col bot dentro" sub={`${int(live)} su ${int(channels.length)} · ${int(joins30)} entrati in 30 giorni${of30 ? ` · ${int(of30)} abbonati OF dai link TG` : ""}`} />
+        <HotTile i={2} lvl={missing.length ? "ink" : "0"} label="Creator senza canale" value={int(missing.length)}
+          sub={missing.length ? `${missing.slice(0, 4).join(", ")}${missing.length > 4 ? ` e altre ${missing.length - 4}` : ""} · le trovi in fondo` : "tutte le creator hanno un canale in mappa"} />
+      </div>
+    </div>
+  );
+}
+
 export default function TelegramChannelsPage() {
   const { data, error, isLoading, mutate } = useSWR(API, fetcher, { revalidateOnFocus: false });
   const [form, setForm] = useState(null); // null | {} nuovo | { preset } | canale
@@ -295,6 +330,7 @@ export default function TelegramChannelsPage() {
   const missing = (data?.creators || []).filter((c) => !withChannel.has(c));
   const live = channels.filter((c) => c.chat_id && c.bot?.status === "admin").length;
   const joins30 = channels.reduce((s, c) => s + c.stats.days.reduce((a, d) => a + d.joins, 0), 0);
+  const inVetro = useInVetro();
 
   const columns = [
     { key: "creator", label: "Creator", render: (r) => r.creators.join(", "), sort: (r) => r.creators.join(", ") },
@@ -334,12 +370,14 @@ export default function TelegramChannelsPage() {
           )}
           {data.all && data.bot?.webhook_error && <Notice danger>Ultimo errore del webhook Telegram: {data.bot.webhook_error}</Notice>}
 
+          {inVetro ? <TelegramTop channels={channels} missing={missing} live={live} joins30={joins30} ofSubs30={ofSubs30} onOpen={setOpenId} /> : (
           <section style={{ ...card, padding: "18px 20px", marginBottom: 16, display: "flex", gap: 32, flexWrap: "wrap" }}>
             <Metric label="Canali in mappa" value={int(channels.length)} />
             <Metric label="Creator senza canale" value={int(missing.length)} note={data.creators.length ? `su ${int(data.creators.length)}` : null} />
             <Metric label="Con il bot dentro" value={int(live)} />
             <Metric label="Entrati negli ultimi 30 giorni" value={int(joins30)} note="solo canali col bot" />
           </section>
+          )}
 
           {data.pending.length > 0 && (
             <section style={{ ...card, padding: "14px 18px", marginBottom: 16 }}>

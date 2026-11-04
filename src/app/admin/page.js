@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
-import {
+import { Headphones,
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, HeartHandshake,
   GraduationCap, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Bot,
@@ -24,7 +24,7 @@ import {
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat, Gift, CalendarDays } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useRouter } from "next/navigation";
@@ -76,6 +76,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/creator-split",         title: "Creator dello split", desc: "Aggiungi o togli una creator: HOC Pro collega da solo pagine OnlyFans, paese e turni, e la creator compare in Revenue e chat, Analisi vendite e S4S", icon: Users },
       { href: "/admin/fan-da-recuperare",     title: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano bene e si sono fermati, con il perché e una bozza di ripresa personale scritta dall'AI dalle loro ultime chat. Segni a chi hai scritto e vedi chi ha ricomprato", icon: HeartHandshake },
       { href: "/admin/analisi-vendite",       title: "Analisi vendite", desc: "Le tue creator in un posto solo: tutte a confronto sugli stessi numeri (lordo, abbonati, reach, click, fan paganti) con una riga di lettura, come vanno e perché (prima chi perde di più, con il perché letto nelle chat), e la scheda di ogni creator", icon: BarChart3 },
+      { href: "/admin/benvenuto",             title: "Benvenuto a pagamento", desc: "Quanto sblocca il benvenuto di ogni pagina, prima e dopo ogni cambio di prezzo. Il prezzo si legge dalle chat; se il benvenuto parte da un altro strumento lo inserisci a mano con la data da cui vale", icon: MailOpen },
       { href: "/admin/looker",                title: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics 3.0 e KPI Sales) con gli stessi nomi, la stessa disposizione e le stesse formule, verificate contro Looker. Solo le tue creator, export CSV", icon: LayoutDashboard },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
@@ -128,9 +129,11 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
-      { href: "/admin/studio-social", title: "Studio social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
+      { href: "/admin/creator-ai", title: "Creator AI", desc: "Studi su Fanvue e mappa delle creator AI italiane con i loro profili. Sezione privata.", icon: Bot },
+      { href: "/admin/studio-social", title: "Regia social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
-      { href: "/admin/warmup", title: "Social", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
+      { href: "/admin/warmup", title: "Clipping", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
+      { href: "/admin/piani", title: "Piani", desc: "I piani di lavoro a fasi (come gli sprint): chi fa cosa e per quando, le voci che si spuntano da sole dai dati, le decisioni con le loro condizioni", icon: ListChecks },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },
@@ -140,6 +143,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
       { href: "/admin/hr",                title: "Persone · Area Partner", desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
+      { href: "/admin/presenze-discord",  title: "Presenze Discord", desc: "Chi è stato nelle stanze vocali del server Discord, quanto e con chi, giornata dalle 5 alle 5; storico per persona e per mansione. Visibile solo a chi ha l'accesso", icon: Headphones },
       { href: "/admin/hr/contratti",      title: "Controllo contratti", desc: "Contratti da Dropbox Sign confrontati con le schede: chi ce l'ha, chi no, chi ha cambiato mansione e serve un contratto nuovo; PDF firmati allegati su ClickUp", icon: FileSignature },
       { href: "/admin/referral",          title: "Porta un amico", desc: "Programma referral: chi ha portato chi, a che punto è ogni persona (colloquio, formazione, primo turno, 3 mesi), premi e percentuali sul venduto Infloww, cosa va pagato", icon: Gift },
       { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },

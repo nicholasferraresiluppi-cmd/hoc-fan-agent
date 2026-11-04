@@ -23,6 +23,7 @@
  *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
  *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
  *   - sempre:            Warm-up: numeri pubblici dei profili IG e X (warmup-metrics, una volta al giorno)
+ *   - sempre:            Trend modelle: reel esplosi dal warehouse + descrizione AI (trend-modelle)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -113,6 +114,8 @@ export async function POST(request) {
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
   // Warm-up (22/10/2026): numeri pubblici dei profili IG e X letti con Apify, una volta al giorno
   out.warmup_metrics = await kickEndpoint(request, "/api/cron/warmup-metrics");
+  // Trend modelle (03/11/2026): reel esplosi dal warehouse (trendfinder + i nostri) e descrizione AI
+  out.trend_modelle = await kickEndpoint(request, "/api/cron/trend-modelle");
   // rilettura delle prime evidenze del Radar (16/10/2026): si porta avanti da sola, qui la si
   // riaccende se la catena si è interrotta (la route non fa niente se il giro non è in corso)
   out.scouting_hlreread = await kickEndpoint(request, "/api/cron/scouting-hlreread");

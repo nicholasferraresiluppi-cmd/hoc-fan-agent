@@ -20,6 +20,8 @@ import { PageHead, Notice, DataTable, SectionTitle, card } from "@/components/ds
 import { FLAG_LABEL, KIND_LABEL, PERSONNEL_KINDS, statusSentence } from "@/lib/hr-contracts-core";
 import { btnPrimary, btnGhost, input, fetcher, postJson, fmtDate, fmtDateTime } from "@/components/hr-ui";
 import { ContractPill, FLAG_TONE, PrepareLink } from "@/components/hr-contracts-ui";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, HotTile } from "@/components/VetroCharts";
 
 const SIX_MONTHS = 183 * 86400e3;
 
@@ -30,6 +32,7 @@ export default function HrContractsPage() {
   const [showAllUnmatched, setShowAllUnmatched] = useState(false);
   const [showOk, setShowOk] = useState(false);
   const v = data?.view;
+  const inVetro = useInVetro();
 
   const groups = useMemo(() => {
     const g = {};
@@ -74,7 +77,7 @@ export default function HrContractsPage() {
   const whatCell = (r) => <span style={{ fontSize: 13, color: CP.textSecondary }}>{statusSentence(r.st, byId, fmtDate)}</span>;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1240, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone", href: "/admin/hr" }, { label: "Contratti" }]}
         title="Controllo contratti"
@@ -96,7 +99,8 @@ export default function HrContractsPage() {
           <p style={{ fontSize: 12.5, color: CP.textMuted, margin: "0 0 12px" }}>
             {Object.keys(v.contracts).length} contratti su Dropbox Sign · aggiornato il {fmtDateTime(v.syncedAt)} · si aggiorna da solo ogni notte · i PDF firmati vengono allegati al task ClickUp della persona
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: 10, marginBottom: 18 }}>
+          {inVetro && <ContractsTop count={count} unmatched={unmatched.length} />}
+          {!inVetro && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: 10, marginBottom: 18 }}>
             {[["cambiata", "da rifare"], ["mancante", "da trovare o fare"], ["risolto", "risolti, ancora in elenco"], ["in_firma", "inviati, non firmati"], ["cambiata_in_firma", "contratto nuovo partito"], ["da_verificare", "da controllare"], ["ok", "a posto"]].map(([f, hint]) => (
               <a key={f} href={`#${{ risolto: "mancante", cambiata_in_firma: "in_firma" }[f] || f}`} style={{ ...card, padding: "12px 14px", textDecoration: "none", display: "block" }}>
                 <div style={{ fontSize: 24, fontWeight: 500, color: count(f) && f !== "ok" ? FLAG_TONE[f][0] : CP.textPrimary }}>{count(f)}</div>
@@ -104,7 +108,7 @@ export default function HrContractsPage() {
                 <div style={{ fontSize: 12, color: CP.textMuted }}>{hint}</div>
               </a>
             ))}
-          </div>
+          </div>}
 
           <Group id="cambiata" title="Mansione cambiata: serve un contratto nuovo" rows={groups.cambiata}
             intro="La mansione scritta nel CRM non è coperta da nessun contratto firmato. O si prepara il contratto nuovo, o la mansione nel CRM è sbagliata e va corretta: in entrambi i casi questa riga sparisce da sola."
@@ -122,7 +126,7 @@ export default function HrContractsPage() {
             intro="Contratto firmato, ma il confronto con la mansione non si può fare: la mansione nel CRM è vuota, oppure il documento non dice la mansione."
             columns={[{ key: "name", label: "Persona", sort: (r) => r.name, render: personCell }, { key: "w", label: "Perché", sortable: false, render: whatCell }]} />
 
-          <section id="senza-scheda" style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
+          <section id="senza-scheda" className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
             <SectionTitle aside={`${unmatched.length}${showAllUnmatched ? "" : ` di ${v.unmatched.length}`}`}>Contratti senza scheda</SectionTitle>
             <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
               Contratti che non si abbinano da soli a nessuna scheda: nome scritto diversamente, omonimi, oppure persone che non hanno ancora compilato il modulo.
@@ -147,7 +151,7 @@ export default function HrContractsPage() {
               ]} />
           </section>
 
-          <section id="ok" style={{ ...card, padding: "14px 16px" }}>
+          <section id="ok" className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "14px 16px" }}>
             <SectionTitle aside={String(count("ok") + count("non_richiesto"))}>A posto</SectionTitle>
             <button type="button" onClick={() => setShowOk(!showOk)} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 13 }}>{showOk ? "Nascondi" : "Mostra chi ha il contratto firmato e coerente con la mansione"}</button>
             {showOk && (
@@ -163,10 +167,40 @@ export default function HrContractsPage() {
   );
 }
 
+// Vetro: la domanda della pagina è «quanti hanno il contratto a posto, e cosa resta da fare?».
+// Il contratto è una regola (serve a tutti quelli che lavorano), quindi il «da fare» può essere rosso.
+function ContractsTop({ count, unmatched }) {
+  const todo = count("cambiata") + count("mancante") + count("risolto");
+  const sign = count("in_firma") + count("cambiata_in_firma");
+  const tot = todo + sign + count("da_verificare") + count("ok");
+  const items = [
+    { label: "A posto", value: count("ok"), color: CP.accentGreen },
+    { label: "In firma", value: sign },
+    { label: "Da controllare", value: count("da_verificare"), color: "var(--vt-cx)" },
+    { label: "Da fare", value: todo, color: CP.accentRed },
+  ];
+  const go = (id) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <Panel title={`${count("ok")} su ${tot} con il contratto a posto`} aside={count("non_richiesto") ? `più ${count("non_richiesto")} a cui non serve` : undefined} i={0}>
+        {tot ? <MixBar items={items} format={(n) => String(n)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna persona da controllare.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={todo ? "2" : "0"} label="Da fare" value={String(todo)}
+          sub={todo ? `${count("cambiata")} con la mansione cambiata · ${count("mancante") + count("risolto")} senza contratto` : "nessun contratto da preparare"}
+          onClick={todo ? go(count("cambiata") ? "cambiata" : "mancante") : undefined} />
+        <HotTile i={2} lvl={unmatched ? "ink" : undefined} label="Contratti senza scheda" value={String(unmatched)}
+          sub={unmatched ? "da collegare a mano alla persona" : "tutti collegati"} onClick={unmatched ? go("senza-scheda") : undefined} />
+      </div>
+    </div>
+  );
+}
+
 function Group({ id, title, intro, rows = [], columns }) {
+  const inVetro = useInVetro();
   if (!rows.length) return null;
   return (
-    <section id={id} style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
+    <section id={id} className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "14px 16px", marginBottom: 14 }}>
       <SectionTitle aside={String(rows.length)}>{title}</SectionTitle>
       <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>{intro}</p>
       <DataTable rows={rows} columns={columns} defaultSort={{ key: "name", dir: 1 }} minWidth={760} maxHeight={520} />

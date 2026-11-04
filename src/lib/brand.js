@@ -273,6 +273,27 @@ export const CP_VETRO_BLU = {
   attn: "#141a2e", scale: "#6353e0",
 };
 
+// "Vetro notte" (4/11/2026, Nicholas: «riusciamo a fare la modalità scura?»): lo stesso vetro sul tema
+// scuro (selettore sole/luna in fondo al menu). Lastre blu notte velate su un fondo quasi nero con
+// macchie di colore sfocate; testo chiaro, accento viola dello scuro (#8b7cf6). Solo dentro <VetroScope>.
+export const CP_VETRO_NOTTE = {
+  ...CP_DARK,
+  bgSunken: "transparent", bg: "transparent",
+  surface: "rgba(24,30,48,.62)", surfaceAlt: "rgba(44,52,78,.72)",
+  panel: "#161c2c",
+  border: "rgba(255,255,255,.09)", borderSoft: "rgba(255,255,255,.06)", borderStrong: "rgba(255,255,255,.16)",
+  textPrimary: "#eef1f8", textSecondary: "#c3cad9", textMuted: "#939db2", mutedIcons: "rgba(238,241,248,.42)",
+  accent: "#8b7cf6", accentInk: "#14101f", accentSoft: "rgba(139,124,246,.18)", accentSoftText: "#c3b9fb", accentDim: "rgba(139,124,246,.32)",
+  accentGreen: "#4ade80", accentRed: "#f08c8c", accentBlue: "#8fb0ff",
+  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(240,140,140,.10)",
+  gold: "#d9b46a", goldSoft: "rgba(217,180,106,.10)", track: "rgba(255,255,255,.10)", neu: "rgba(238,241,248,.8)",
+  ruleData: "rgba(255,255,255,.18)", fieldBd: "rgba(255,255,255,.20)", sel: "rgba(139,124,246,.14)", hover: "rgba(255,255,255,.05)",
+  scrim: "rgba(4,6,12,.62)", cool: "#8fb0ff", warm: "#4ade80",
+  heroBg: "rgba(24,30,48,.62)",
+  tierTop: "#8b7cf6", tierStrong: "#eef1f8",
+  attn: "#eef1f8", scale: "#8b7cf6",
+};
+
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
 // clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
 export const DATA_SCALE = {

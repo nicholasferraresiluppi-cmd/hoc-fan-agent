@@ -7,6 +7,11 @@
 // POST {action:"label", id, label, note} nome e nota per chi pubblica
 // POST {action:"save", videoId, on, note}  salva / toglie un video dalle idee
 // POST {action:"refresh"}               rilegge tutti i profili adesso (una volta l'ora al massimo)
+// GET ?trends=1                         Trend: ricerche, ultimo giro (raccoglie quello in corso se è finito)
+// POST {action:"trend_add", text, country} / {action:"trend_remove", id}   ricerche dei trend
+// POST {action:"trend_refresh"}         avvia subito il giro delle ricerche (al massimo ogni 12 ore)
+// POST {action:"similar_seed", id, on}  segna una pagina come partenza per i simili
+// POST {action:"similar_refresh"}       avvia subito la ricerca dei profili simili (al massimo ogni 12 ore)
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -16,6 +21,8 @@ import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { parseProfileInput, profileStats, scoreVideo, runBudget, MAX_PROFILES } from "@/lib/clip-radar-core";
 import { loadAll, addProfile, removeProfile, updateProfile, toggleSaved, readProfiles, listProfiles, apifyConfigured, syncOurProfiles, videoChunk } from "@/lib/clip-radar";
+import { loadTrends, collectTrends, startTrends, addQuery, removeQuery } from "@/lib/clip-trends";
+import { loadSimilar, collectSimilar, startSimilar } from "@/lib/clip-similar";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -31,6 +38,11 @@ export async function GET(request) {
   const g = await gate();
   if (g.err) return g.err;
   const sp = new URL(request.url).searchParams;
+  if (sp.get("trends")) {
+    if (apifyConfigured()) await Promise.all([collectTrends().catch(() => {}), collectSimilar().catch(() => {})]);
+    const [trends, similar] = await Promise.all([loadTrends(), loadSimilar()]);
+    return Response.json({ configured: apifyConfigured(), ...trends, similar }, noStore);
+  }
   if (sp.get("media")) {
     const c = await videoChunk(String(sp.get("p") || ""), String(sp.get("media")), request.headers.get("range"));
     if (!c) return Response.json({ error: "Video non disponibile per il download" }, { status: 404 });
@@ -94,6 +106,11 @@ export async function POST(request) {
       await updateProfile(String(body.id), { label: String(body.label || "").trim().slice(0, 60) || null, note: String(body.note || "").slice(0, 500), ...(body.country !== undefined ? { country: body.country === "eng" ? "eng" : body.country === "ita" ? "ita" : null } : {}) });
       return Response.json({ ok: true });
     }
+    if (body.action === "similar_seed") {
+      if (!body.id) return bad("Manca il profilo");
+      await updateProfile(String(body.id), { similarSeed: Boolean(body.on) });
+      return Response.json({ ok: true });
+    }
     if (body.action === "save") {
       if (!body.videoId) return bad("Manca il video");
       await toggleSaved(String(body.videoId), Boolean(body.on), g.by, body.note);
@@ -108,6 +125,39 @@ export async function POST(request) {
       const res = await readProfiles(profiles);
       if (res.skip === "cap") return bad(`Tetto di spesa del mese raggiunto (${res.cap} $): si riparte il mese prossimo`, 429);
       return Response.json({ ok: true, result: res });
+    }
+    if (body.action === "trend_add") {
+      const r = await addQuery({ text: body.text, country: body.country }, g.by);
+      return Response.json({ ok: true, ...r });
+    }
+    if (body.action === "trend_remove") {
+      if (!body.id) return bad("Manca la ricerca");
+      await removeQuery(String(body.id));
+      return Response.json({ ok: true });
+    }
+    if (body.action === "trend_refresh") {
+      if (!apifyConfigured()) return bad("Apify non è configurato sul server", 503);
+      const lock = await kv.set("clipradar:trends:manual", Date.now(), { nx: true, ex: 12 * 3600 });
+      if (!lock) return bad("Le ricerche sono già partite nelle ultime 12 ore: il giro automatico parte già ogni notte", 429);
+      // se il giro non parte, il blocco delle 12 ore non deve restare: si può riprovare subito
+      const r = await startTrends({ force: true, by: g.by }).catch(async (e) => { await kv.del("clipradar:trends:manual"); throw e; });
+      if (!r.started) await kv.del("clipradar:trends:manual");
+      if (r.skip === "cap") return bad(`Tetto di spesa del mese raggiunto (${r.cap} $): si riparte il mese prossimo`, 429);
+      if (r.busy) return bad("Un giro di ricerche è già in corso: i risultati arrivano in pochi minuti", 409);
+      if (!r.started) return bad("Le ricerche non sono partite: controlla che ci sia almeno una ricerca", 400);
+      return Response.json({ ok: true, ...r });
+    }
+    if (body.action === "similar_refresh") {
+      if (!apifyConfigured()) return bad("Apify non è configurato sul server", 503);
+      const lock = await kv.set("clipradar:similar:manual", Date.now(), { nx: true, ex: 12 * 3600 });
+      if (!lock) return bad("La ricerca dei simili è già partita nelle ultime 12 ore", 429);
+      const r = await startSimilar({ force: true, by: g.by }).catch(async (e) => { await kv.del("clipradar:similar:manual"); throw e; });
+      if (!r.started) await kv.del("clipradar:similar:manual");
+      if (r.skip === "cap") return bad(`Tetto di spesa del mese raggiunto (${r.cap} $): si riparte il mese prossimo`, 429);
+      if (r.busy) return bad("Una ricerca dei simili è già in corso", 409);
+      if (r.skip === "no-seeds") return bad("Nessuna pagina Instagram nel Radar da cui partire", 400);
+      if (!r.started) return bad("La ricerca non è partita", 400);
+      return Response.json({ ok: true, ...r });
     }
     return bad("Azione sconosciuta");
   } catch (e) {

@@ -22,6 +22,8 @@ import { useTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import { fmt$, fmtInt, fmtPct } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card, NUM, BTN_PRIMARY_OFF } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, DeviationBars, MixBar } from "@/components/VetroCharts";
 
 // Verdetto: il rosso solo per "molto fuori media" (segnale su un dato).
 const VERDICT = {
@@ -136,6 +138,47 @@ export default function CompExamPage() {
   );
 }
 
+// Vetro (30/10/2026): la domanda è «su questa creator chi incassa fuori dalla media del team?».
+// Ogni operatore con la % incassata come scarto dalla media del team: entro ±15% in linea, fino al
+// 35% da rivedere, oltre in rosso (stesse regole del verdetto). Accanto il numero della creator, quanto
+// resta a HOC e i verdetti in una barra.
+function ExamTop({ data, teamPct, totalSales, nMonths, oldProfiles }) {
+  const ops = data.operators
+    .filter((o) => o.pct_effective != null && teamPct)
+    .map((o) => ({ label: o.operator, dev: (o.pct_effective - teamPct) / teamPct, value: o.pct_effective, sales: o.totalSales }))
+    .sort((a, b) => Math.abs(b.dev) - Math.abs(a.dev));
+  const count = (v) => data.operators.filter((o) => o.verdict === v).length;
+  const mix = [
+    { label: "In linea", value: count("OK"), color: "var(--vt-cx)" },
+    { label: "Da rivedere", value: count("REVIEW"), color: "var(--vt-c0)" },
+    { label: "Molto fuori media", value: count("OUT_OF_SCALE"), color: CP.accentRed },
+    { label: "Senza dati", value: count("UNKNOWN"), color: CP.track },
+  ];
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 16 }}>
+      <Panel i={0} title="Chi incassa fuori dalla media del team" aside={`% incassata rispetto alla media del team (${pct1(teamPct)}) · i più lontani in cima`}>
+        {ops.length ? <DeviationBars items={ops} format={pct1} limit={14} /> : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun operatore con una % incassata calcolabile.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={1}>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>Pagato agli operatori sul venduto · {data.creator.name}</div>
+          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", ...NUM }}>{pct1(teamPct)}</div>
+          {teamPct != null && <div style={{ fontSize: 13, color: CP.textPrimary, marginTop: 4, ...NUM }}>A HOC resta {fmt$(totalSales - data.total_team_earnings)} ({pct1(1 - teamPct)} del venduto)</div>}
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>
+            {monthsLabel(nMonths)}: {data.months_analyzed.join(", ")} · venduto {fmt$(totalSales)} · {fmtInt(data.operators_count)} operatori
+          </div>
+        </Panel>
+        <Panel i={2} title="Verdetti">
+          <MixBar items={mix} format={(v) => fmtInt(v)} height={26} />
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 10 }}>
+            {fmtInt(data.total_profiles_on_creator)} profili collegati{oldProfiles.length ? ` · ${oldProfiles.length} vecchi da pulire (in fondo)` : ""}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 function Results({ data }) {
   const [theme] = useTheme();
   const S = DATA_SCALE[theme] || DATA_SCALE.light;
@@ -147,6 +190,7 @@ function Results({ data }) {
   const unknownOps = data.operators.filter((o) => o.verdict === "UNKNOWN" && o.totalSales > 0);
   const oldProfiles = data.old_profiles_on_creator || [];
   const unmapped = data.operators.filter((o) => !o.member_matched).length;
+  const inVetro = useInVetro();
 
   const columns = [
     { key: "operator", label: "Operatore", render: (o) => (
@@ -179,6 +223,7 @@ function Results({ data }) {
 
   return (
     <>
+      {inVetro ? <ExamTop data={data} teamPct={teamPct} totalSales={totalSales} nMonths={nMonths} oldProfiles={oldProfiles} /> : (
       <HeroMetric
         label={`Pagato agli operatori sul venduto · ${data.creator.name}`}
         value={pct1(teamPct)}
@@ -193,6 +238,7 @@ function Results({ data }) {
           <Metric label="Profili collegati" value={fmtInt(data.total_profiles_on_creator)} note={oldProfiles.length ? `${oldProfiles.length} vecchi da pulire` : null} />
         </div>
       </HeroMetric>
+      )}
 
       {data.months_errors?.length > 0 && (
         <Notice danger>Non sono riuscito a leggere questi mesi: {data.months_errors.map((e) => e.period_id).join(", ")}. I numeri sopra non li includono.</Notice>

@@ -11,7 +11,9 @@ import { useUser } from "@clerk/nextjs";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, SectionTitle, Notice, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, HotTile } from "@/components/VetroCharts";
 import { alertDialog } from "@/components/AppDialogs";
 
 const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 };
@@ -26,6 +28,7 @@ export default function ReviewPage() {
   const [smComment, setSmComment] = useState("");
   const [outcome, setOutcome] = useState("");
   const [filter, setFilter] = useState("all");
+  const inVetro = useInVetro();
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -90,7 +93,22 @@ export default function ReviewPage() {
       {error && <Notice danger>Errore: {String(error)}</Notice>}
       {loading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
-      {!loading && !error && (
+      {!loading && !error && inVetro && items.length > 0 && (
+        <div className="vt-row21" style={{ marginBottom: 18 }}>
+          <Panel title={`${fmtInt(items.length)} feedback degli operatori`} aside="ultimi 100 · d'accordo o no col voto dell'AI" i={0}>
+            <MixBar format={fmtInt} items={[
+              { label: "D'accordo", value: items.length - disagree.length, color: CP.accentGreen },
+              { label: "Non d'accordo", value: disagree.length },
+            ]} />
+          </Panel>
+          <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+            <HotTile i={1} lvl={toReview.length ? "ink" : "0"} label="Da rivedere" value={fmtInt(toReview.length)} sub={toReview.length ? "aspettano il tuo commento" : "tutti rivisti"}
+              onClick={toReview.length ? () => setFilter("todo") : undefined} />
+            <HotTile i={2} label="Non d'accordo" value={fmtInt(disagree.length)} sub="da guardare per primi" onClick={disagree.length ? () => setFilter("down") : undefined} />
+          </div>
+        </div>
+      )}
+      {!loading && !error && !(inVetro && items.length > 0) && (
         <HeroMetric
           label="Feedback da rivedere"
           value={fmtInt(toReview.length)}
@@ -105,11 +123,11 @@ export default function ReviewPage() {
       )}
 
       {items.length > 0 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <FilterBar onReset={filter !== "all" ? () => setFilter("all") : undefined}>
           <FilterChip label={`Tutti · ${items.length}`} active={filter === "all"} onClick={() => setFilter("all")} />
           <FilterChip label={`Da rivedere · ${toReview.length}`} active={filter === "todo"} onClick={() => setFilter("todo")} />
           <FilterChip label={`Non d'accordo · ${disagree.length}`} active={filter === "down"} onClick={() => setFilter("down")} />
-        </div>
+        </FilterBar>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>

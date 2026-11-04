@@ -26,7 +26,7 @@ import useSWR from "swr";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useTheme } from "@/lib/theme-client";
 import { UserButton, SignedIn } from "@clerk/nextjs";
-import {
+import { Headphones,
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Radar, Bot,
@@ -34,10 +34,10 @@ import {
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+  History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
-  FileSignature, Repeat, Gift } from "lucide-react";
+  FileSignature, Repeat, Gift, MailOpen } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -72,6 +72,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
       { href: "/admin/creator-split",            label: "Creator dello split", icon: Users },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
+      { href: "/admin/benvenuto",                label: "Benvenuto a pagamento", icon: MailOpen },
       { href: "/admin/looker",                   label: "Report Looker", icon: LayoutDashboard },
       { href: "/admin/fan-da-recuperare",        label: "Fan da recuperare", icon: HeartHandshake },
       { href: "/admin/chat-monitor",             label: "Chat Monitor", icon: MessagesSquare },
@@ -152,9 +153,11 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
-      { href: "/admin/studio-social",            label: "Studio social",   icon: Clapperboard },
+      { href: "/admin/creator-ai",               label: "Creator AI",      icon: Bot },
+      { href: "/admin/studio-social",            label: "Regia social",    icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
-      { href: "/admin/warmup",                   label: "Social",         icon: Sunrise },
+      { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
+      { href: "/admin/piani",                    label: "Piani",          icon: ListChecks },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
     ],
   },
@@ -164,6 +167,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/hr",                       label: "Persone",      icon: BookUser },
+      { href: "/admin/presenze-discord",         label: "Presenze Discord", icon: Headphones },
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
