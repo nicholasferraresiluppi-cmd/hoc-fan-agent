@@ -577,7 +577,7 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const skippedKeys = new Set((person.sync?.skipped || []).map((x) => x.key));
   for (const k of Object.keys(fresh)) {
     if (!isEmptyValue(fresh[k]) || isEmptyValue(current.fields[k])) continue;
-    if (base[k] === undefined || skippedKeys.has(k) || k === "location") delete fresh[k];
+    if (base[k] === undefined || skippedKeys.has(k)) delete fresh[k];
   }
 
   // campi specchio: testo cambiato ma non leggibile → si tiene l'app, lo si scrive nello storico
