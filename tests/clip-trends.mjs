@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseQuery, queryId, igQueryFromUrl, normalizeTrendRow, summarize, heat, buildTrends, prevSnapshot,
-  trendBudget, trendsDue, pickPrev, pushHist, musicList, soundKey, buildTrends as bt, HIST_KEEP, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
+  trendBudget, trendsDue, pickPrev, pushHist, musicList, soundKey, similarList, similarBudget, similarDue, buildTrends as bt, HIST_KEEP, HIT_VIEWS, DEFAULT_QUERIES, candidateAccounts, SEARCH_COUNTRY, COUNTRY_ADDON,
 } from "../src/lib/clip-trends-core.js";
 
 let n = 0;
@@ -156,5 +156,27 @@ eq(snd.length, 1, "un solo audio che torna");
 eq([snd[0].id, snd[0].accounts, snd[0].hits, snd[0].radar], ["ig:77", 3, 3, 2], "stesso audio per id (ricerca) e per nome (Radar)");
 const onlyRadar = bt(queries, [], {}, NOW, ["a", "b", "c"].map((o) => rv(o, 70_000, "Meme audio · x"))).sounds;
 eq([onlyRadar.length, onlyRadar[0].countries], [1, []], "un audio solo dal Radar si trova anche senza ricerche");
+
+// profili simili
+const srows = [
+  { username: "tv.arty", sourceUsername: "zhanna_yalomist", matchedSeeds: ["zhanna_yalomist", "theparisdavis"], followerCount: 44841, fullName: "Arty", biography: "California\nLA" },
+  { username: "tv.arty", sourceUsername: "theparisdavis", matchedSeeds: ["theparisdavis"], followerCount: 44841 },
+  { username: "medesoo0", sourceUsername: "theparisdavis", matchedSeeds: ["theparisdavis"], followerCount: 71829 },
+  { username: "piccola", sourceUsername: "milkstardust", followerCount: 900 },
+  { username: "celebrita", sourceUsername: "imsophri", matchedSeeds: ["imsophri"], followerCount: 5_854_738 },
+  { username: "privata", sourceUsername: "imsophri", isPrivate: true, followerCount: 2000 },
+  { username: "giaseguita", sourceUsername: "imsophri", followerCount: 2000 },
+  { username: "theparisdavis", sourceUsername: "zhanna_yalomist", followerCount: 30000 },
+  { username: "", sourceUsername: "x" },
+];
+const seeds = [{ handle: "zhanna_yalomist", country: "eng" }, { handle: "theparisdavis", country: "eng" }, { handle: "imsophri", country: null }, { handle: "milkstardust", country: "ita" }];
+const sl = similarList(srows, seeds, ["ig:giaseguita"]);
+eq(sl.map((c) => c.handle), ["tv.arty", "medesoo0", "piccola"], "ordine: più pagine nostre, poi follower; fuori privati, celebrità, già seguiti e le pagine di partenza");
+eq([sl[0].overlap, sl[0].seeds, sl[0].country, sl[0].bio], [2, ["zhanna_yalomist", "theparisdavis"], "eng", "California LA"], "il profilo simile a due pagine");
+eq([sl[2].seeds, sl[2].country], [["milkstardust"], "ita"], "senza matchedSeeds vale la pagina di origine, e il suo paese");
+eq(similarList(null), [], "niente risultati");
+eq(similarBudget(1), 0.5, "minimo 0,50 $ per run (Apify)");
+eq(similarBudget(15), Math.round((15 * 15 * 0.0056 * 1.3 + 0.02) * 100) / 100, "tetto con 15 pagine");
+ok(similarDue(null, NOW) && !similarDue({ at: NOW - 3 * D }, NOW) && similarDue({ at: NOW - 7 * D }, NOW), "una volta a settimana");
 
 console.log(`clip-trends: ${n} asserzioni ok`);

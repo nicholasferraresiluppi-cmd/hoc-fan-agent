@@ -298,3 +298,51 @@ export function soundKey(p) {
   if (/original|originale/.test(name) && p.owner && name.includes(String(p.owner).toLowerCase())) return null;
   return `${p.platform}:n:${name}`;
 }
+
+// --- Profili simili (4/11, Nicholas: «come troviamo altri profili clipping da cui prendere ispirazione»).
+// Le ricerche per frase trovano di tutto (coppie, film, celebrità). Più preciso è partire dalle pagine
+// che sono già il genere giusto: per ogni pagina Instagram del Radar si leggono i «profili simili» che
+// Instagram stesso suggerisce (memo23/instagram-similar-profiles-scraper, senza login). Provato il 4/11
+// su 5 pagine: i simili seguono il genere della pagina di partenza (da theparisdavis ragazze
+// «relatable», da zhanna pagine di meme/relazioni, da imsophri modelle), quindi il segnale forte è
+// essere simile a PIÙ pagine nostre. Settimanale: chi è simile a chi cambia in settimane, non in ore.
+export const SIMILAR_PER_SEED = 15;
+export const SIMILAR_PRICE = 0.0056;   // profilo simile 0,0024 + dati del profilo (follower, bio) 0,0032
+export const SIMILAR_DAYS = 7;
+export const MAX_SIMILAR = 40;
+export const similarBudget = (nSeeds) => Math.max(0.5, Math.round((nSeeds * SIMILAR_PER_SEED * SIMILAR_PRICE * 1.3 + 0.02) * 100) / 100);
+export const similarDue = (last, now) => !last?.at || now - last.at >= (SIMILAR_DAYS - 0.5) * DAY;
+
+/**
+ * Dai risultati grezzi alla lista da proporre: un profilo una volta sola (con tutte le pagine nostre
+ * a cui somiglia), senza privati, senza chi è già nel Radar e senza le pagine sopra il milione
+ * (celebrità e media: non si impara un formato da lì). Ordine: a quante pagine nostre somiglia, poi follower.
+ * seeds: [{ handle, country }] le pagine di partenza.
+ */
+export function similarList(rows, seeds = [], known = []) {
+  const skip = new Set((known || []).map(String));
+  const seedCountry = new Map((seeds || []).map((s) => [String(s.handle).toLowerCase(), s.country || null]));
+  const by = new Map();
+  for (const r of rows || []) {
+    const h = String(r?.username || "").trim().toLowerCase();
+    if (!h || r.isPrivate || seedCountry.has(h) || skip.has(`ig:${h}`)) continue;
+    const fans = num(r.followerCount);
+    if (fans != null && fans > BIG_ACCOUNT) continue;
+    const ms = (Array.isArray(r.matchedSeeds) && r.matchedSeeds.length ? r.matchedSeeds : [r.sourceUsername]).map((x) => String(x || "").toLowerCase()).filter(Boolean);
+    const ex = by.get(h);
+    if (ex) { ex.seeds = [...new Set([...ex.seeds, ...ms])]; if (ex.fans == null && fans != null) ex.fans = fans; continue; }
+    by.set(h, {
+      id: `ig:${h}`, platform: "ig", handle: h, name: String(r.fullName || "").slice(0, 80), fans,
+      bio: String(r.biography || "").replace(/\s+/g, " ").trim().slice(0, 160),
+      cover: String(r.profilePicUrl || "").slice(0, 1200) || null, verified: Boolean(r.isVerified),
+      category: r.category ? String(r.category).slice(0, 40) : null, seeds: ms,
+    });
+  }
+  return [...by.values()].map((a) => {
+    const cs = a.seeds.map((s) => seedCountry.get(s)).filter(Boolean);
+    const country = cs.length ? cs.sort((x, y) => cs.filter((c) => c === y).length - cs.filter((c) => c === x).length)[0] : null;
+    return { ...a, overlap: a.seeds.length, country };
+  })
+    .sort((x, y) => (y.overlap - x.overlap) || ((y.fans ?? -1) - (x.fans ?? -1)))
+    .slice(0, MAX_SIMILAR);
+}

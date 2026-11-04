@@ -10,6 +10,7 @@ import { refreshPublicMetrics } from "@/lib/warmup-metrics";
 import { weeklyRefresh } from "@/lib/warmup-xrefs";
 import { nightlyRefresh as clipRadarRefresh } from "@/lib/clip-radar";
 import { dailyTrends } from "@/lib/clip-trends";
+import { weeklySimilar } from "@/lib/clip-similar";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -32,6 +33,8 @@ export async function POST(request) {
   try { result.clipRadar = await clipRadarRefresh(); } catch (e) { result.clipRadar = { error: e?.message || "unknown" }; }
   // Trend del clipping: raccoglie il giro avviato la notte prima, ne avvia uno nuovo (una volta al giorno)
   try { result.clipTrends = await dailyTrends(); } catch (e) { result.clipTrends = { error: e?.message || "unknown" }; }
+  // Profili simili alle pagine del Radar: una volta a settimana
+  try { result.clipSimilar = await weeklySimilar(); } catch (e) { result.clipSimilar = { error: e?.message || "unknown" }; }
   const summary = result.error ? `err:${result.error}` : JSON.stringify(result);
   await kv
     .set("cron:heartbeat:warmup-metrics", { at: Date.now(), via: viaCron ? "cron" : "session", result: summary.slice(0, 200), ...(result.error ? { error: true } : {}) }, { ex: 40 * 24 * 3600 })
