@@ -98,7 +98,7 @@ export default function BilancioPage() {
           <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 10 }}>Dati del warehouse aggiornati alle {hm(data.updated_at)}{data.live ? " · si aggiornano da soli ogni 10 minuti" : ""}.</div>
         </div>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{BIL_CSS + `@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
     </VetroScope>
   );
@@ -261,11 +261,16 @@ function DayPicker({ data, go, trigger, block = false }) {
 const SH = { blue: "#4a7fd4", green: "#3f9b5a", grey: "#8a92a2", amber: "#d9a520", peach: "#e8a76a", navy: "#1f2a44" };
 // 30/10 sera (Nicholas: «mi sembra privo di colori»): le tinte al 15% sul vetro diventavano grigie →
 // i pastelli pieni del foglio (palette standard di Google Sheets), intestazione del quadro blu notte piena.
-const FILL = { peach: "#fce5cd", blue: "#c9daf8", green: "#d9ead3", grey: "#e6e6e6", yellow: "#fff2cc", yellowStrong: "#ffe599", coral: "#f4cccc", target: "#cfe2f3", hit: "#b6d7a8", navy: "#1f2a44", section: "#e8ebf2", lilac: "#e4dcfb" };
+// colori del foglio Bilancio_unico_LIVE: col tema chiaro sono quelli del foglio, col tema scuro (vetro notte,
+// 4/11/2026) le stesse tinte velate sul fondo scuro e testo chiaro. Variabili in BIL_CSS.
+const FILL_HEX = { peach: "#fce5cd", blue: "#c9daf8", green: "#d9ead3", grey: "#e6e6e6", yellow: "#fff2cc", yellowStrong: "#ffe599", coral: "#f4cccc", target: "#cfe2f3", hit: "#b6d7a8", navy: "#1f2a44", section: "#e8ebf2", lilac: "#e4dcfb" };
+const FILL = Object.fromEntries(Object.keys(FILL_HEX).map((k) => [k, `var(--bil-${k})`]));
+const BIL_CSS = `:root{${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${v};`).join("")}--bil-ink:#1f2a44;--bil-rule:rgba(31,42,68,.18)}`
+  + `:root:not([data-theme="light"]){${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${k === "navy" ? "#26314f" : `color-mix(in srgb, ${v} ${k === "yellowStrong" || k === "hit" ? 30 : 18}%, transparent)`};`).join("")}--bil-ink:#e8ecf5;--bil-rule:rgba(255,255,255,.12)}`;
 const ECO_DOT = { rosa: "#e58bb5", viola: "#8b6fe0", verde: "#3f9b5a" };
 const COUNTRY_SHORT = { IT: "IT", EN: "ENG", ES: "ESP" };
 const COUNTRY_TINT = { IT: SH.blue, EN: SH.green, ES: SH.grey };
-const COUNTRY_FILL = { IT: "#c9daf8", EN: "#d9ead3", ES: "#e6e6e6" };
+const COUNTRY_FILL = { IT: FILL.blue, EN: FILL.green, ES: FILL.grey };
 
 /** Le righe come nel foglio: [{ kind:"multi", c, accounts }...], poi [{ kind:"single", c, a }...]. */
 function sheetRows(creators) {
@@ -337,7 +342,7 @@ function Block({ title, color, sub, className, children }) {
   );
 }
 
-const hd = (fill, align = "right") => ({ ...th, textAlign: align, background: fill, color: fill === FILL.navy ? "#fff" : "#1f2a44", fontWeight: 600, padding: "9px 12px", borderBottom: `1px solid ${fill === FILL.navy ? FILL.navy : "rgba(31,42,68,.18)"}` });
+const hd = (fill, align = "right") => ({ ...th, textAlign: align, background: fill, color: fill === FILL.navy ? "#fff" : "var(--bil-ink)", fontWeight: 600, padding: "9px 12px", borderBottom: `1px solid ${fill === FILL.navy ? FILL.navy : "var(--bil-rule)"}` });
 const cell = (extra) => ({ ...td, padding: "7px 12px", textAlign: "right", ...NUM, ...extra });
 const TOTAL_BG = FILL.yellowStrong;
 const SUBTOTAL_BG = FILL.yellow;
@@ -348,7 +353,7 @@ function Tag({ country }) {
 
 function SectionRow({ label, span }) {
   return (
-    <tr><td colSpan={span} style={{ ...td, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#1f2a44", background: FILL.section, borderTop: `1px solid ${CP.border}` }}>{label}</td></tr>
+    <tr><td colSpan={span} style={{ ...td, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--bil-ink)", background: FILL.section, borderTop: `1px solid ${CP.border}` }}>{label}</td></tr>
   );
 }
 
