@@ -6,7 +6,7 @@
 // sulle pagine del Radar + musica in salita negli USA.
 import { useState } from "react";
 import useSWR from "swr";
-import { ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ExternalLink, Music, Play, Plus, RefreshCw, Trash2, Users } from "lucide-react";
 import { CP } from "@/lib/brand";
 import { Notice, NUM, FilterBar, EmptyState, SectionTitle } from "@/components/ds";
 import { confirmDialog } from "@/components/AppDialogs";
@@ -139,10 +139,32 @@ function MusicRow({ m }) {
   );
 }
 
+function SimilarRow({ c, busy, onAdd }) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
+      <a href={profileUrl(c)} target="_blank" rel="noopener noreferrer" style={{ flex: "0 0 auto", width: 44, height: 44, borderRadius: "50%", overflow: "hidden", background: CP.surfaceAlt, display: "grid", placeItems: "center", color: CP.textMuted }}>
+        {c.cover && !broken ? <img src={c.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Users size={16} />}
+      </a>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <a href={profileUrl(c)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14.5, fontWeight: 500, color: CP.textPrimary, textDecoration: "none" }}>@{c.handle}</a>
+          <span style={{ ...hint, fontSize: 12.5, ...NUM }}>Instagram{c.fans != null ? ` · ${shortNum(c.fans)} follower` : ""}</span>
+          {c.overlap > 1 && <Chip color={CP.accentGreen} title="Instagram lo suggerisce come simile a più pagine che seguiamo: è il segnale più forte">simile a {c.overlap} pagine</Chip>}
+        </div>
+        <div style={{ ...hint, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          simile a @{c.seeds.join(", @")}{c.bio ? ` · ${c.bio}` : ""}
+        </div>
+      </div>
+      <button type="button" style={{ ...btnSm, flex: "0 0 auto" }} disabled={busy} onClick={() => onAdd(c)}><Plus size={13} />Aggiungi al Radar</button>
+    </div>
+  );
+}
+
 export default function ClipTrends({ cf, setCf }) {
   const { data, error, mutate } = useSWR(URL_T, fetcher, {
     revalidateOnFocus: false,
-    refreshInterval: (d) => (d?.running ? 20_000 : 0),
+    refreshInterval: (d) => (d?.running || d?.similar?.running ? 20_000 : 0),
   });
   const [adding, setAdding] = useState(null); // { text, country }
   const [busy, setBusy] = useState(null);
@@ -166,6 +188,9 @@ export default function ClipTrends({ cf, setCf }) {
   const music = cf === "ita" ? [] : data.last?.music || [];
   const live = formats.filter(isLive).length;
   const candidates = (data.last?.candidates || []).filter(inC);
+  const sim = data.similar || {};
+  const similar = (sim.last?.list || []).filter((c) => !c.country || inC(c));
+  const refreshSimilar = () => run("similar", { action: "similar_refresh" }, () => "Ricerca dei simili partita: ci vuole circa un minuto per pagina, la lista arriva qui da sola.");
   const follow = async (c) => {
     await run(`add:${c.id}`, { action: "add", text: c.handle, platform: c.platform, country: c.country || (cf === "all" ? "eng" : cf) }, (r) => (r.exists ? `@${c.handle} è già nel Radar.` : `@${c.handle} aggiunto al Radar: leggo i suoi video (meno di un minuto), li trovi in «Video dei profili».`));
   };
@@ -232,6 +257,20 @@ export default function ClipTrends({ cf, setCf }) {
           {candidates.map((c) => <CandidateRow key={c.id} c={c} busy={!!busy} onAdd={follow} />)}
         </div>
       )}
+
+      <div style={{ ...cardBox, marginTop: 4 }}>
+        <SectionTitle aside="i profili che Instagram suggerisce come simili alle pagine Instagram che seguiamo nel Radar, una volta a settimana">Simili alle pagine che seguiamo{similar.length ? ` · ${similar.length}` : ""}</SectionTitle>
+        {sim.running ? <p style={{ ...hint, margin: "6px 0 10px" }}>Sto cercando i profili simili (avviato {when(sim.running.startedAt)}): ci vuole circa un minuto per pagina, la lista arriva qui da sola.</p>
+          : !sim.last ? <p style={{ ...hint, margin: "6px 0 10px" }}>Ancora nessuna ricerca dei simili. Parte da sola una volta a settimana; la prima la puoi far partire adesso.</p>
+          : !similar.length ? <p style={{ ...hint, margin: "6px 0 10px" }}>Nessun profilo simile nuovo{sim.last.error ? ` (ultimo giro: ${sim.last.error})` : ""}.</p>
+          : similar.map((c) => <SimilarRow key={c.id} c={c} busy={!!busy} onAdd={follow} />)}
+        {!sim.running && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", paddingTop: 10, borderTop: similar.length ? `1px solid ${CP.borderSoft}` : "none" }}>
+            <button type="button" style={btnSm} disabled={!!busy || !data.configured} onClick={refreshSimilar}><RefreshCw size={13} />{busy === "similar" ? "Avvio…" : `Cerca simili adesso (~${String(sim.budget ?? 0).replace(".", ",")} $)`}</button>
+            {sim.last?.at && <span style={{ ...hint, fontSize: 12.5 }}>ultima ricerca {when(sim.last.at)}, da {sim.last.seeds?.length || 0} pagine</span>}
+          </div>
+        )}
+      </div>
 
       {music.length > 0 && (
         <div style={{ ...cardBox, marginTop: 4 }}>
