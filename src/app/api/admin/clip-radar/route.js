@@ -129,7 +129,7 @@ export async function POST(request) {
     if (body.action === "trend_refresh") {
       if (!apifyConfigured()) return bad("Apify non è configurato sul server", 503);
       const lock = await kv.set("clipradar:trends:manual", Date.now(), { nx: true, ex: 12 * 3600 });
-      if (!lock) return bad("Le ricerche sono già partite nelle ultime 12 ore: i trend cambiano in giorni, non in ore", 429);
+      if (!lock) return bad("Le ricerche sono già partite nelle ultime 12 ore: il giro automatico parte già ogni notte", 429);
       // se il giro non parte, il blocco delle 12 ore non deve restare: si può riprovare subito
       const r = await startTrends({ force: true, by: g.by }).catch(async (e) => { await kv.del("clipradar:trends:manual"); throw e; });
       if (!r.started) await kv.del("clipradar:trends:manual");

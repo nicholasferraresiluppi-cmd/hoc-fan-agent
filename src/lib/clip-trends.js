@@ -1,6 +1,6 @@
-// Trend del clipping — ricerche settimanali e archivio (3/11/2026). Logica pura in clip-trends-core.js.
+// Trend del clipping — ricerche giornaliere e archivio (3/11/2026, ogni giorno dal 4/11). Logica pura in clip-trends-core.js.
 //
-// Ogni settimana le ricerche salvate passano su TikTok (clockworks/tiktok-scraper, ricerca video) e
+// Ogni giorno le ricerche salvate passano su TikTok (clockworks/tiktok-scraper, ricerca video) e
 // Instagram (apify/instagram-hashtag-scraper, ricerca per parola): solo contenuti pubblici, nessun
 // account. Le ricerche TikTok durano minuti, più del tempo di una funzione: il giro si AVVIA (run
 // asincroni Apify) e si RACCOGLIE dopo, quando la pagina viene aperta o al giro notturno seguente.
@@ -8,20 +8,24 @@
 // Chiavi:  clipradar:trends:queries  HASH id → { id, text, country, addedAt, addedBy }
 //          clipradar:trends:seeded   le ricerche di partenza sono già state messe (una volta sola)
 //          clipradar:trends:job      il giro in corso { startedAt, by, queries, runs: { tt_eng, tt_ita, ig } }
-//          clipradar:trends:last     l'ultimo giro raccolto { at, formats, sounds, candidates, usd, errors }
+//          clipradar:trends:last     l'ultimo giro raccolto { at, formats, sounds, music, candidates, usd, errors, hist }
+// Insieme alle ricerche parte la classifica della musica in salita negli USA (trendingtiktoksongs,
+// TikTok Popular+Viral, crescita sui 7 giorni, ~0,08 $ a giro): sono soprattutto canzoni, non audio
+// da meme, ma molti meme si montano proprio su quelle.
 // TikTok cerca «da un paese» (proxyCountryCode): le ricerche inglesi come le vede un utente
 // americano, quelle italiane come un utente italiano. Un run per paese, Instagram uno solo.
 // La spesa va nello stesso tetto mensile del Radar (clipradar:spend:{YYYY-MM}).
 import { kv } from "@vercel/kv";
-import { apifyConfigured, capUsd, spentThisMonth, addSpend, listProfiles } from "@/lib/clip-radar";
+import { apifyConfigured, capUsd, spentThisMonth, addSpend, listProfiles, loadAll as loadRadar } from "@/lib/clip-radar";
 import {
   DEFAULT_QUERIES, MAX_QUERIES, PER_QUERY, TREND_PRICE, COUNTRY_ADDON, SEARCH_COUNTRY, parseQuery, queryId, normalizeTrendRow,
-  buildTrends, candidateAccounts, prevSnapshot, trendBudget, trendsDue,
+  buildTrends, candidateAccounts, prevSnapshot, trendBudget, trendsDue, pickPrev, pushHist, musicList, MUSIC_ROWS, MUSIC_PRICE,
 } from "@/lib/clip-trends-core";
 
 const API = "https://api.apify.com/v2";
 const TT_ACTOR = "clockworks~tiktok-scraper";
 const IG_ACTOR = "apify~instagram-hashtag-scraper";
+const MUSIC_ACTOR = "trendingtiktoksongs~tiktok-trending-sounds-history";
 const Q = "clipradar:trends:queries";
 const SEEDED = "clipradar:trends:seeded";
 const JOB = "clipradar:trends:job";
@@ -32,6 +36,7 @@ const parse = (v) => (typeof v === "string" ? JSON.parse(v) : v);
 
 // solo i campi che servono: i risultati TikTok completi pesano decine di KB l'uno
 const TT_FIELDS = "id,text,textLanguage,createTime,createTimeISO,webVideoUrl,playCount,diggCount,commentCount,shareCount,collectCount,isPinned,isSlideshow,searchQuery,authorMeta,musicMeta,videoMeta";
+const MUSIC_FIELDS = "sound_id,title,artist,usage_count,usage_change,usage_growth_pct,is_original_sound,is_commerce_music,tiktok_url,cover_url,chart_type,rank";
 const IG_FIELDS = "shortCode,type,productType,videoDuration,timestamp,ownerUsername,url,videoPlayCount,videoViewCount,likesCount,commentsCount,sharesCount,displayUrl,caption,musicInfo,isPinned,inputUrl,error";
 
 async function apify(path, init) {
@@ -99,6 +104,7 @@ export async function startTrends({ force = false, by = null } = {}) {
   const texts = [...new Set(queries.map((q) => q.text))];
   const starts = Object.entries(byCountry).map(([c, set]) => [`tt_${c}`,
     startRun(TT_ACTOR, { searchQueries: [...set], resultsPerPage: PER_QUERY.tt, searchSection: "/video", proxyCountryCode: SEARCH_COUNTRY[c] || "None", shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false, shouldDownloadSlideshowImages: false }, ttUsd(set.size))]);
+  starts.push(["music", startRun(MUSIC_ACTOR, { mode: "insights", countries: ["US"], chartTypes: ["popular", "viral"], lookbackDays: 7, growthFilter: "rising", sortBy: "usage_change", maxRows: MUSIC_ROWS, includeExamples: false }, 0.5)]);
   starts.push(["ig", startRun(IG_ACTOR, { hashtags: texts, keywordSearch: true, resultsType: "reels", resultsLimit: PER_QUERY.ig }, cap(texts.length * PER_QUERY.ig * TREND_PRICE.ig * 1.5 + 0.02))]);
   const done = await Promise.all(starts.map(([k, pr]) => pr.then((r) => [k, r]).catch((e) => [k, { error: e.message }])));
   const runs = Object.fromEntries(done);
@@ -129,11 +135,19 @@ export async function collectTrends() {
     const late = Date.now() - job.startedAt > JOB_MAX_MS;
     // giri vecchi (prima del 3/11 sera) hanno «tt»; quelli nuovi «tt_eng», «tt_ita»
     const keys = Object.keys(job.runs || {});
-    const res = await Promise.all(keys.map((k) => runItems(job.runs[k], k.startsWith("tt") ? TT_FIELDS : IG_FIELDS).then((r) => [k, r])));
+    const fieldsOf = (k) => (k === "music" ? MUSIC_FIELDS : k.startsWith("tt") ? TT_FIELDS : IG_FIELDS);
+    const res = await Promise.all(keys.map((k) => runItems(job.runs[k], fieldsOf(k)).then((r) => [k, r])));
     if (res.some(([, r]) => !r.done) && !late) return { pending: true };
     const posts = [], errors = [];
-    let usd = 0.002;
+    let usd = 0.002, musicRows = [];
     for (const [k, r] of res) {
+      if (k === "music") {
+        musicRows = r.items || [];
+        usd += musicRows.length * MUSIC_PRICE;
+        if (r.error) errors.push(`Musica USA: ${r.error}`);
+        if (!r.done) errors.push("Musica USA: non ha finito in tempo");
+        continue;
+      }
       const plat = k.startsWith("tt") ? "tt" : "ig";
       for (const row of r.items || []) { const p = normalizeTrendRow(row, plat); if (p) posts.push(p); }
       usd += (r.items?.length || 0) * (plat === "tt" ? TREND_PRICE.tt + COUNTRY_ADDON : TREND_PRICE.ig);
@@ -145,12 +159,18 @@ export async function collectTrends() {
     await addSpend(usd);
     const queries = (await listQueries()).filter((q) => (job.queries || []).includes(q.id));
     const last = parse(await kv.get(LAST));
-    const prev = last?.formats ? prevSnapshot(last.formats) : {};
     const now = Date.now();
-    const { formats, sounds } = buildTrends(queries, posts, prev, now);
+    // storico: i giri vecchi (prima del 4/11) non hanno hist, il loro ultimo giro fa da primo punto
+    const hist = last?.hist || (last?.formats ? [{ at: last.at, snap: prevSnapshot(last.formats) }] : []);
+    const prevEntry = pickPrev(hist, now);
+    // i video dei profili del Radar (non i nostri): per gli audio che tornano su più pagine
+    const radar = await loadRadar().catch(() => null);
+    const extra = radar ? radar.profiles.filter((p) => !p.ours).flatMap((p) => radar.videosByProfile[p.id] || []) : [];
+    const { formats, sounds } = buildTrends(queries, posts, prevEntry?.snap || {}, now, extra);
+    const music = musicList(musicRows);
     const known = (await listProfilesSafe()).map((p) => p.id);
     const candidates = candidateAccounts(posts, queries, known, now);
-    await kv.set(LAST, { at: now, startedAt: job.startedAt, by: job.by, formats, sounds, candidates, usd, posts: posts.length, errors, prevAt: last?.at || null });
+    await kv.set(LAST, { at: now, startedAt: job.startedAt, by: job.by, formats, sounds, music, candidates, usd, posts: posts.length, errors, prevAt: prevEntry?.at || null, hist: pushHist(hist, now, prevSnapshot(formats)) });
     await kv.del(JOB);
     return { collected: true, posts: posts.length, usd };
   } finally {
@@ -158,8 +178,8 @@ export async function collectTrends() {
   }
 }
 
-/** Giro notturno: raccoglie quello avviato la notte prima, poi avvia il nuovo se è passata una settimana. */
-export async function weeklyTrends() {
+/** Giro notturno: raccoglie quello avviato la notte prima, poi avvia il nuovo (una volta al giorno). */
+export async function dailyTrends() {
   if (!apifyConfigured()) return { skip: "no-apify-token" };
   const c = await collectTrends();
   const s = c.pending ? { busy: true } : await startTrends();
@@ -175,6 +195,7 @@ export async function loadTrends() {
   // chi nel frattempo è entrato nel Radar non si propone più
   const inRadar = new Set(profiles.map((p) => p.id));
   if (l?.candidates) l.candidates = l.candidates.filter((c) => !inRadar.has(c.id));
+  if (l) delete l.hist;
   return {
     queries, last: l,
     running: j ? { startedAt: j.startedAt, by: j.by } : null,

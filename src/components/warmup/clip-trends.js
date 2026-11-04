@@ -2,7 +2,8 @@
 
 // Trend del clipping (scheda del Radar): i formati che in queste settimane fanno numeri su tanti
 // account diversi. Logica in lib/clip-trends-core.js, dati da /api/admin/clip-radar?trends=1
-// (ricerche settimanali su TikTok e Instagram con Apify, solo contenuti pubblici).
+// (ricerche giornaliere su TikTok e Instagram con Apify, solo contenuti pubblici) + audio che tornano
+// sulle pagine del Radar + musica in salita negli USA.
 import { useState } from "react";
 import useSWR from "swr";
 import { ExternalLink, Music, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -120,7 +121,20 @@ function SoundRow({ s }) {
       <span style={{ fontSize: 14.5, fontWeight: 500, minWidth: 0, flex: "1 1 200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name || "audio senza nome"}</span>
       <span style={{ ...hint, fontSize: 13, ...NUM }}>{s.accounts} account · {s.hits} sopra le {shortNum(HIT_VIEWS)}{s.medianViews != null ? ` · di solito ${shortNum(s.medianViews)}` : ""}{s.shareRate != null ? ` · ${pct(s.shareRate)} condivisioni` : ""}</span>
       {s.countries?.length > 0 && <Chip>{s.countries.map((c) => c.toUpperCase()).join(" · ")}</Chip>}
+      {s.radar > 0 && <Chip color={CP.accentGreen} title="Usato anche dai profili che seguiamo nel Radar">nel Radar</Chip>}
       {top && <a href={top.url} target="_blank" rel="noopener noreferrer" style={{ ...btnSm, textDecoration: "none" }}><ExternalLink size={13} />Ascolta</a>}
+    </div>
+  );
+}
+
+function MusicRow({ m }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${CP.borderSoft}`, flexWrap: "wrap" }}>
+      <Music size={15} style={{ color: CP.textMuted, flex: "0 0 auto" }} />
+      <span style={{ fontSize: 14.5, fontWeight: 500, minWidth: 0, flex: "1 1 200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}{m.artist ? <span style={{ ...hint, fontWeight: 400 }}> · {m.artist}</span> : null}</span>
+      <span style={{ ...hint, fontSize: 13, ...NUM }}>+{shortNum(m.change)} video in 7 giorni{m.growthPct != null ? ` (+${m.growthPct}%)` : ""} · {shortNum(m.usage)} in tutto</span>
+      {m.charts?.includes("viral") && <Chip color={CP.accentGreen} title="Nella classifica Viral di TikTok USA: sale di colpo">virale</Chip>}
+      {m.url && <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ ...btnSm, textDecoration: "none" }}><ExternalLink size={13} />Ascolta</a>}
     </div>
   );
 }
@@ -147,7 +161,9 @@ export default function ClipTrends({ cf, setCf }) {
   const formats = (data.last?.formats || []).filter(inC);
   const withResults = formats.filter((f) => f.found > 0);
   const empty = formats.filter((f) => f.found === 0);
-  const sounds = (data.last?.sounds || []).filter(inC);
+  // gli audio trovati solo sui profili del Radar non hanno paese: si vedono sempre
+  const sounds = (data.last?.sounds || []).filter((s) => !s.countries?.length || inC(s));
+  const music = cf === "ita" ? [] : data.last?.music || [];
   const live = formats.filter(isLive).length;
   const candidates = (data.last?.candidates || []).filter(inC);
   const follow = async (c) => {
@@ -173,7 +189,7 @@ export default function ClipTrends({ cf, setCf }) {
   return (
     <div>
       <HeroHead eyebrow="Trend del clipping" title="Formati che girano adesso" accent={where}
-        sub="Ogni settimana cerchiamo i formati su TikTok e Instagram: un formato è in trend quando ci fanno numeri tanti account diversi, non un video solo."
+        sub="Ogni notte cerchiamo i formati su TikTok e Instagram e guardiamo gli audio delle pagine che seguiamo: un meme è in trend quando ci fanno numeri tanti account diversi, non un video solo."
         numbers={<>
           <BigNum label="Ricerche" value={queries.length} />
           <BigNum label="Vivi adesso" value={live} strong title={`Formati con almeno ${LIVE_HITS} account diversi sopra le ${shortNum(HIT_VIEWS)} negli ultimi ${TREND_DAYS} giorni`} />
@@ -189,10 +205,17 @@ export default function ClipTrends({ cf, setCf }) {
       {data.last?.errors?.length > 0 && <Notice>Ultimo giro incompleto: {data.last.errors.join("; ")}.</Notice>}
       {msg && <Notice>{msg}</Notice>}
 
+      {sounds.length > 0 && (
+        <div style={{ ...cardBox, marginBottom: 12 }}>
+          <SectionTitle aside="lo stesso audio su più account, nelle ricerche e sulle pagine del Radar: spesso il meme è l'audio">Audio che tornano · {sounds.length}</SectionTitle>
+          {sounds.map((s) => <SoundRow key={s.id} s={s} />)}
+        </div>
+      )}
+
       {!data.last ? (
         <EmptyState title="Ancora nessun giro di ricerche"
           action={refreshBtn}>
-          Le ricerche partono da sole una volta a settimana. La prima la puoi far partire adesso: ci vogliono pochi minuti.
+          Le ricerche partono da sole ogni notte. La prima la puoi far partire adesso: ci vogliono pochi minuti.
         </EmptyState>
       ) : !withResults.length ? (
         <EmptyState title={queries.length ? "Nessun risultato per queste ricerche" : "Nessuna ricerca per questo paese"}
@@ -210,10 +233,10 @@ export default function ClipTrends({ cf, setCf }) {
         </div>
       )}
 
-      {sounds.length > 0 && (
+      {music.length > 0 && (
         <div style={{ ...cardBox, marginTop: 4 }}>
-          <SectionTitle aside="lo stesso audio su più account: spesso il trend è l'audio">Audio che tornano</SectionTitle>
-          {sounds.map((s) => <SoundRow key={s.id} s={s} />)}
+          <SectionTitle aside="classifiche TikTok USA, chi sale di più in una settimana: sono canzoni, non meme, ma molti meme si montano su queste">Musica in salita negli USA · {music.length}</SectionTitle>
+          {music.map((m) => <MusicRow key={m.id} m={m} />)}
         </div>
       )}
 
@@ -236,9 +259,9 @@ export default function ClipTrends({ cf, setCf }) {
       </details>
 
       <details style={{ marginTop: 12 }}>
-        <summary style={{ cursor: "pointer", ...hint, fontSize: 13 }}>Come si leggono i numeri · ricerche una volta a settimana{data.last?.at ? `, l'ultima ${when(data.last.at)}` : ""}</summary>
+        <summary style={{ cursor: "pointer", ...hint, fontSize: 13 }}>Come si leggono i numeri · ricerche ogni notte{data.last?.at ? `, l'ultima ${when(data.last.at)}` : ""}</summary>
         <p style={{ ...hint, margin: "8px 0", maxWidth: 820 }}>
-          Per ogni ricerca prendiamo i video più popolari su TikTok (30, cercati come li vede un utente americano per le ricerche in inglese e italiano per quelle in italiano) e Instagram (20) e contiamo gli ACCOUNT, non i video: «12 account sopra le {shortNum(HIT_VIEWS)}» vuol dire dodici profili diversi che nell&apos;ultimo mese ci hanno fatto almeno {shortNum(HIT_VIEWS)} visualizzazioni. Un video virale da solo può essere un caso; dieci account diversi sono un formato che funziona. «Vivo adesso» = almeno {LIVE_HITS}. Le condivisioni contano più dei like: i meme di coppia si mandano al fidanzato o all&apos;amica, ed è così che un profilo nuovo arriva a chi non lo segue. «Da account piccoli» = profili sotto i {shortNum(SMALL_ACCOUNT)} follower (solo TikTok li dice): lì il merito è del formato. «Profili da seguire» = gli account che in queste ricerche hanno un video sopra le {shortNum(HIT_VIEWS)} e che il Radar non segue ancora (su TikTok solo chi scrive nella lingua del paese): si aggiungono con un clic, non da soli, perché nelle ricerche escono anche pagine fuori nicchia. «In salita / in calo» confronta con il giro della settimana prima. Le copertine scadono dopo qualche giorno: il video si apre comunque dal link. Spesa del mese (Radar e Trend insieme) ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
+          Per ogni ricerca prendiamo i video più popolari su TikTok (30, cercati come li vede un utente americano per le ricerche in inglese e italiano per quelle in italiano) e Instagram (20) e contiamo gli ACCOUNT, non i video: «12 account sopra le {shortNum(HIT_VIEWS)}» vuol dire dodici profili diversi che nell&apos;ultimo mese ci hanno fatto almeno {shortNum(HIT_VIEWS)} visualizzazioni. Un video virale da solo può essere un caso; dieci account diversi sono un formato che funziona. «Vivo adesso» = almeno {LIVE_HITS}. Le condivisioni contano più dei like: i meme di coppia si mandano al fidanzato o all&apos;amica, ed è così che un profilo nuovo arriva a chi non lo segue. «Da account piccoli» = profili sotto i {shortNum(SMALL_ACCOUNT)} follower (solo TikTok li dice): lì il merito è del formato. «Profili da seguire» = gli account che in queste ricerche hanno un video sopra le {shortNum(HIT_VIEWS)} e che il Radar non segue ancora (su TikTok solo chi scrive nella lingua del paese): si aggiungono con un clic, non da soli, perché nelle ricerche escono anche pagine fuori nicchia. «In salita / in calo» confronta con il giro di circa una settimana prima. «Audio che tornano» = lo stesso audio usato da almeno 3 account diversi, contando sia i video delle ricerche sia quelli dei profili del Radar («nel Radar»): così un meme nuovo si vede anche se nessuna ricerca lo nomina. «Musica in salita» = le canzoni che nell&apos;ultima settimana sono state usate in più video nuovi su TikTok USA (classifiche Popular e Viral). Le copertine scadono dopo qualche giorno: il video si apre comunque dal link. Spesa del mese (Radar e Trend insieme) ~{String(data.spent).replace(".", ",")} $ su un tetto di {data.cap} $.
         </p>
         {data.last && refreshBtn}
       </details>
