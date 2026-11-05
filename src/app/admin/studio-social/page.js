@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /admin/studio-social — Studio social: i profili social delle creator gestiti dalla redazione.
+ * /admin/studio-social — Regia social (fino al 31/10/2026 «Studio social»): i profili social delle creator gestiti dalla redazione.
  *
  * Una scheda per profilo: fase (rodaggio/lancio/crescita), quanti contenuti ci sono in ogni passo
  * della coda e il prossimo in programma. Dentro il profilo: identità, coda, lista del giorno.
@@ -14,6 +14,8 @@ import { Plus } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
 import { PLATFORMS, PLATFORM_LABEL, STATUSES, phaseLine } from "@/lib/studio-social-core";
 
 const fetcher = async (url) => {
@@ -67,16 +69,70 @@ function NewProfile({ open, onClose, onSaved }) {
   );
 }
 
+/*
+ * Vetro: «a che punto è la coda dei contenuti, e cosa aspetta una persona?» — tutti i contenuti dei
+ * profili in una barra nell'ordine del lavoro (idea → pubblicato), accanto «Da approvare».
+ */
+function StudioTop({ profiles }) {
+  const sum = (k) => profiles.reduce((a, p) => a + (p.counts?.[k] || 0), 0);
+  const items = STATUSES.filter((x) => x.key !== "scartato").map((x, k) => ({ label: x.label, value: sum(x.key), color: x.key === "pubblicato" ? CP.accentGreen : undefined, k }));
+  const toApprove = sum("da_approvare");
+  return (
+    <div className="vt-row21" style={{ marginBottom: 16 }}>
+      <Panel title="La coda dei contenuti" aside={`${profiles.length} ${profiles.length === 1 ? "profilo" : "profili"} · dall'idea al pubblicato`} i={0}>
+        {items.some((x) => x.value > 0) ? <MixBar items={items} format={(v) => String(v)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun contenuto in coda.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={1} lvl={toApprove ? "ink" : "0"} label="Da approvare" value={toApprove} sub={toApprove ? "pronti: una persona li guarda prima che escano" : "niente in attesa"} />
+      </div>
+    </div>
+  );
+}
+
+/** Una scheda profilo nell'elenco (anche negli archiviati). */
+function ProfileCard({ p, today }) {
+  const open = STATUSES.filter((s) => !["pubblicato", "scartato"].includes(s.key)).reduce((n, s) => n + (p.counts?.[s.key] || 0), 0);
+  return (
+    <Link href={`/admin/studio-social/${encodeURIComponent(p.id)}`} style={{ ...card, padding: 16, textDecoration: "none", display: "block" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+        <div style={{ width: 42, height: 42, borderRadius: "50%", background: CP.accentSoft, color: CP.accentSoftText, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>
+          {(p.handle || "?").replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>@{p.handle}</div>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>{[p.creator, PLATFORM_LABEL[p.platform], p.format && `format ${p.format}`].filter(Boolean).join(" · ")}</div>
+        </div>
+      </div>
+      <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>{phaseLine(p, today)}</div>
+      <div style={{ display: "flex", gap: 16, fontSize: 13, color: CP.textMuted }}>
+        <span><span style={{ color: CP.textPrimary, ...NUM }}>{open}</span> in lavorazione</span>
+        <span><span style={{ color: CP.textPrimary, ...NUM }}>{p.counts?.da_approvare || 0}</span> da approvare</span>
+        <span><span style={{ color: CP.textPrimary, ...NUM }}>{p.counts?.pubblicato || 0}</span> pubblicati</span>
+      </div>
+      {p.next && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${CP.borderSoft}`, fontSize: 13, color: CP.textSecondary }}>
+          Prossimo: <span style={{ color: CP.textPrimary }}>{p.next.title}</span> · {fmtDay(p.next.day)}
+        </div>
+      )}
+    </Link>
+  );
+}
+
 export default function StudioSocialPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/studio-social", fetcher, { revalidateOnFocus: false });
   const [creating, setCreating] = useState(false);
-  const profiles = data?.profiles || [];
+  const all = data?.profiles || [];
+  // Archiviati (31/10/2026): fuori dall'elenco e dai conteggi, consultabili in fondo. Mai cancellati.
+  const profiles = all.filter((p) => !p.archived);
+  const archived = all.filter((p) => p.archived);
+  const [showArchived, setShowArchived] = useState(false);
+  const inVetro = useInVetro();
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1200, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Studio social" }]}
-        title="Studio social"
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Regia social" }]}
+        title="Regia social"
         subtitle="I profili social delle creator gestiti dalla redazione: chi sono, cosa pubblicano e cosa c'è da fare oggi. Ogni contenuto passa dai revisori prima di uscire; follow e commenti si fanno a mano."
         actions={
           <button onClick={() => setCreating(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONTS.body }}>
@@ -100,35 +156,24 @@ export default function StudioSocialPage() {
         </div>
       )}
 
+      {inVetro && profiles.length > 0 && <StudioTop profiles={profiles} />}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 14 }}>
-        {profiles.map((p) => {
-          const open = STATUSES.filter((s) => !["pubblicato", "scartato"].includes(s.key)).reduce((n, s) => n + (p.counts?.[s.key] || 0), 0);
-          return (
-            <Link key={p.id} href={`/admin/studio-social/${encodeURIComponent(p.id)}`} style={{ ...card, padding: 16, textDecoration: "none", display: "block" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <div style={{ width: 42, height: 42, borderRadius: "50%", background: CP.accentSoft, color: CP.accentSoftText, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>
-                  {(p.handle || "?").replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase()}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>@{p.handle}</div>
-                  <div style={{ fontSize: 13, color: CP.textSecondary }}>{[p.creator, PLATFORM_LABEL[p.platform], p.format && `format ${p.format}`].filter(Boolean).join(" · ")}</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 10 }}>{phaseLine(p, data?.today)}</div>
-              <div style={{ display: "flex", gap: 16, fontSize: 13, color: CP.textMuted }}>
-                <span><span style={{ color: CP.textPrimary, ...NUM }}>{open}</span> in lavorazione</span>
-                <span><span style={{ color: CP.textPrimary, ...NUM }}>{p.counts?.da_approvare || 0}</span> da approvare</span>
-                <span><span style={{ color: CP.textPrimary, ...NUM }}>{p.counts?.pubblicato || 0}</span> pubblicati</span>
-              </div>
-              {p.next && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${CP.borderSoft}`, fontSize: 13, color: CP.textSecondary }}>
-                  Prossimo: <span style={{ color: CP.textPrimary }}>{p.next.title}</span> · {fmtDay(p.next.day)}
-                </div>
-              )}
-            </Link>
-          );
-        })}
+        {profiles.map((p) => <ProfileCard key={p.id} p={p} today={data?.today} />)}
       </div>
+
+      {archived.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived} style={{ background: "none", border: "none", padding: 0, color: CP.textSecondary, fontSize: 14, cursor: "pointer", fontFamily: FONTS.body }}>
+            {showArchived ? "Nascondi" : "Mostra"} archiviati ({archived.length})
+          </button>
+          {showArchived && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 14, marginTop: 12, opacity: 0.75 }}>
+              {archived.map((p) => <ProfileCard key={p.id} p={p} today={data?.today} />)}
+            </div>
+          )}
+        </div>
+      )}
 
       <NewProfile open={creating} onClose={() => setCreating(false)} onSaved={async () => { setCreating(false); await mutate(); }} />
     </div>

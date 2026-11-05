@@ -231,6 +231,70 @@ export const CP_NOTTE_CALDA = {
   textMuted: "#a8a092", mutedIcons: "#857d70", hover: "rgba(255,245,225,.04)",
 };
 
+// "Vetro caldo" (25/10/2026, prova su Casa e Le mie creator — Nicholas dal reel @code.xr «Glassy
+// Dashboard V2»): vetro color sabbia sopra un fondo sfumato legno/sabbia, pulsanti neri e bianchi,
+// verde solo per il buon andamento. NON è un tema dell'app: lo applica <VetroScope> alle sole pagine
+// in prova (variabili ridefinite sul contenitore). Vetro anche sulle tabelle (scelta di Nicholas).
+export const CP_VETRO = {
+  ...CP_CASA_CHIARA,
+  bgSunken: "transparent", bg: "transparent",
+  surface: "rgba(250,244,236,.40)", surfaceAlt: "rgba(255,250,244,.62)",
+  panel: "#f3ebe1",
+  border: "rgba(255,255,255,.55)", borderSoft: "rgba(60,35,15,.10)", borderStrong: "rgba(60,35,15,.22)",
+  textPrimary: "#1d1510", textSecondary: "rgba(29,21,16,.76)", textMuted: "rgba(29,21,16,.62)", mutedIcons: "rgba(29,21,16,.5)",
+  accent: "#1d1510", accentInk: "#ffffff", accentSoft: "rgba(255,255,255,.62)", accentSoftText: "#1d1510", accentDim: "rgba(29,21,16,.22)",
+  accentGreen: "#11673f", accentRed: "#9e2a33", accentBlue: "rgba(29,21,16,.76)",
+  dangerSoft: "rgba(158,42,51,.08)",
+  gold: "#7a4f14", goldSoft: "rgba(122,79,20,.08)", track: "rgba(60,35,15,.16)", neu: "rgba(29,21,16,.8)",
+  ruleData: "rgba(60,35,15,.22)", fieldBd: "rgba(60,35,15,.28)", sel: "rgba(255,255,255,.45)", hover: "rgba(255,255,255,.22)",
+  scrim: "rgba(40,24,14,.35)", cool: "#2f5a9e", warm: "#11673f",
+  heroBg: "rgba(250,244,236,.40)",
+  tierTop: "#7a4f14", tierStrong: "#1d1510",
+  attn: "#1d1510", scale: "#11673f",
+};
+
+// "Vetro bianco e blu" (26/10/2026, Nicholas sceglie la prima prova del canvas, quella fatta sulla
+// copertina del reel 1): vetro bianco su un fondo azzurro con macchie di colore sfocate, inchiostro
+// blu notte, accento viola HOC per ciò che si clicca. Stesso uso di CP_VETRO (solo dentro <VetroScope>).
+export const CP_VETRO_BLU = {
+  ...CP_VETRO,
+  surface: "rgba(255,255,255,.55)", surfaceAlt: "rgba(255,255,255,.74)",
+  panel: "#f6f8fc",
+  border: "rgba(255,255,255,.85)", borderSoft: "rgba(20,30,60,.08)", borderStrong: "rgba(20,30,60,.18)",
+  textPrimary: "#141a2e", textSecondary: "#4a536b", textMuted: "#5f6880", mutedIcons: "rgba(20,26,46,.45)",
+  accent: "#6353e0", accentInk: "#ffffff", accentSoft: "rgba(99,83,224,.10)", accentSoftText: "#4a3cc4", accentDim: "rgba(99,83,224,.25)",
+  accentGreen: "#147a4c", accentRed: "#b4303d", accentBlue: "#2f6bff",
+  dangerSoft: "rgba(180,48,61,.08)",
+  gold: "#8a5a00", goldSoft: "rgba(138,90,0,.08)", track: "rgba(20,30,60,.10)", neu: "rgba(20,26,46,.8)",
+  ruleData: "rgba(20,30,60,.18)", fieldBd: "rgba(20,30,60,.22)", sel: "rgba(99,83,224,.08)", hover: "rgba(255,255,255,.4)",
+  scrim: "rgba(20,26,46,.32)", cool: "#2f6bff", warm: "#147a4c",
+  heroBg: "rgba(255,255,255,.55)",
+  tierTop: "#6353e0", tierStrong: "#141a2e",
+  attn: "#141a2e", scale: "#6353e0",
+};
+
+// "Vetro notte" (4/11/2026, Nicholas: «riusciamo a fare la modalità scura?»): lo stesso vetro sul tema
+// scuro (selettore sole/luna in fondo al menu). Solo dentro <VetroScope>.
+export const CP_VETRO_NOTTE = {
+  // 5/11/2026, Nicholas: «colori poco accesi» → «mezzanotte»: nero blu profondo con luci indaco e ciano,
+  // testo bianco pieno, accento indaco acceso, verde e rosso più vivi.
+  ...CP_DARK,
+  bgSunken: "transparent", bg: "transparent",
+  surface: "rgba(17,22,52,.5)", surfaceAlt: "rgba(34,42,92,.72)",
+  panel: "#0f1433",
+  border: "rgba(129,140,248,.2)", borderSoft: "rgba(255,255,255,.06)", borderStrong: "rgba(129,140,248,.32)",
+  textPrimary: "#ffffff", textSecondary: "#d6d8e4", textMuted: "#9aa0b4", mutedIcons: "rgba(255,255,255,.45)",
+  accent: "#818cf8", accentInk: "#0b0d26", accentSoft: "rgba(129,140,248,.18)", accentSoftText: "#c7cbff", accentDim: "rgba(129,140,248,.32)",
+  accentGreen: "#34d399", accentRed: "#fb7185", accentBlue: "#60a5fa",
+  logoFilter: "brightness(0) invert(1)", dangerSoft: "rgba(251,113,133,.12)",
+  gold: "#fbbf24", goldSoft: "rgba(251,191,36,.12)", track: "rgba(255,255,255,.10)", neu: "rgba(255,255,255,.82)",
+  ruleData: "rgba(255,255,255,.18)", fieldBd: "rgba(129,140,248,.3)", sel: "rgba(129,140,248,.16)", hover: "rgba(255,255,255,.05)",
+  scrim: "rgba(3,4,14,.66)", cool: "#22d3ee", warm: "#34d399",
+  heroBg: "rgba(17,22,52,.5)",
+  tierTop: "#818cf8", tierStrong: "#ffffff",
+  attn: "#ffffff", scale: "#818cf8",
+};
+
 // Scala per i DATI (sequenziale, separata dall'accento viola che è per ciò che si
 // clicca): chiaro = valore basso. Una tinta, 5 passi, per tema.
 export const DATA_SCALE = {

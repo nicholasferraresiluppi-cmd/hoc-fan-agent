@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/sync — stato e comandi della sincronizzazione con ClickUp (SEED).
+ * /api/admin/hr/sync — stato e comandi della sincronizzazione con ClickUp (people.manage).
  *
  * GET  → configurazione (lista impostata? token? chiave CF?), webhook registrato,
  *        ultimo import, conflitti recenti, campi attesi vs presenti sulla lista.
@@ -11,6 +11,9 @@
  *        verso localhost: ClickUp deve poterlo raggiungere.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { realignCrmViews, lastViewsReport } from "@/lib/hr-views";
+import { syncContractMilestones, milestoneStatus } from "@/lib/hr-contract-milestone";
+import { stripContractLinks } from "@/lib/hr-block-cleanup";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
@@ -23,18 +26,37 @@ function webhookEndpoint(request) {
 }
 
 export async function GET(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
-  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request) });
+  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport(), milestones: await milestoneStatus().catch(() => null) });
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { body = {}; }
   try {
+    // vista e webhook toccano la configurazione di ClickUp: restano agli admin (18/10/2026)
+    if ((body?.action === "view_columns" || body?.action === "register_webhook") && !(await authorize(CAPABILITIES.SEED)).ok) {
+      return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+    }
+    // viste del CRM sui campi nuovi (18/10/2026): anteprima, poi apply (scrive su ClickUp: solo admin)
+    if (body?.action === "views_realign") {
+      const apply = body.apply === true;
+      if (apply && !(await authorize(CAPABILITIES.SEED)).ok) return Response.json({ ok: false, error: "Serve un admin." }, { status: 403 });
+      const r = await realignCrmViews({ apply, by: az.userId });
+      return Response.json(r, { status: r.ok ? 200 : 400 });
+    }
+    if (body?.action === "strip_contract_link") {
+      const r = await stripContractLinks({ budgetMs: 45_000 });
+      return Response.json(r.ok ? r : { ...r, error: `Non fatto: ${r.reason}.` }, { status: r.ok ? 200 : 409 });
+    }
+    if (body?.action === "contract_milestones") {
+      const r = await syncContractMilestones({ by: az.userId, waitMs: 15_000 });
+      return Response.json(r.ok ? r : { ...r, error: `Non aggiornato: ${r.reason}. Riprova tra un minuto.` }, { status: r.ok ? 200 : 409 });
+    }
     if (body?.action === "import") {
       const r = await importFromClickup({ mode: "import", by: az.userId });
       return Response.json(r, { status: r.ok || r.skipped ? 200 : r.busy ? 409 : 502 });

@@ -213,7 +213,7 @@ export function buildInsights(r, now = Date.now()) {
     out.push({
       kind: "info",
       title: `${r.never_opened.length} voci di menu mai aperte in ${r.window} giorni`,
-      text: `Es. ${r.never_opened.slice(0, 4).map((n) => n.label).join(", ")}. Sono candidate a finire in modalità Advanced o a sparire: meno voci = app più leggibile.`,
+      text: `Es. ${r.never_opened.slice(0, 4).map((n) => n.label).join(", ")}. Sono candidate a uscire dal menu delle mansioni (restano in «Tutti gli strumenti») o a sparire: meno voci = app più leggibile.`,
     });
   }
 

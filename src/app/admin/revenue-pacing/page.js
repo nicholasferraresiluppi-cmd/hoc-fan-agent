@@ -17,6 +17,9 @@ import { Disclosure, Notice, card, NUM } from "@/components/ds";
 import RaceHero from "./RaceHero";
 import { suggestedGoal } from "@/lib/live-priority";
 import { waitingNow } from "../chat-monitor/ui";
+import { alertDialog } from "@/components/AppDialogs";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MonthArea, MixBar, Bars, usd } from "@/components/VetroCharts";
 
 const errText = (status) =>
   status === 401 || status === 403 ? "Non hai il permesso per vedere questi dati." :
@@ -111,6 +114,7 @@ export default function RevenuePacingPage() {
   useEffect(() => { try { const v = localStorage.getItem("hoc:live:paese"); if (v) setCountryState(v); } catch {} }, []);
   const setCountry = (c) => { setCountryState(c); try { localStorage.setItem("hoc:live:paese", c); } catch {} };
   const [tab, setTab] = useState("mese");
+  const [vetro, setVetro] = useVetro();
   const [refreshing, setRefreshing] = useState(false);
   const apiUrl = slug == null ? null : `/api/admin/revenue-pacing${slug ? `?creator=${encodeURIComponent(slug)}` : ""}`;
   const { data, error, isLoading, mutate } = useSWR(apiUrl, liveFetcher, { revalidateOnFocus: false });
@@ -151,7 +155,7 @@ export default function RevenuePacingPage() {
       const fresh = await liveFetcher(`/api/admin/revenue-pacing?refresh=1&creator=${encodeURIComponent(data?.creator || slug || "")}`);
       await mutate(fresh, { revalidate: false });
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     } finally {
       setRefreshing(false);
     }
@@ -163,13 +167,15 @@ export default function RevenuePacingPage() {
 
   return (
     <CountriesCtx.Provider value={COUNTRIES}>
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+    <VetroScope on={vetro}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px 60px", fontFamily: FONTS.body }}>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: CP.textPrimary, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 14, height: 14, background: CP.accent, transform: "rotate(45deg)", borderRadius: 2, display: "inline-block" }} />
           Revenue Analytics{creatorName ? ` · ${creatorName}` : ""}
         </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: CP.textMuted }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: CP.textMuted, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <VetroSwitch on={vetro} set={setVetro} />
           {data?.updated_at && <span>{new Date(data.updated_at).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
           <button onClick={refresh} disabled={refreshing} title="Aggiorna ora" aria-label="Aggiorna ora" style={iconBtn}>
             <RefreshCw size={14} style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
@@ -206,6 +212,7 @@ export default function RevenuePacingPage() {
       {row && <div style={{ textAlign: "center", fontSize: 12, color: CP.textMuted, marginTop: 20 }}>Fonte: BigQuery HOC · {COUNTRY_LONG[country]} · i giorni sono in ora UTC</div>}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
+    </VetroScope>
     </CountriesCtx.Provider>
   );
 }
@@ -280,11 +287,12 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
 
   return (
     <>
+      <MonthOverview row={row} rows={data.data || []} goal={goal} goalSuggested={goalSuggested} country={country} month={month} daily={daily} />
       <RaceHero row={row} goal={goal} goalSuggested={goalSuggested} month={month} daily={daily} creatorName={creatorName} onSetGoal={openGoals} chat={chat} />
       <Disclosure open={detailsOpen} onToggle={() => setDetailsOpen((o) => !o)} title="Tutti i numeri del mese"
         summary="Composizione del revenue, proiezioni, monetizzazione dei nuovi, obiettivo e mese scorso">
       <div style={grid(240)}>
-        <div style={box}>
+        <div className="vt-glass" style={box}>
           <Label tip="Revenue netto incassato dal primo del mese a oggi, diviso tra nuovi abbonati del mese e abbonati dei mesi prima.">Revenue del mese</Label>
           <div style={big}>{fmt$(row.revenue_mtd)}</div>
           <div style={small}>Giorno {row.day_of_month}/{row.days_in_month} · {row.days_remaining}gg rimasti</div>
@@ -296,7 +304,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
           </div>
         </div>
 
-        <div style={box}>
+        <div className="vt-glass" style={box}>
           <Label tip="Dove chiude il mese: ogni giorno pesa quanto ha pesato negli ultimi 12 mesi chiusi (gli ultimi 3 mesi contano il triplo). Il confronto è con la media degli ultimi 12 mesi.">Proiezione fine mese</Label>
           <div style={big}>{fmt$(row.revenue_proj_eom)}</div>
           <div style={{ ...small, color: tone(row.revenue_delta_vs_hist) }}>{signed$(row.revenue_delta_vs_hist)} vs storico ({signedPct(deltaHistPct, 0)})</div>
@@ -311,7 +319,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
           <div style={{ ...small, marginTop: 6 }}>{country === "ALL" ? "Somma degli account" : COUNTRY_LONG[country]}</div>
         </div>
 
-        <div style={box}>
+        <div className="vt-glass" style={box}>
           <Label tip="Fan che si sono iscritti per la prima volta questo mese. Spendenti = hanno già fatto almeno un acquisto.">Nuovi sub del mese</Label>
           <div style={big}>{fmtInt(row.new_subs_mtd)}</div>
           <div style={{ ...small, color: tone(subsVsHist) }}>Proiezione: {fmtInt(row.new_subs_proj_eom)} ({signedPct(subsVsHist, 0)} vs storico)</div>
@@ -324,7 +332,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
         </div>
       </div>
 
-      <div style={{ ...box, marginTop: 10 }}>
+      <div className="vt-glass" style={{ ...box, marginTop: 10 }}>
         <Label tip="Incassato del mese contro l'obiettivo. Ritmo atteso = quota di mese trascorsa (giorni passati ÷ giorni del mese).">
           Obiettivo mensile · {COUNTRY_LONG[country]} — {monthName(month)}{goalSuggested ? " · suggerito (mese prima +10%)" : ""}
         </Label>
@@ -356,7 +364,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
         )}
       </div>
 
-      <div style={{ ...box, marginTop: 10 }}>
+      <div className="vt-glass" style={{ ...box, marginTop: 10 }}>
         <Label tip="Quanto rendono i nuovi abbonati del mese, contro la media degli ultimi 12 mesi.">Monetizzazione acquisizioni — mese corrente</Label>
         <div style={{ ...grid(160), marginTop: 8 }}>
           <Mini k="LTV mese" v={fmt$2(row.current_month_ltv)} s="Rev new sub / tot sub" />
@@ -367,7 +375,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
       </div>
 
       <SectionLabel tip="Revenue del mese diviso tra i nuovi abbonati (prima iscrizione questo mese) e tutti gli altri.">Composizione revenue generato</SectionLabel>
-      <div style={{ ...box, borderColor: alpha(CP.accent, "55") }}>
+      <div className="vt-glass" style={{ ...box, borderColor: alpha(CP.accent, "55") }}>
         <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase", color: CP.accent }}>New sub (mese corrente)</div>
         <div style={big}>{fmt$(row.new_sub_revenue_mtd)}</div>
         <Row k="% del totale generato" v={pct(pNew)} />
@@ -379,7 +387,7 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
         </div>
       </div>
 
-      <div style={{ ...box, marginTop: 10 }}>
+      <div className="vt-glass" style={{ ...box, marginTop: 10 }}>
         <Label tip="Quanto dovrebbero spendere entro fine mese i nuovi abbonati previsti: nuovi a fine mese × quota storica che compra × spesa media storica di chi compra.">Revenue atteso da nuovi sub</Label>
         <div style={{ marginTop: 8 }}>
           <Row k="New sub proiettati a fine mese" v={fmtInt(row.new_subs_proj_eom)} />
@@ -402,6 +410,77 @@ function MonthTab({ row, goal, goalSuggested, country, month, daily, data, mutat
         </Disclosure>
       </div>
     </>
+  );
+}
+
+// Colpo d'occhio del mese (solo col vetro, 26/10/2026): quattro riquadri, il mese che sale contro
+// il mese prima e il ritmo del traguardo, e da dove arriva il venduto (paesi col Totale, altrimenti
+// nuovi abbonati contro chi c'era già). Stessi numeri dei riquadri di dettaglio: niente query nuove.
+function MonthOverview({ row, rows, goal, goalSuggested, country, month, daily }) {
+  const inVetro = useInVetro();
+  const COUNTRIES = useCountries();
+  if (!inVetro) return null;
+  const [y, m] = month.split("-").map(Number);
+  const prevKey = addMonths(month, -1);
+  const prevDays = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+  const dayKey = (key, d) => `${key}-${String(d).padStart(2, "0")}`;
+  const cur = Array.from({ length: row.days_in_month }, (_, i) => daily.get(dayKey(month, i + 1))?.rev || 0);
+  const prev = Array.from({ length: prevDays }, (_, i) => daily.get(dayKey(prevKey, i + 1))?.rev || 0);
+  const hasPrev = prev.some((v) => v > 0);
+  const closed = Math.max(0, row.day_of_month - 1); // oggi è in corso
+  const sparkRev = cur.slice(0, closed);
+  // il mese prima agli stessi giorni chiusi: confronto onesto a metà mese
+  const prevSame = prev.slice(0, closed).reduce((a, v) => a + v, 0);
+  const curClosed = sparkRev.reduce((a, v) => a + v, 0);
+  const vsPrev = hasPrev && prevSame > 0 && closed > 0 ? (curClosed - prevSame) / prevSame : null;
+  const spenders = row.current_month_converting_new_subs || 0;
+  const tot = (row.new_sub_revenue_mtd || 0) + (row.retention_revenue_mtd || 0);
+  const pNew = div(row.new_sub_revenue_mtd, tot);
+  const curName = MONTHS_IT[m - 1], prevName = MONTHS_IT[(m + 10) % 12];
+  const Cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const green = (t) => <span style={{ color: CP.accentGreen }}>{t}</span>;
+
+  const byCountry = country === "ALL" && COUNTRIES.length > 1
+    ? COUNTRIES.map((c) => ({ label: COUNTRY_LONG[c], value: Number(rows.find((r) => r.country === c)?.revenue_mtd) || 0 }))
+        .filter((x) => x.value > 0).sort((a, b) => b.value - a.value)
+    : null;
+  const mix = byCountry || (tot > 0 ? [
+    { label: "Nuovi abbonati del mese", value: row.new_sub_revenue_mtd || 0 },
+    { label: "Abbonati di prima", value: row.retention_revenue_mtd || 0 },
+  ].sort((a, b) => b.value - a.value) : []);
+
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): la domanda «arriva al traguardo?» ha già il suo
+  // widget, la corsa del mese qui sotto (RaceHero: dove sei, dove dovresti essere, arrivo previsto) → niente
+  // riquadri che la ripetono. Qui solo ciò che la corsa non dice: come sale il mese contro il mese prima,
+  // da dove arriva il venduto (barra del mix: paesi o nuovi/vecchi abbonati) e i nuovi abbonati giorno per
+  // giorno, oggi evidenziato.
+  const subsDays = Array.from({ length: row.day_of_month }, (_, i) => daily.get(dayKey(month, i + 1))?.subs || 0);
+
+  return (
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{Cap(curName)} giorno per giorno</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{usd(row.revenue_mtd)}{vsPrev == null ? "" : <> · {vsPrev >= 0 ? green(`${signedPct(vsPrev, 0)} sul ${prevName}`) : `${signedPct(vsPrev, 0)} sul ${prevName}`} agli stessi giorni</>}</div>
+        </div>
+        <MonthArea cur={cur} prev={hasPrev ? prev : []} days={row.days_in_month} prevDays={prevDays} upto={row.day_of_month}
+          goal={goal} curLabel={Cap(curName)} prevLabel={Cap(prevName)} />
+      </section>
+      <div style={{ display: "grid", gap: 14, minWidth: 0, alignContent: "start" }}>
+        {mix.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>{byCountry ? "Venduto per paese" : "Da dove arriva il venduto"}</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 12 }}>{byCountry ? `a ${curName}` : `${pct(pNew, 0)} dai fan arrivati a ${curName}`}</div>
+            <MixBar items={mix} height={26} />
+          </section>
+        )}
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 4 }}>Nuovi abbonati al giorno</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginBottom: 10, ...NUM }}>{fmtInt(row.new_subs_mtd)} a {curName}, {fmtInt(spenders)} hanno già comprato · oggi in corso</div>
+          <Bars data={subsDays} hi={subsDays.length - 1} partial unit=" nuovi" height={110} />
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -445,12 +524,12 @@ function RecentTab({ row, country, month, daily }) {
     <>
       <SectionLabel tip="Il mese scorso intero contro il mese in corso fino a oggi.">Mese precedente vs in corso</SectionLabel>
       <div style={grid(260)}>
-        <div style={box}>
+        <div className="vt-glass" style={box}>
           <Label>{monthName(prevMonth)} (completo)</Label>
           <div style={big}>{fmt$(prev.rev)}</div>
           <div style={small}>{fmtInt(prev.subs)} nuovi sub</div>
         </div>
-        <div style={{ ...box, borderColor: CP.accent, background: alpha(CP.accent, "0d") }}>
+        <div className="vt-glass" style={{ ...box, borderColor: CP.accent, background: alpha(CP.accent, "0d") }}>
           <Label>{monthName(month)} (in corso)</Label>
           <div style={big}>{fmt$(cur.rev)}</div>
           <div style={small}>{fmtInt(cur.subs)} nuovi sub</div>
@@ -463,7 +542,7 @@ function RecentTab({ row, country, month, daily }) {
           const dr = div(a.rev - b.rev, b.rev);
           const ds = div(a.subs - b.subs, b.subs);
           return (
-            <div key={n} style={box}>
+            <div key={n} className="vt-glass" style={box}>
               <Label>Ultimi {n} giorni (oggi escl.)</Label>
               <div style={{ ...label, fontSize: 10.5, marginTop: 8 }}>Revenue</div>
               <div style={{ fontSize: 18, fontWeight: 500, color: CP.textPrimary, ...NUM }}>{fmt$(a.rev)}</div>
@@ -500,7 +579,7 @@ function LineChart({ points, k, fmt }) {
   const labelEvery = Math.ceil(points.length / 7);
   const h = hover != null ? points[hover] : null;
   return (
-    <div style={{ ...box, padding: "10px 12px", position: "relative" }}>
+    <div className="vt-glass" style={{ ...box, padding: "10px 12px", position: "relative" }}>
       {h && (
         <div style={{ position: "absolute", top: 8, right: 12, fontSize: 12, color: CP.textSecondary, ...NUM }}>
           {shortDate(h.date)}: <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmt(h[k])}</b>
@@ -551,7 +630,7 @@ function DailyTable({ country, today, daily }) {
   return (
     <>
       <SectionLabel tip="Ogni giorno confrontato con lo stesso giorno del mese precedente; cumulativo = totale del mese fino a quel giorno.">Dettaglio giornaliero — ultimi 14gg</SectionLabel>
-      <div style={box}>
+      <div className="vt-glass" style={box}>
         <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
           <button onClick={() => setMode("rev")} style={tabBtn(isRev)}>Revenue</button>
           <button onClick={() => setMode("subs")} style={tabBtn(!isRev)}>Nuovi Sub</button>

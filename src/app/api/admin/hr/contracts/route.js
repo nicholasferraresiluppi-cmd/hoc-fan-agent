@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/contracts — contratti Dropbox Sign nel Centro HR (SEED, 09/10/2026).
+ * /api/admin/hr/contracts — contratti Dropbox Sign nel Centro HR (people.manage, 09/10/2026).
  *
  * GET  → { view (stato per persona, contratti, senza scheda), configured, sync }
  * POST → { action: "sync" }                       aggiorna da Dropbox Sign adesso (a budget)
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET() {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { view, people } = await getView();
   const phases = Object.fromEntries(people.filter((p) => !p.archived).map((p) => [p.id, { phase: p.fields?.collaborationStatus || null, mansioni: p.fields?.mansioni || [] }]));
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Radio, Play, Square, RefreshCw, UserPlus, ShieldAlert, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { fmt$ } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM, Tabs } from "@/components/ds";
 
 const LIVE_POLL_MS = 120_000;
 const QUICK_TAGS = [
@@ -336,7 +336,7 @@ export default function CmCockpitPage() {
 
   /* ---------- render ---------- */
   const shell = (children, actions) => (
-    <div style={{ padding: "28px 24px 80px", maxWidth: 1180, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 80px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Cockpit CM" }]}
         title="Cockpit CM"
@@ -360,10 +360,7 @@ export default function CmCockpitPage() {
   if (phase === "open") {
     const selCount = fasciaRows.filter((r) => selected[r.shift_id]).length + offList.length;
     const tabsRow = (
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <FilterChip label="Apri un turno" active={tab === "turno"} onClick={() => setTab("turno")} />
-        <FilterChip label="I miei guadagni" active={tab === "guadagni"} onClick={() => setTab("guadagni")} />
-      </div>
+      <Tabs items={[["turno", "Apri un turno"], ["guadagni", "I miei guadagni"]]} value={tab} onChange={setTab} />
     );
 
     if (tab === "guadagni") {

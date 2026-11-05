@@ -45,8 +45,9 @@ export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare
 // salvato resta quello di ClickUp, a schermo si legge in italiano.
 export const GENDER_LABELS = { Female: "Donna", Male: "Uomo", "Non-Binary": "Non binario", "I prefer not to declare it": "Preferisco non dirlo" };
 // Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
-// vivo il confronto reference ↔ annunci e a riconoscere il premio reference (100 € a 30
-// turni). La prima voce apre la domanda "Chi ti ha segnalato?".
+// vivo il confronto reference ↔ annunci e a riconoscere il premio reference. Dal 26/10/2026
+// il premio è il programma «Porta un amico» (lib/referral-core.js, /admin/referral), che
+// propone queste schede all'HR. La prima voce apre la domanda "Chi ti ha segnalato?".
 export const SOURCE_REFERRAL = "Me l'ha consigliato qualcuno";
 export const SOURCE_AD = "Ho visto un annuncio o un post sui social";
 // 05/10/2026 (Nicholas): o reference o annuncio. «Dai social» e «Altro» confluiscono nell'annuncio
@@ -121,6 +122,10 @@ export function taskStatusNamesFor(phase) {
   return [...new Set([p.status, p.label, p.cu])];
 }
 
+// 18/10/2026 — campi del vecchio CRM tolti dalla lista ClickUp (Nicholas: "se non servono li tolgo"):
+// Role, Additional Role, Project, Department, Skills, Mansione attuale, Time Slots. `retired: true` =
+// niente sincronizzazione con ClickUp e niente modifica in scheda; il valore già salvato in app resta
+// (storico, ricerca). Mansione → «Mansione», creator → «Progetto», competenze → «Competenze e livello».
 export const FIELDS = [
   // Anagrafica
   { key: "firstName", label: "Nome", section: "anagrafica", type: "text", taskName: true },
@@ -130,7 +135,10 @@ export const FIELDS = [
   { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS, labels: GENDER_LABELS },
   { key: "birthPlace", label: "Luogo di nascita", section: "anagrafica", type: "birth", appOnly: true, mirror: "Luogo di nascita" },
   { key: "residenceComune", label: "Comune di residenza", section: "anagrafica", type: "comune", appOnly: true, mirror: "Comune di residenza" },
-  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", cu: "Location" },
+  // 04/11/2026: su ClickUp l'indirizzo va come TESTO nel campo «Indirizzo». Il campo mappa «Location»
+  // vuole le coordinate, il modulo raccoglie solo via e civico: l'indirizzo finiva nel blocco in
+  // descrizione e chi prepara il contratto non lo trovava tra i campi (93 schede su 94).
+  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", appOnly: true, mirror: "Indirizzo" },
   { key: "residenceCap", label: "CAP", section: "anagrafica", type: "text", appOnly: true, mirror: "CAP" },
   { key: "codiceFiscale", label: "Codice fiscale", section: "anagrafica", type: "cf", cu: "Codice fiscale", extra: true, sensitive: true },
   { key: "personalEmail", label: "Email personale", section: "anagrafica", type: "email", cu: "Personal Email" },
@@ -142,20 +150,20 @@ export const FIELDS = [
   // fase della persona: tendina "Collaboration Status" + stato del task (tabella PERSON_PHASES)
   { key: "collaborationStatus", label: "Fase", section: "rapporto", type: "option", cu: "Collaboration Status", choices: PERSON_PHASES, options: PHASE_LABELS },
   { key: "employmentType", label: "Tipo di rapporto", section: "rapporto", type: "option", cu: "Type of Employment" },
-  { key: "role", label: "Ruolo", section: "rapporto", type: "labels", cu: "Role" },
-  { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", cu: "Additional Role" },
+  { key: "role", label: "Ruolo", section: "rapporto", type: "labels", retired: true },
+  { key: "additionalRole", label: "Ruolo aggiuntivo", section: "rapporto", type: "labels", retired: true },
   { key: "mansioni", label: "Mansione", section: "rapporto", type: "labels", cu: "Mansione", options: MANSIONI },
-  { key: "currentJob", label: "Mansione (testo, vecchio)", section: "rapporto", type: "text", cu: "Mansione attuale", extra: true },
-  { key: "department", label: "Reparto", section: "rapporto", type: "labels", cu: "Department" },
+  { key: "currentJob", label: "Mansione (testo, vecchio)", section: "rapporto", type: "text", retired: true, extra: true },
+  { key: "department", label: "Reparto", section: "rapporto", type: "labels", retired: true },
   { key: "progetto", label: "Progetto", section: "rapporto", type: "labels", cu: "Progetto", options: PROGETTI },
-  { key: "project", label: "Progetto (vecchio)", section: "rapporto", type: "labels", cu: "Project" },
+  { key: "project", label: "Progetto (vecchio)", section: "rapporto", type: "labels", retired: true },
   { key: "seniority", label: "Seniority", section: "rapporto", type: "option", cu: "Seniority" },
-  { key: "skills", label: "Competenze (etichette ClickUp)", section: "rapporto", type: "labels", cu: "Skills" },
+  { key: "skills", label: "Competenze (etichette ClickUp)", section: "rapporto", type: "labels", retired: true },
   { key: "skillLevels", label: "Competenze e livello", section: "rapporto", type: "skillmap", appOnly: true, mirror: "Competenze e livello" },
   { key: "learnWish", label: "Vorrebbe imparare", section: "rapporto", type: "learn", appOnly: true, mirror: "Vorrebbe imparare" },
   { key: "pastRoles", label: "Ruoli già ricoperti", section: "rapporto", type: "roles", appOnly: true, mirror: "Ruoli già ricoperti" },
   { key: "otherSkills", label: "Altro che sa fare", section: "rapporto", type: "longtext", appOnly: true, mirror: "Altro che sa fare", max: 500 },
-  { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", cu: "Time Slots" },
+  { key: "timeSlots", label: "Fasce orarie", section: "rapporto", type: "labels", retired: true },
   { key: "source", label: "Come ci ha conosciuto", section: "rapporto", type: "option", cu: "Provenienza", extra: true, options: SOURCES },
   { key: "referredBy", label: "Segnalato da", section: "rapporto", type: "text", cu: "Segnalato da", extra: true },
   { key: "startDate", label: "Inizio collaborazione", section: "rapporto", type: "date", cu: "Start of Collaboration" },
@@ -165,12 +173,18 @@ export const FIELDS = [
   { key: "companyPhone", label: "Telefono aziendale", section: "rapporto", type: "phone", cu: "Company Phone Number" },
   { key: "yellowWarnings", label: "Richiami gialli", section: "rapporto", type: "number", cu: "Yellow Warnings" },
   { key: "redWarnings", label: "Richiami rossi", section: "rapporto", type: "number", cu: "Red Warnings" },
+  // Note (18/10/2026, Nicholas: "la descrizione su ClickUp non riuscivo a modificarla"): il testo libero
+  // della DESCRIZIONE del task, cioè tutto ciò che sta sopra «— Dati HOC Pro —». A due vie: si scrive in
+  // app o su ClickUp. Niente `cu`: non è un campo personalizzato, lo legge e scrive hr-clickup-map.
+  { key: "notes", label: "Note", section: "rapporto", type: "longtext", desc: true, max: 4000 },
   // Contratto
   { key: "agreementWith", label: "Accordo con", section: "contratto", type: "labels", cu: "Agreement with" },
   // stato del contratto: asse separato dalla fase (tendina "HV Contract Status", tabella CONTRACT_STATUSES).
   // La chiave resta hvContractStatus (esisteva già: rinominarla avrebbe staccato i dati salvati). Non è nel modulo pubblico.
   { key: "hvContractStatus", label: "Stato del contratto", section: "contratto", type: "option", cu: "HV Contract Status", choices: CONTRACT_STATUSES, options: CONTRACT_LABELS },
   { key: "partitaIva", label: "Partita IVA", section: "contratto", type: "bool", cu: "Partita IVA", extra: true },
+  // 28/10/2026 (Nicholas): a chi risponde «sì» si chiede anche il numero. Campo ClickUp «Numero partita IVA» (testo).
+  { key: "partitaIvaNumero", label: "Numero partita IVA", section: "contratto", type: "text", cu: "Numero partita IVA", extra: true, validate: "piva", max: 40 },
   // Documenti (in app solo riferimenti: i file stanno su ClickUp)
   { key: "idDocument", label: "Documento d'identità", section: "documenti", type: "fileRef", cu: "Documento d'identità", extra: true, readOnly: true },
   { key: "cvUpload", label: "CV caricato dal modulo", section: "documenti", type: "fileRef", readOnly: true, appOnly: true },
@@ -190,11 +204,11 @@ export const SECTIONS = [
 export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
   "skillLevels", "otherSkills", "pastRoles", "learnWish",
-  "spokenLanguages", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
+  "spokenLanguages", "partitaIva", "partitaIvaNumero", "codiceFiscale", "personalInterests", "linkedin",
   "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda
-export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly).map((f) => f.key);
+export const EDITABLE_KEYS = FIELDS.filter((f) => !f.readOnly && !f.retired).map((f) => f.key);
 
 /**
  * Riporta i campi "a tabella" (fase, contratto) all'etichetta italiana: le schede
@@ -256,6 +270,38 @@ export function validateCodiceFiscale(input) {
   if (cfControlChar(v.slice(0, 15)) !== v[15]) return { ok: false, error: "Il carattere di controllo non torna: controlla di averlo scritto bene." };
   return { ok: true, value: v };
 }
+// ── Partita IVA (28/10/2026) ────────────────────────────────────────────────
+// Italiana: 11 cifre (anche con «IT» davanti), ultima cifra di controllo (algoritmo tipo Luhn).
+// Chi lavora da fuori ha il numero IVA del suo paese: 5-20 caratteri tra lettere, cifre, punti,
+// trattini e barre, con almeno 5 cifre (stessa apertura del codice fiscale estero).
+export function pivaControlDigit(first10) {
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    let d = Number(first10[i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+/** @returns {{ok:true, value:string, foreign?:true} | {ok:false, error:string}} */
+export function validatePartitaIva(input) {
+  const v = s(input).toUpperCase().replace(/\s+/g, "");
+  if (!v) return { ok: false, error: "Numero partita IVA vuoto." };
+  const it = /^(IT)?(\d+)$/.exec(v);
+  if (it) {
+    const n = it[2];
+    if (n.length !== 11) {
+      if (it[1] || n.length < 11) return { ok: false, error: "La partita IVA italiana ha 11 cifre. Se è di un altro paese, scrivila con la sigla del paese davanti (per esempio ES…)." };
+    } else {
+      if (pivaControlDigit(n.slice(0, 10)) !== n[10]) return { ok: false, error: "L'ultima cifra non torna: controlla di averla scritta bene." };
+      return { ok: true, value: n };
+    }
+  }
+  if (/^IT/.test(v)) return { ok: false, error: "La partita IVA italiana ha 11 cifre." };
+  if (FOREIGN_TAX_RE.test(v) && (v.match(/\d/g) || []).length >= 5) return { ok: true, value: v, foreign: true };
+  return { ok: false, error: "Il numero non sembra una partita IVA: controlla di averlo scritto tutto." };
+}
+
 export function maskCf(cf) {
   const v = s(cf);
   if (v.length < 4) return "••••••••••••••••";
@@ -264,6 +310,6 @@ export function maskCf(cf) {
 
 // ── Modulo pubblico e file ──────────────────────────────────────────────────
 // testo in /hr/privacy (03/10/2026): informativa art. 13 GDPR per i dati della collaborazione
-export const PRIVACY_VERSION = "2026-10-03.2"; // .2: frase sullo spazio temporaneo dei documenti
+export const PRIVACY_VERSION = "2026-10-28.1"; // 28/10: si raccoglie anche il numero di partita IVA (.2 del 03/10: spazio temporaneo dei documenti)
 // 50 MB (03/10/2026, alzato da 20 su richiesta di Nicholas): i file vanno diretti sul Blob privato, non più nel corpo della funzione (~4,5 MB)
 export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;

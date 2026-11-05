@@ -70,7 +70,7 @@ export default function DataStatus({ compact = false }) {
   const now = data?.now || Date.now();
   const sources = data?.sources || [];
   // Nel chip: le due fonti che alimentano i numeri principali
-  const chipSources = sources.filter((s) => s.id === "infloww" || s.id === "creatorspro");
+  const chipSources = sources.filter((s) => s.id === "infloww-export" || s.id === "creatorspro");
   const anyStale = privileged && sources.some((s) => s.status === "stale");
   const ariaLabel = `Stato dati: ${sources.length ? sources.map((s) => `${s.label} ${s.status === "ok" ? "aggiornato" : s.status === "stale" ? "fermo" : "sconosciuto"}`).join(", ") : "in caricamento"}`;
 
@@ -132,7 +132,7 @@ export default function DataStatus({ compact = false }) {
           style={{
             position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 70,
             width: "min(360px, calc(100vw - 32px))",
-            background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 14,
+            background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14,
             boxShadow: "0 18px 48px rgba(0,0,0,.35)", padding: 14, fontFamily: FONTS.body,
           }}
         >
@@ -158,6 +158,7 @@ export default function DataStatus({ compact = false }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: CP.textPrimary, fontWeight: 500 }}>{s.label}</div>
                     <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 2, lineHeight: 1.4 }}>{s.feeds}</div>
+                    {s.note && privileged && <div style={{ fontSize: 12, color: CP.attn, marginTop: 4, lineHeight: 1.4 }}>{s.note}</div>}
                   </div>
                   <div style={{ fontSize: 11.5, textAlign: "right", color: alarm ? CP.accentRed : CP.textSecondary, whiteSpace: "nowrap" }}>
                     <div>{s.status === "ok" ? "aggiornato" : stale ? (privileged ? "fermo da" : "ultimo aggiornamento") : "—"}</div>

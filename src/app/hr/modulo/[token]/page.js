@@ -99,14 +99,14 @@ const STEPS = [
   { title: "Chi sei", sub: "partiamo dalle basi", keys: ["firstName", "surname", "dateOfBirth", "gender", "nationality", "birthPlace", "codiceFiscale"] },
   { title: "Dove vivi", sub: "ci serve per i documenti", keys: ["residenceComune", "location", "residenceCap"] },
   { title: "Come contattarti", sub: "solo per lavoro", keys: ["personalEmail", "personalPhone", "linkedin"] },
-  { title: "Il tuo lavoro", sub: "partita IVA e lingue", keys: ["partitaIva", "spokenLanguages"] },
+  { title: "Il tuo lavoro", sub: "partita IVA e lingue", keys: ["partitaIva", "partitaIvaNumero", "spokenLanguages"] },
   { title: "Le tue competenze", sub: "cosa sai fare, e a che livello", keys: ["skillLevels", "otherSkills", "learnWish"] },
   { title: "La tua esperienza", sub: "da dove arrivi", keys: ["pastRoles", "personalInterests", "source", "referredBy"] },
   { title: "La privacy", sub: "leggi e conferma", keys: [] },
 ];
 const LABELS = {
   firstName: "Nome", surname: "Cognome", currentJob: "Che cosa fai oggi (facoltativo)", nationality: "Nazionalità", spokenLanguages: "Lingue che parli",
-  partitaIva: "Hai una partita IVA?", personalInterests: "Interessi (facoltativo)",
+  partitaIva: "Hai una partita IVA?", partitaIvaNumero: "Numero di partita IVA", personalInterests: "Interessi (facoltativo)",
   linkedin: "Profilo LinkedIn (facoltativo)", birthPlace: "Dove sei nato/a",
   location: "Indirizzo (via e numero civico)", residenceCap: "CAP / codice postale", residenceComune: "Dove vivi", skillLevels: "Cosa sai fare, e a che livello",
   learnWish: "Cosa ti piacerebbe imparare (facoltativo, al massimo 2)", gender: "Genere",
@@ -130,6 +130,7 @@ const KEYBOARD = {
   surname: { autoComplete: "family-name", autoCapitalize: "words", enterKeyHint: "next" },
   dateOfBirth: { autoComplete: "bday" },
   codiceFiscale: { autoCapitalize: "characters", enterKeyHint: "next" },
+  partitaIvaNumero: { autoCapitalize: "characters", spellCheck: false, enterKeyHint: "next" },
   location: { autoComplete: "street-address", enterKeyHint: "next" },
   residenceCap: { autoComplete: "postal-code", inputMode: "numeric", enterKeyHint: "next" },
   personalEmail: { autoComplete: "email", inputMode: "email", autoCapitalize: "none", spellCheck: false, enterKeyHint: "next" },
@@ -515,7 +516,7 @@ export default function HrFormPage() {
 
   const setField = (k, v) => {
     // "Chi ti ha segnalato" vale solo per chi è arrivato da una reference
-    setData((d) => ({ ...d, [k]: v, ...(k === "source" && v !== SOURCE_REFERRAL ? { referredBy: "" } : {}) }));
+    setData((d) => ({ ...d, [k]: v, ...(k === "source" && v !== SOURCE_REFERRAL ? { referredBy: "" } : {}), ...(k === "partitaIva" && v !== true ? { partitaIvaNumero: "" } : {}) }));
     if (fieldErrs[k]) setFieldErrs((e) => { const n = { ...e }; delete n[k]; return n; });
     if (["codiceFiscale", "dateOfBirth", "gender", "birthPlace"].includes(k)) setCfWarn(null);
   };
@@ -681,7 +682,7 @@ export default function HrFormPage() {
           <Headline title={s.title} sub={s.sub} size={36} />
           {s.keys.some((k) => required.has(k)) && <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: -8 }}>I campi con * sono obbligatori.</div>}
 
-          {s.keys.filter((k) => FORM_KEYS.includes(k) && (k !== "referredBy" || data.source === SOURCE_REFERRAL)).map((k) => {
+          {s.keys.filter((k) => FORM_KEYS.includes(k) && (k !== "referredBy" || data.source === SOURCE_REFERRAL) && (k !== "partitaIvaNumero" || data.partitaIva === true)).map((k) => {
             const f = FIELD_BY_KEY[k];
             const cfOff = k === "codiceFiscale" && !ctx.cfEnabled;
             const fe = fieldErrs[k];

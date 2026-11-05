@@ -13,6 +13,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, DataTable, card } from "@/components/ds";
 import { fmtInt } from "@/lib/format";
 import { computeInflowwOperatorSignals } from "@/lib/infloww-signals";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) =>
   fetch(url).then((r) => (r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.error || "Errore")))));
@@ -87,7 +88,7 @@ export default function InflowwIngestPage() {
   }
 
   async function clearAll() {
-    if (!confirm("Svuotare tutti i profili Infloww accumulati?")) return;
+    if (!(await confirmDialog({ title: "Svuotare tutti i profili Infloww accumulati?", ok: "Svuota", danger: true }))) return;
     setMsg(null);
     try {
       const res = await fetch("/api/admin/infloww-ingest", {
@@ -134,7 +135,7 @@ export default function InflowwIngestPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Carica export Infloww" }]}
         title="Carica export Infloww"

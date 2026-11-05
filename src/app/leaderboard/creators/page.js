@@ -15,7 +15,9 @@ import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtPct, fmtDelta, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, EarlyMonthNote } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, EarlyMonthNote, NUM } from "@/components/ds";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { RankBars } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -40,6 +42,7 @@ export default function CreatorsLeaderboardPage() {
   const [q, setQ] = useState("");
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [matchOpen, setMatchOpen] = useState(false);
+  const [vetro, setVetro] = useVetro();
   const periodOptions = useMemo(() => monthOpts(), []);
   const prevId = prevOf(periodId);
   const isCurrent = periodId === periodOptions[0].value;
@@ -106,13 +109,15 @@ export default function CreatorsLeaderboardPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <VetroScope on={vetro}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       {tutorialOpen && <ScoreTutorialModal onClose={() => setTutorialOpen(false)} />}
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Creator" }]}
         title="Creator"
         subtitle="Quanto rende ogni creator e chi ci lavora meglio. Clic su una creator per il suo team, su un operatore per la sua scheda."
         actions={<>
+          <VetroSwitch on={vetro} set={setVetro} />
           <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} aria-label="Mese" style={ctl}>
             {periodOptions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
@@ -133,7 +138,8 @@ export default function CreatorsLeaderboardPage() {
       )}
 
       {ok && (<>
-        <HeroMetric
+        <VetroOverview data={data} prev={prev} official={official} rows={rows} total={total} isCurrent={isCurrent} prevName={prevName} monthLabel={monthLabel} periodId={periodId} onView={setView} />
+        {!vetro && <HeroMetric
           label={`Venduto delle creator · ${monthLabel}${isCurrent ? " finora" : ""}`}
           value={fmt$(total)}
           compare={prev?.total_sales_agency ? (isCurrent ? `${prevName} intero: ${fmt$(prev.total_sales_agency)} · il confronto allo stesso giorno è nell'hub` : `${prevName}: ${fmt$(prev.total_sales_agency)} (${fmtDelta(total, prev.total_sales_agency)})`) : null}
@@ -145,7 +151,7 @@ export default function CreatorsLeaderboardPage() {
             <Metric label="Venduto per turno" value={fmt$(data.avg_sales_per_shift_agency)} delta={fmtDelta(data.avg_sales_per_shift_agency, prev?.avg_sales_per_shift_agency)} />
             <Metric label="Venduto medio per creator" value={fmt$(data.avg_sales_per_creator)} />
           </div>
-        </HeroMetric>
+        </HeroMetric>}
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           <FilterChip label={`Tutte (${rows.length})`} active={view === "all"} onClick={() => setView("all")} />
@@ -187,7 +193,92 @@ export default function CreatorsLeaderboardPage() {
         </div>
       </>)}
     </div>
+    </VetroScope>
   );
 }
+
+// Colpo d'occhio delle creator (solo col vetro, 26/10/2026): quattro riquadri al posto del numero grande,
+// chi porta il venduto (ciambella) e chi si è mosso di più nel venduto a turno sul mese prima (misura
+// a turno, quindi onesta anche a mese in corso). Stessi numeri della pagina, nessuna richiesta nuova.
+function VetroOverview({ data, prev, official, rows, total, isCurrent, prevName, monthLabel, periodId, onView }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const pt = prev?.avg_sales_per_shift_agency;
+  const perDelta = pt ? (data.avg_sales_per_shift_agency - pt) / pt : null;
+  const pctTxt = (v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v * 100))}%`;
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): la pagina Creator serve a «dove si vende, e dove si
+  // vende meglio a turno» → al posto di quattro riquadri e di una ciambella con troppe fette, due classifiche
+  // a barre: chi porta il venduto (quota sul totale) e il venduto per turno con la tacca della media
+  // dell'agenzia (verde chi sta sopra, almeno MIN_PER_SHIFTS turni); sotto chi si è mosso.
+  const MIN_PER_SHIFTS = 5;
+  const href = (r) => `/leaderboard/creators/${encodeURIComponent(r.alias)}?period_id=${periodId}`;
+  const avgPer = data.avg_sales_per_shift_agency;
+  const bySales = [...rows].filter((r) => r.total_sales > 0).sort((a, b) => b.total_sales - a.total_sales).map((r) => ({ label: r.alias, value: r.total_sales, href: href(r) }));
+  const byPer = [...rows].filter((r) => r.per != null && (r.total_shifts || 0) >= MIN_PER_SHIFTS).sort((a, b) => b.per - a.per)
+    .map((r) => ({ label: r.alias, value: r.per, href: href(r), good: avgPer != null && r.per >= avgPer }));
+  const moved = rows.filter((r) => r.move != null);
+  const ups = [...moved].filter((r) => r.move > 0).sort((a, b) => b.move - a.move).slice(0, 5);
+  const downs = [...moved].filter((r) => r.move < 0).sort((a, b) => a.move - b.move).slice(0, 5);
+  const maxM = Math.max(0.01, ...ups.map((r) => r.move), ...downs.map((r) => -r.move));
+  const bar = (r, up) => (
+    <Link key={r.id} href={href(r)} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr) 52px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, textDecoration: "none", padding: "3px 0" }}>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.alias}</span>
+      <span style={{ height: 8, borderRadius: 99, background: CP.track, overflow: "hidden" }}>
+        <span style={{ display: "block", height: "100%", width: `${(Math.abs(r.move) / maxM) * 100}%`, borderRadius: 99, background: up ? "var(--vt-c1)" : "var(--vt-c2)" }} />
+      </span>
+      <span style={{ textAlign: "right", color: up ? CP.accentGreen : CP.textSecondary, ...NUM }}>{pctTxt(r.move)}</span>
+    </Link>
+  );
+  const head = (title, sub) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{title}</div>
+      <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{sub}</div>
+    </div>
+  );
+  return (
+    <>
+      <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 2px 10px", ...NUM }}>
+        {fmtInt(data.creators_count)} creator attive, {fmtInt(data.operators_count)} operatori · venduto <b style={{ color: CP.textPrimary, fontWeight: 500 }}><VetroNum value={fmt$(total)} /></b>
+        {official?.current?.sales ? ` di ${fmt$(official.current.sales)} ufficiali` : ""}{isCurrent ? " finora" : ""}
+      </div>
+      {(bySales.length > 0 || byPer.length > 0) && (
+        <div className="vt-row21" style={{ marginBottom: 14 }}>
+          {bySales.length > 0 && (
+            <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+              {head("Chi porta il venduto", `${monthLabel} · quota sul totale`)}
+              <RankBars items={bySales} limit={10} />
+            </section>
+          )}
+          {byPer.length > 0 && (
+            <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+              {head("Venduto per turno", perDelta == null ? `almeno ${MIN_PER_SHIFTS} turni` : <><span style={{ color: perDelta >= 0 ? CP.accentGreen : CP.textMuted }}>{pctTxt(perDelta)}</span> sul {prevName}, agenzia</>)}
+              <RankBars items={byPer} limit={10} mark={avgPer} markLabel={`media dell'agenzia ${fmt$(avgPer)} a turno · in verde chi sta sopra`} />
+            </section>
+          )}
+        </div>
+      )}
+      {moved.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0, marginBottom: 14 }}>
+          {head("Chi si è mosso di più", `venduto per turno sul ${prevName || "mese prima"}`)}
+          {ups.length === 0 && downs.length === 0 ? (
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun confronto col mese prima.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
+              <div>
+                <button onClick={() => onView("up")} style={moveHead}>In miglioramento</button>
+                {ups.length ? ups.map((r) => bar(r, true)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
+              </div>
+              <div>
+                <button onClick={() => onView("down")} style={moveHead}>In calo</button>
+                {downs.length ? downs.map((r) => bar(r, false)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+    </>
+  );
+}
+const moveHead = { display: "block", background: "none", border: "none", padding: 0, margin: "0 0 6px", fontSize: 12.5, color: CP.textSecondary, cursor: "pointer", fontFamily: FONTS.body };
 
 const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };

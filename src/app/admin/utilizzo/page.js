@@ -168,7 +168,7 @@ export default function UsagePage() {
 }
 
 function Shell({ children }) {
-  return <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>;
+  return <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>{children}</div>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -353,7 +353,7 @@ function Pages({ rows, r, flow, ux, stuck, win, selPage, openPage, areaF, setAre
         <p style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
           {r.tracked_days < 7
             ? `Dati da ${r.tracked_days} ${r.tracked_days === 1 ? "giorno" : "giorni"}: per ora l'elenco dice solo cosa non è ancora stato aperto, non cosa è inutile.`
-            : "Candidate a finire in modalità Advanced o a essere tolte: meno voci, app più leggibile. Prima di toglierle chiedi a chi dovrebbero servire."}
+            : "Candidate a uscire dal menu delle mansioni (restano in «Tutti gli strumenti») o a essere tolte: meno voci, app più leggibile. Prima di toglierle chiedi a chi dovrebbero servire."}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {r.never_opened.length === 0 && <span style={{ fontSize: 13, color: CP.textMuted }}>Tutte le voci sono state aperte almeno una volta.</span>}

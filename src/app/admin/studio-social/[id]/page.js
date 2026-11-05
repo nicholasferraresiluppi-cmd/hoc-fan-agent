@@ -4,7 +4,7 @@
  * /admin/studio-social/[id] — un profilo social della redazione.
  *
  * Dall'alto: fase e numeri, cosa fare oggi a mano, la settimana (calendario fisso + contenuti del
- * giorno), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
+ * giorno), il banco dei video montati (BancoMontaggi), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
  * da cui tutto deve discendere, poi Telegram e landing (TelegramPanel). Un contenuto va in
  * "Programmati" solo col video montato, i quattro revisori, la qualità «ok» con tutte le voci e
  * nessun blocco: la regola la applica il server.
@@ -24,6 +24,8 @@ import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/Teleg
 import EditorialSection from "@/components/studio/EditorialSection";
 import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
+import BancoMontaggi from "@/components/studio/BancoMontaggi";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -292,7 +294,7 @@ export default function StudioProfilePage() {
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
   const deleteItem = async (item) => {
-    if (!confirm(`Eliminare "${item.title}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare "${item.title}"?`, ok: "Elimina", danger: true }))) return;
     try { await post({ action: "deleteItem", itemId: item.id }); await mutate(); setEditing(null); } catch (e) { setErr(e.message); }
   };
   const moveItem = async (item, status) => {
@@ -313,6 +315,16 @@ export default function StudioProfilePage() {
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
 
+  // Archivia/riattiva (31/10/2026): si manda il profilo intero col flag, mai cancellato.
+  const toggleArchived = async () => {
+    setErr(null);
+    try {
+      const r = await fetch("/api/admin/studio-social", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data.profile, archived: !data.profile.archived }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      await mutate();
+    } catch (e) { setErr(e.message); }
+  };
   const saveArc = async (arc) => { await post({ action: "arc", arc }); await mutate(); };
   const deleteArc = async (arc) => { await post({ action: "deleteArc", arcId: arc.id }); await mutate(); };
 
@@ -334,13 +346,19 @@ export default function StudioProfilePage() {
   const idn = profile.identity || {};
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Studio social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Regia social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
         title={`@${profile.handle}`}
         subtitle={[profile.creator, PLATFORM_LABEL[profile.platform], profile.format && `format ${profile.format}`].filter(Boolean).join(" · ")}
-        actions={<button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+        actions={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={btn(false)} onClick={toggleArchived}>{profile.archived ? "Riattiva profilo" : "Archivia profilo"}</button>
+            {!profile.archived && <button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+          </div>
+        }
       />
+      {profile.archived && <Notice>Profilo archiviato: non compare nell'elenco della Regia social. I contenuti restano qui, niente è stato cancellato.</Notice>}
       {err && !editing && !editId && <Notice danger>{err}</Notice>}
 
       {/* Fase e numeri */}
@@ -377,6 +395,9 @@ export default function StudioProfilePage() {
         onNewPost={(prefill) => setPostEditing(prefill)}
         onSaveArc={saveArc} onDeleteArc={deleteArc}
       />
+
+      {/* Banco montaggi: i video della cartella Drive, da guardare e scegliere */}
+      <BancoMontaggi pid={id} />
 
       {/* Coda */}
       <SectionTitle>Coda dei contenuti</SectionTitle>

@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/people/[id]/contract — preparazione e invio del contratto (SEED, 10/10/2026).
+ * /api/admin/hr/people/[id]/contract — preparazione e invio del contratto (people.manage, 10/10/2026).
  *
  * GET  → contesto della pagina (modello suggerito, condizioni, dati del documento, controlli, cosa manca)
  * POST → { action: "save", templateId, terms }      salva la bozza (cifrata)
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   const ctx = await contractContext(id);
@@ -27,7 +27,7 @@ export async function GET(request, props) {
 const clip = (v, n = 400) => (v == null ? "" : String(v)).slice(0, n);
 
 export async function POST(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   let body;

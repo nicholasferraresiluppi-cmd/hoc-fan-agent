@@ -17,7 +17,7 @@
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { isCronAuthorized } from "@/lib/cron-auth";
-import { continueChain, chainDepth } from "@/lib/cron-chain";
+import { continueChain, chainDepth, clearChainBreak } from "@/lib/cron-chain";
 import {
   getLedgerJob, startLedgerJob, stepLedgerJob, getLedgerMeta, romePeriod,
 } from "@/lib/payout-ledger";
@@ -58,6 +58,7 @@ async function tick(chain = 0) {
     const res = await stepLedgerJob();
     return { action: "start", period: p, has_more: res.has_more, last_step: res.job?.last_step, error: res.error };
   }
+  await clearChainBreak("/api/cron/payout-ledger"); // niente da fare = il lavoro di stanotte è finito
   return { action: "idle", reason: "mese corrente e precedente freschi (<20h)" };
 }
 
