@@ -15,6 +15,8 @@ const views = (newCut) => [
   { id: "talent", label: "Talenti da formare", test: (c) => c.sig === "nessuno" && c.fmt && c.fmt !== "nessuno" },
   { id: "new", label: "Nuove questa settimana", test: (c) => c.firstSeen && c.firstSeen >= newCut },
   { id: "check", label: "Indizi da verificare", test: (c) => c.sig === "debole" },
+  // OnlyFans trovato cercando su Google (5/11/2026): chi tiene Instagram e OnlyFans separati
+  { id: "web", label: "Trovate su Google", test: (c) => c.link?.where === "web" },
   { id: "todo", label: "Da classificare", test: (c) => c.g === "Da classificare" },
   // catena dei seguiti: OnlyFanser di cui non abbiamo ancora letto chi segue (le prossime della matrioska)
   { id: "folq", label: "Seguiti da leggere", test: (c) => c.sig === "forte" && !c.folAt && !c.ours },
