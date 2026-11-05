@@ -286,7 +286,7 @@ function Sheet({ data, go, mine, editing, onSaved }) {
   return (
     <>
       <div className="vt-glass" style={{ ...card, overflow: "hidden", marginBottom: 18 }}>
-        <div style={{ background: SH.navy, color: "#fff", padding: "12px 18px", fontSize: 16, fontWeight: 600, letterSpacing: 0.2 }}>
+        <div style={{ background: FILL.navy, color: "#fff", padding: "12px 18px", fontSize: 16, fontWeight: 600, letterSpacing: 0.2 }}>
           Bilancio creator · {monthLabel(data.month)} <span style={{ fontWeight: 400, opacity: 0.75 }}>· dati live dal warehouse</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
