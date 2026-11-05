@@ -252,13 +252,14 @@ function PublicCard({ a, wk, label }) {
             {!x && last.highlights != null && <Metric2 value={numFmt(last.highlights)} label="Storie in evidenza" />}
           </div>
           <ReachLine r={p.reach} x={x} />
+          {!x && <WakeLine wk={p.wakes} />}
           <LinkLine l={p.link} w={w} />
           <div style={{ ...eyebrow, margin: "14px 0 8px" }}>Settimana {label}</div>
           {!w || !w.published ? <p style={{ ...hint, margin: 0 }}>Nessun post di questa settimana visto dalle letture automatiche.</p> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
               <Metric2 value={w.published} label={x ? "Post pubblicati" : `Post pubblicati · ${w.reels} reel`} />
               <Metric2 value={numFmt(w.views)} label={x ? "Visualizzazioni totali" : "Visualizzazioni dei reel"} />
-              <Metric2 value={numFmt(w.avgViews)} label="Media per post" color={x && w.avgViews != null ? (w.avgViews >= 600 ? CP.accentGreen : CP.accentRed) : undefined} />
+              <Metric2 value={numFmt(w.avgViews)} label={x ? "Media per post" : "Media per reel"} color={x && w.avgViews != null ? (w.avgViews >= 600 ? CP.accentGreen : CP.accentRed) : undefined} />
               <Metric2 value={numFmt(w.likes)} label="Like" />
               <Metric2 value={numFmt(w.comments)} label="Commenti" />
               {w.followersDelta != null && <Metric2 value={(w.followersDelta > 0 ? "+" : "") + numFmt(w.followersDelta)} label={w.deltaPartial ? "Follower (da quando si legge)" : "Follower nella settimana"} />}
@@ -266,7 +267,7 @@ function PublicCard({ a, wk, label }) {
           )}
         </>
       )}
-      <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "Visite al profilo e tocchi sul link li vede solo l'app: restano da segnare a mano. "}Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine.</p>
+      <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "Visite al profilo e tocchi sul link li vede solo l'app: restano da segnare a mano. "}{x ? "Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine." : "Ogni notte si rileggono tutti i reel degli ultimi 45 giorni: il numero di una settimana cresce finché crescono i suoi reel."}</p>
     </div>
   );
 }
@@ -304,6 +305,26 @@ function ReachLine({ r, x }) {
     <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, border: `1px solid ${alpha(col, "55")}`, background: alpha(col, "0d"), fontSize: 14 }}>
       <b style={{ fontWeight: 500, color: col }}>Copertura {txt}</b> · i {cosa} di questi giorni fanno <b style={{ fontWeight: 500, ...NUM }}>{numFmt(r.recentMedian)}</b> visualizzazioni a un giorno, contro <b style={{ fontWeight: 500, ...NUM }}>{numFmt(r.baseMedian)}</b> nelle settimane prima ({Math.round(r.ratio * 100)}%).
       {r.status === "crollo" && <span style={{ display: "block", marginTop: 4, color: CP.textSecondary }}>Con lo Stato dell&apos;account verde è il segno tipico dello shadowban: controllalo dal telefono.</span>}
+    </div>
+  );
+}
+
+// reel vecchi che ripartono: al giorno prendono quanto un reel tipico del profilo in tutta la vita
+function WakeLine({ wk }) {
+  if (!wk?.list?.length) return null;
+  const col = CP.accentGreen;
+  return (
+    <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${alpha(col, "55")}`, background: alpha(col, "0d"), fontSize: 14 }}>
+      <b style={{ fontWeight: 500, color: col }}>{wk.list.length === 1 ? "Un reel vecchio sta ripartendo" : `${wk.list.length} reel vecchi stanno ripartendo`}</b> · al giorno prendono almeno quanto un reel tipico del profilo in tutto (<span style={NUM}>{numFmt(wk.median)}</span>)
+      <div style={{ display: "grid", gap: 4, marginTop: 6 }}>
+        {wk.list.map((r) => (
+          <a key={r.id} href={r.url} target="_blank" rel="noreferrer" style={{ display: "flex", gap: 8, alignItems: "baseline", color: CP.textPrimary, textDecoration: "none" }}>
+            <span style={{ color: CP.textSecondary, minWidth: 92 }}>di {r.ageDays} giorni fa</span>
+            <b style={{ fontWeight: 500, ...NUM }}>+{numFmt(r.perDay)}</b><span style={{ color: CP.textSecondary }}>al giorno · a</span><span style={NUM}>{numFmt(r.views)}</span>
+            <ExternalLink size={13} style={{ color: CP.textMuted, alignSelf: "center" }} />
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
