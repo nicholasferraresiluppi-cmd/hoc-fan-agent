@@ -914,6 +914,9 @@ const FIRST_NAMES = new Set([
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Parole del nome per la ricerca: "carla.fitness_official" → "carla fitness". */
+// parole vere (con lettere) di un nome: "principessa.23" è UNA parola, il numero non conta
+const webWords = (s) => webTokens(s).filter((t) => /[a-z]{2}/i.test(t)).length;
+
 export function webTokens(h) {
   return normHandle(h).split(/[._-]+/).filter((t) => t && !WEB_NOISE.has(t));
 }
@@ -985,7 +988,7 @@ export function matchWebResults(h, results) {
       // UNA parola sola in handle e titolo ("sinister", "michelle"): il titolo uguale lo può avere chiunque,
       // prova solo con l'indirizzo a numeri di default (giro del 5/11: @sssinister_ → "Sinister" di un'altra);
       // nome e cognome nel titolo ("Giulia Scarozza Vip") restano una prova
-      const strong = /^u\d+$/.test(user) || (near && (webTokens(handle).length > 1 || webTokens(title.replace(/\s+/g, "_")).length > 1));
+      const strong = /^u\d+$/.test(user) || (near && (webWords(handle) > 1 || webWords(title.replace(/\s+/g, "_")) > 1));
       if (stem.length >= 7 && webStem(title) === stem) how = strong ? "titolo" : "simile";
       else if (near && us.length >= 7) how = "simile";
     }
