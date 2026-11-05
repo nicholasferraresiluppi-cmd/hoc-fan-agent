@@ -739,6 +739,9 @@ export function bestLink(ps) {
       if (!c) continue;
       if (!best || c.strength > best.strength) best = { ...c, where, url, ...(via ? { via } : {}) };
     }
+    // trovato cercando su Google (5/11/2026): qui la forza la dà la prova che è lei, non il dominio
+    const w = p.web;
+    if (w?.url && w.strength > (best?.strength ?? -1)) best = { label: w.strength >= 2 ? "OnlyFans" : "OnlyFans con un nome simile", strength: w.strength, where: "web", url: w.url, how: w.how };
   }
   return best;
 }
@@ -857,7 +860,138 @@ export function linkWhere(link, { short = false } = {}) {
   if (!link) return "";
   if (link.where === "tag") return short ? `tramite @${link.via}` : `nella bio di @${link.via}, l'account taggato nella prima storia in evidenza`;
   if (link.where === "evidenza") return short ? "nella prima evidenza" : "nella prima storia in evidenza";
+  if (link.where === "web") return short ? "da Google" : `cercando su Google: ${WEB_HOW[link.how] || "da confermare"}`;
   return "in bio";
+}
+
+// ---------- OnlyFans cercato su Google (5/11/2026, caso @soryu_geggy_cosplay) ----------
+//
+// 731k follower, OnlyFans da 15 $ al mese, e il radar non lo sapeva: niente link in bio né nelle
+// evidenze, perché tiene Instagram e OnlyFans separati (fa l'ospite alle fiere). Google però ha
+// in archivio la pagina OnlyFans: `site:onlyfans.com soryu geggy cosplay` la dà come primo
+// risultato. Provato su 11 creator di cui sapevamo già l'indirizzo OnlyFans: ne trova 7, e
+// spesso perché la pagina OnlyFans stessa porta il link al suo Instagram.
+// Il punto delicato è che è LEI: la ricerca restituisce anche pagine di altri con un nome simile.
+// Prove, dalla più forte:
+//   "ig"     la pagina cita il suo Instagram (instagram.com/<handle> o @<handle>)          → forte
+//   "titolo" il nome della pagina è il suo handle, e l'indirizzo è il suo o quello a numeri
+//            che OnlyFans dà di partenza (u123…)                                          → forte
+//            con un indirizzo di un'altra persona è "simile": pagine false col nome di una famosa
+//            esistono (provato: "Irene Marinaro" su onlyfans.com/noemyferretti)
+//   "utente" l'indirizzo OnlyFans è il suo handle (senza punti, numeri e lettere ripetute) → forte
+//   "simile" l'indirizzo contiene il suo nome                                              → da guardare
+// Nome, indirizzo e titolo contano solo da 7 lettere in su: un nome di battesimo non basta mai
+// (provato su 40 creator del radar: "amelia_81" prendeva una pagina "Amelia" di un'altra).
+
+const WEB_HOW = {
+  ig: "la pagina OnlyFans porta al suo Instagram",
+  titolo: "la pagina OnlyFans ha il suo stesso nome",
+  utente: "l'indirizzo OnlyFans è il suo stesso nome",
+  simile: "indirizzo OnlyFans con un nome simile, da confermare",
+};
+const WEB_HOSTS = /(^|\.)(onlyfans\.com|fansly\.com|fanvue\.com)$/;
+const WEB_NOISE = new Set(["official", "officiale", "ufficiale", "real", "the", "its", "im", "iam", "private", "privato", "privata", "backup", "back", "up", "reel", "reels", "of", "vip", "ita", "italy", "xx", "xo"]);
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Parole del nome per la ricerca: "carla.fitness_official" → "carla fitness". */
+export function webTokens(h) {
+  return normHandle(h).split(/[._-]+/).filter((t) => t && !WEB_NOISE.has(t));
+}
+/** Radice per il confronto: senza separatori, numeri e lettere ripetute ("biancaneveeeh" = "biancanevehh"). */
+export function webStem(s) {
+  return String(s || "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && !WEB_NOISE.has(t)).join("").replace(/\d+/g, "").replace(/(.)\1+/g, "$1");
+}
+/** La ricerca Google per un account. */
+export function webQuery(h) {
+  return `site:onlyfans.com ${webTokens(h).join(" ")}`;
+}
+
+/** Indirizzo di una pagina OnlyFans → nome utente ("/soryugeggy", "/2736337520/irenemarinaroo"), o null. */
+export function webUserOf(url) {
+  try {
+    const u = new URL(url);
+    if (!WEB_HOSTS.test(u.hostname.replace(/^www\./, "").toLowerCase())) return null;
+    const seg = u.pathname.split("/").filter(Boolean);
+    const user = /^\d+$/.test(seg[0] || "") ? seg[1] : seg[0];
+    if (!user || OF_PATHS_NOT_PROFILES.test(user)) return null;
+    return user.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+const webPrice = (text) => {
+  const m = String(text || "").match(/subscribe\s*\$\s*(\d+(?:\.\d+)?)\s*per month/i);
+  return m ? Number(m[1]) : null;
+};
+
+/**
+ * Tra i risultati Google ([{ url, title, description }]) la pagina che è davvero sua:
+ * { url, user, strength, how, price, title } o null. A parità di forza vince la prova più forte.
+ */
+export function matchWebResults(h, results) {
+  const handle = normHandle(h);
+  const stem = webStem(handle);
+  if (!handle) return null;
+  const igRe = new RegExp(`(instagram\\.com/|@)${reEsc(handle)}(?![a-z0-9_.])`, "i");
+  const rank = { ig: 4, titolo: 3, utente: 2, simile: 1 };
+  let best = null;
+  for (const r of results || []) {
+    const user = webUserOf(r?.url || "");
+    if (!user) continue;
+    const text = `${r.title || ""} ${r.description || ""}`;
+    const title = String(r.title || "").replace(/\s*onlyfans\s*$/i, "").trim();
+    let how = null;
+    if (igRe.test(text)) how = "ig";
+    else if (stem.length >= 7 && webStem(user) === stem) how = "utente";
+    else {
+      const us = webStem(user);
+      const near = us.length >= 5 && stem.length >= 7 && (us.includes(stem) || stem.includes(us));
+      if (stem.length >= 7 && webStem(title) === stem) how = near || /^u\d+$/.test(user) ? "titolo" : "simile";
+      else if (near && us.length >= 7) how = "simile";
+    }
+    if (!how || (best && rank[how] <= rank[best.how])) continue;
+    // la pagina del profilo, non quella di un suo post
+    const url = `https://onlyfans.com/${user}`;
+    best = { url, user, strength: how === "simile" ? 1 : 3, how, price: webPrice(r.description), title: title.slice(0, 80) };
+  }
+  return best;
+}
+
+/** Righe dell'attore → Map ricerca → risultati ([{ url, title, description }]); le ricerche andate male restano fuori. */
+export function parseGoogleItems(items) {
+  const out = new Map();
+  for (const it of items || []) {
+    const q = it?.searchQuery?.term;
+    if (!q || it["#error"]) continue;
+    const rs = (it.organicResults || []).map((r) => ({ url: r.url, title: r.title, description: r.description }));
+    out.set(q, [...(out.get(q) || []), ...rs]);
+  }
+  return out;
+}
+
+/** Profilo dopo la ricerca: `found` = matchWebResults, `null` = cercato e niente. Il livello non scende mai. */
+export function applyWebCheck(p, found, { q, now = Date.now() } = {}) {
+  const next = { ...p, web: found ? { ...found, q, at: now } : { q, at: now } };
+  const s = sigFromLink(bestLink([{ ...next, url: "", hlLinks: [], hlVia: [] }]));
+  next.sig = SIG_RANK[s] > SIG_RANK[p.sig || "nessuno"] ? s : p.sig || "nessuno";
+  return next;
+}
+
+/**
+ * Chi cercare: account ancora da valutare, non nostri, senza un profilo a pagamento già trovato,
+ * mai cercati (o cercati più di 90 giorni fa). Prima i più seguiti: lì la scoperta vale di più.
+ */
+export function webCheckCandidates(profiles, crm, forgotten = new Set(), { now = Date.now(), maxAgeDays = 90 } = {}) {
+  const ok = new Set();
+  for (const c of buildCreators(profiles, crm)) {
+    if (c.ours || c.stage !== DEFAULT_STAGE || c.sig === "forte" || c.missing) continue;
+    for (const h of c.handles) ok.add(h);
+  }
+  return profiles
+    .filter((p) => ok.has(p.h) && !forgotten.has(p.h) && !p.missing && webTokens(p.h).join("").length >= 4 && !(p.web?.at && now - p.web.at < maxAgeDays * 86400000))
+    .sort((a, b) => (b.fol || 0) - (a.fol || 0))
+    .map((p) => p.h);
 }
 
 const DAY = 86400000;

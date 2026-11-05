@@ -139,6 +139,7 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
       </section>
 
       {data.canAdmin && <HlReread st={data.hlReread} onReload={onReload} />}
+      {data.canAdmin && <WebCheck st={data.webCheck} onReload={onReload} />}
 
       <footer style={{ display: "flex", flexWrap: "wrap", gap: "6px 28px", fontSize: 13, color: CP.textMuted, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 16 }}>
         <span>{ref.lastCompletedAt ? `Ultimo giro dei numeri: ${fmtDate(ref.lastCompletedAt)}${ref.lastUpdated ? `, ${fmtFull(ref.lastUpdated)} account letti` : ""}` : "Numeri della ricerca di ottobre"}</span>
@@ -211,6 +212,65 @@ function HlReread({ st, onReload }) {
           : st?.status === "fatta"
             ? null
             : <button style={btn} disabled={busy} onClick={() => send("start")}>{st?.status ? "Rileggi quelle rimaste" : "Avvia la rilettura"}</button>}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * OnlyFans cercato su Google (5/11/2026, solo admin): per chi tiene Instagram e OnlyFans separati.
+ * Gira da solo dalla notte (primo giro su tutto il radar, poi ogni settimana sui nuovi); qui si
+ * vede a che punto è e lo si ferma o riavvia.
+ */
+function WebCheck({ st, onReload }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const running = st?.status === "in_corso";
+  useEffect(() => {
+    if (!running || !onReload) return undefined;
+    const t = setInterval(() => onReload(), 30000);
+    return () => clearInterval(t);
+  }, [running, onReload]);
+  async function send(action) {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/admin/scouting/web-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      onReload?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const found = st?.found || {};
+  const forte = (found.forte || 0) + (st?.prevFound?.forte || 0);
+  const simile = (found.simile || 0) + (st?.prevFound?.simile || 0);
+  const tally = st?.status ? `${fmtFull(st.done || 0)} di ${fmtFull(st.total || 0)} cercate · ${fmtFull(forte)} con OnlyFans trovato${simile ? ` e ${fmtFull(simile)} con un nome simile da confermare` : ""} · spesi ${usd(st.spentUsd)} su ${usd(st.capUsd)}` : null;
+  const head = !st?.status ? "Cerca su Google gli OnlyFans senza link"
+    : running ? "Ricerca su Google in corso"
+    : st.status === "fatta" ? `Ricerca su Google finita il ${fmtDate(st.endedAt)}`
+    : st.status === "tetto" ? "Ricerca su Google fermata: raggiunto il tetto di spesa"
+    : "Ricerca su Google fermata";
+  return (
+    <section aria-labelledby="r-web" style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 18 }}>
+      <h3 id="r-web" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{head}</h3>
+      <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, maxWidth: 760 }}>
+        {!st?.status
+          ? "Per chi tiene Instagram e OnlyFans separati: il radar cerca su Google la sua pagina OnlyFans e la tiene solo se è davvero lei (porta al suo Instagram o ha il suo stesso nome). Parte da sola stanotte, poi ogni settimana sulle nuove. Meno di mezzo centesimo a creator, tetto 15 $."
+          : tally}
+      </p>
+      {st?.status && (forte > 0 || simile > 0) && <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Le trovi in Esplora › Trovate su Google.</p>}
+      {st?.failed ? <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>{fmtFull(st.failed)} ricerche non riuscite: si riprovano al giro della settimana dopo.</p> : null}
+      {st?.lastError && running && <p style={{ margin: 0, fontSize: 13, color: CP.attn }}>Ultimo intoppo: {st.lastError} — il giro riprova da solo.</p>}
+      {err && <p role="alert" style={{ margin: 0, fontSize: 13, color: CP.attn }}>{err}</p>}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {running
+          ? <button style={btn} disabled={busy} onClick={() => send("stop")}>Ferma</button>
+          : st?.status === "fatta"
+            ? null
+            : <button style={btn} disabled={busy} onClick={() => send("start")}>{st?.status ? "Riprendi la ricerca" : "Avvia adesso"}</button>}
       </div>
     </section>
   );

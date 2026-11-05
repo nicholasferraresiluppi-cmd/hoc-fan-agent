@@ -20,7 +20,8 @@
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
- *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
+ *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo;
+ *                        scouting-webcheck: OnlyFans cercato su Google, catena propria)
  *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
  *   - sempre:            Warm-up: numeri pubblici dei profili IG e X (warmup-metrics, una volta al giorno)
  *   - sempre:            Trend modelle: reel esplosi dal warehouse + descrizione AI (trend-modelle)
@@ -124,6 +125,9 @@ export async function POST(request) {
   // apertura dei link del Radar che da soli non dicono niente (17/10/2026, caso Elisa Esposito):
   // gratis, si concatena da sola finché ci sono link da aprire
   out.scouting_probe = await kickEndpoint(request, "/api/cron/scouting-probe");
+  // OnlyFans cercato su Google (05/11/2026, caso @soryu_geggy_cosplay): primo giro su tutto il
+  // radar, poi una volta a settimana sugli account nuovi; tetto 15 $ a giro
+  out.scouting_webcheck = await kickEndpoint(request, "/api/cron/scouting-webcheck");
   // canali Telegram delle creator (14/10/2026): iscritti del giorno di ogni canale dal bot HOC
   out.telegram_channels = await kickEndpoint(request, "/api/cron/telegram-channels");
 
