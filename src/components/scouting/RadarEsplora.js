@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { hookLine, attentionScore, agencies, RANGE_FILTERS, passRanges, activeRanges, QUEUE_SORTS } from "@/lib/scouting-core";
 import { DataTable, FilterChip } from "@/components/ds";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
 import { NUM, SERIF, fmtFull, fmtN, fmtEr, input, btn, igProfile, LinkChip, Growth, Spark, Initials, STAGE_LABEL, RatingTag, useIsPhone } from "./radar-ui";
 
 const views = (newCut) => [
@@ -95,8 +96,27 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
     <button onClick={() => setShown((x) => x + PAGE)} style={{ ...btn, alignSelf: "center" }}>Mostra altre {fmtFull(Math.min(PAGE, rows.length - shown))}</button>
   );
 
+  // intestazione «stile reel» (30/10/2026): quante ne mostra la vista scelta + le viste che contano
+  const viewLabel = VIEWS.find((v) => v.id === view).label;
+  const hero = (
+    <HeroHead
+      eyebrow="Radar creator · esplora"
+      title={view === "all" ? "Tutte le" : "Ci sono"}
+      accent={`${fmtFull(rows.length)} creator`}
+      sub={view === "all" ? "Le creator italiane del radar: una riga per persona." : `Vista «${viewLabel}»${activeFilters ? ", con i filtri scelti" : ""}.`}
+      numbers={phone ? null : <>
+        <HeroNum label="Con profilo a pagamento" value={viewCounts.paid} strong />
+        <HeroNum label="Assolutamente" value={viewCounts.top} />
+        <HeroNum label="Nuove questa settimana" value={viewCounts.new} />
+        <HeroNum label="Talenti da formare" value={viewCounts.talent} />
+      </>}
+      style={{ marginBottom: 6 }}
+    />
+  );
+
   if (phone) return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {hero}
       <label htmlFor="rx-q" style={{ position: "absolute", left: -9999 }}>Cerca</label>
       <input id="rx-q" type="search" value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="Cerca nome, @ o nicchia" style={{ ...input, width: "100%", fontSize: 16 }} />
       <div role="tablist" aria-label="Viste" className="rx-strip">
@@ -182,6 +202,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {hero}
       <div role="tablist" aria-label="Viste" style={{ display: "flex", flexWrap: "wrap", gap: "6px 26px", borderBottom: `1px solid ${CP.border}` }}>
         {VIEWS.map((v) => (
           <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => { setView(v.id); setGrp("all"); setShown(PAGE); }}

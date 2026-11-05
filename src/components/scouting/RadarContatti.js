@@ -2,6 +2,7 @@
 // Radar creator — vista "Contatti": le colonne del percorso, dalla scelta alla firma.
 // I contatti restano in pausa finché non arriva il parere dell'avvocato (docs/SCOUTING_PRIVACY.md).
 import { CP, alpha } from "@/lib/brand";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
 import { NUM, fmtN, btnQuiet, LinkChip, STAGE_LABEL, RatingTag } from "./radar-ui";
 
 const COLS = ["interessante", "contattata", "trattativa", "firmata"];
@@ -16,6 +17,19 @@ export default function RadarContatti({ creators, onOpen }) {
   const by = Object.fromEntries(COLS.map((s) => [s, creators.filter((c) => c.stage === s).sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.updatedAt || 0) - (a.updatedAt || 0))]));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <HeroHead
+        eyebrow="Radar creator · contatti"
+        title="Dalla scelta alla firma:"
+        accent={`${by.interessante.length + by.contattata.length + by.trattativa.length + by.firmata.length} creator`}
+        sub="Le creator scelte, colonna per colonna. Le «Assolutamente» stanno in cima."
+        numbers={<>
+          <HeroNum label="Interessanti" value={by.interessante.length} strong />
+          <HeroNum label="Contattate" value={by.contattata.length} />
+          <HeroNum label="In trattativa" value={by.trattativa.length} />
+          <HeroNum label="Firmate" value={by.firmata.length} />
+        </>}
+        style={{ marginBottom: -12 }}
+      />
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 20px", border: `1px solid ${alpha(CP.gold, "55")}`, borderRadius: 12, padding: "14px 18px", fontSize: 14.5 }}>
         <span style={{ flex: "1 1 360px" }}>Contatti in pausa: aspettiamo il parere sull&apos;uso dei dati pubblici e il testo da mandare al primo messaggio.</span>
       </div>
@@ -28,7 +42,7 @@ export default function RadarContatti({ creators, onOpen }) {
               </h2>
               {by[s].length === 0 && <p style={{ margin: 0, border: `1px dashed ${CP.border}`, borderRadius: 12, padding: 16, fontSize: 13.5, color: CP.textSecondary }}>{EMPTY[s]}</p>}
               {by[s].slice(0, 40).map((c) => (
-                <article key={c.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 12, background: CP.surface, border: `1px solid ${CP.border}` }}>
+                <article key={c.id} className="rx-card" style={{ display: "flex", flexDirection: "column", gap: 6, padding: 14, borderRadius: 14, background: CP.surface, border: `1px solid ${CP.border}` }}>
                   <button onClick={() => onOpen(c)} style={{ ...btnQuiet, padding: 0, minHeight: 0, justifyContent: "flex-start", color: CP.textPrimary, fontWeight: 600 }}>{c.name}</button>
                   <span style={{ fontSize: 13, color: CP.textSecondary }}>{[c.nic || c.g, `${fmtN(c.fol)} follower`].join(" · ")}</span>
                   <LinkChip link={c.link} sig={c.sig} />
