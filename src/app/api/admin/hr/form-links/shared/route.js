@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/form-links/shared — il link UNICO del modulo HR (Centro HR, SEED, 03/10/2026).
+ * /api/admin/hr/form-links/shared — il link UNICO del modulo HR (Centro HR, people.manage, 03/10/2026).
  *
  * GET  → { link: { path, createdAt } | null }
  * POST { action: "regenerate" } → crea il link, o lo sostituisce (il vecchio smette di funzionare)
@@ -16,14 +16,14 @@ export const runtime = "nodejs";
 const view = (l) => (l ? { path: l.path, createdAt: l.createdAt } : null);
 
 export async function GET() {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const link = await getSharedFormLink();
   return Response.json({ ok: true, link: view(link) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   let body;
   try { body = await request.json(); } catch { body = {}; }

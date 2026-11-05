@@ -4,11 +4,14 @@
 // le ultime segnalazioni e da dove vengono i dati.
 import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { pickToday, movers, whyLines, reviewQueue } from "@/lib/scouting-core";
-import { SERIF, NUM, fmtN, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, BigNum, STAGE_LABEL } from "./radar-ui";
+import { pickToday, movers, whyLines, reviewQueue, RATINGS } from "@/lib/scouting-core";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
+import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
+import { SignalRow } from "./RadarSegnala";
+import { FilterChip } from "@/components/ds";
 
 
-export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
+export default function RadarOggi({ me, newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
   const today = useMemo(() => pickToday(creators, { n: 3, newCut }), [creators, newCut]);
   const moving = useMemo(() => movers(creators, 5), [creators]);
   const counts = data.counts || {};
@@ -23,21 +26,21 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
   const toReview = reviewQueue(creators, { scope: "paid", newCut }).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
-      {onValuta && toReview > 0 && (
-        <button onClick={onValuta} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 14, border: `1px solid ${alpha(CP.gold, "77")}`, background: alpha(CP.gold, "10") }}>
-          <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ ...SERIF, fontSize: 24, lineHeight: 1.1 }}>{fmtFull(toReview)} creator col profilo a pagamento da valutare</span>
-            <span style={{ fontSize: 13.5, color: CP.textSecondary }}>Una alla volta: scarta, vista o interessante.</span>
-          </span>
-          <span style={{ fontSize: 15, color: CP.gold, whiteSpace: "nowrap" }}>Inizia →</span>
-        </button>
-      )}
-      <section aria-label="Il radar in numeri" className="ro-nums" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "24px 40px", borderTop: `1px solid ${CP.border}`, borderBottom: `1px solid ${CP.border}`, padding: "26px 0" }}>
-        <BigNum value={fmtFull(creators.length)} label="creator italiane seguite" />
-        <BigNum value={fmtFull(paid)} label="con un profilo a pagamento" gold />
-        <BigNum value={fmtFull(fmt)} label="con un format che si ripete" />
-        <BigNum value={fmtFull(contacted)} label="contattate · in attesa del parere legale" />
-      </section>
+      <style>{RO_CSS}</style>
+      <HeroHead
+        eyebrow="Radar creator · oggi"
+        title={toReview ? "Da valutare ci sono" : "Il radar segue"}
+        accent={toReview ? `${fmtFull(toReview)} creator` : `${fmtFull(creators.length)} creator`}
+        sub={toReview ? "Tutte col profilo a pagamento. Una alla volta: un voto per ognuna." : "Nessuna col profilo a pagamento resta da valutare: le hai guardate tutte."}
+        numbers={<>
+          <HeroNum label="Creator seguite" value={creators.length} />
+          <HeroNum label="Con profilo a pagamento" value={paid} strong />
+          <HeroNum label="Con un format" value={fmt} />
+          <HeroNum label="Contattate" value={contacted} title="In attesa del parere legale" />
+        </>}
+        actions={onValuta && toReview > 0 ? <button style={btnPrimary} onClick={onValuta}>Inizia a valutare</button> : null}
+        style={{ marginBottom: -20 }}
+      />
 
       <section aria-labelledby="r-oggi" style={{ display: "flex", flexDirection: "column", gap: 26 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
@@ -47,11 +50,11 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         {today.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0 }}>Nessuna creator da valutare con un profilo a pagamento: le hai già guardate tutte.</p>
         ) : (
-          <div className="ro-today" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 36 }}>
+          <div className="ro-today" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
             {today.map((c, i) => {
               const why = whyLines(c, { newCut });
               return (
-                <article key={c.id} style={{ display: "flex", flexDirection: "column", gap: 16, borderTop: `1px solid ${i === 0 ? CP.gold : CP.borderStrong || CP.border}`, paddingTop: 20 }}>
+                <article key={c.id} className="ro-card" style={{ display: "flex", flexDirection: "column", gap: 16, borderRadius: 18, border: `1px solid ${i === 0 ? alpha(CP.gold, "88") : CP.borderSoft || CP.border}`, background: i === 0 ? `radial-gradient(ellipse at 15% 0%, ${alpha(CP.gold, "14")}, transparent 60%), ${CP.surface}` : CP.surface, padding: 20, animationDelay: `${i * 70}ms` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <Initials name={c.name} gold={i === 0} pic={c.pic} />
                     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -69,9 +72,8 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
                   <LinkChip link={c.link} sig={c.sig} />
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button style={btnPrimary} onClick={() => onOpen(c)}>Apri la scheda</button>
-                    <button style={btn} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "interessante" }, `${c.name}: interessante.`)}>Interessante</button>
-                    <button style={btnQuiet} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "scartata" }, `${c.name}: scartata.`)}>Scarta</button>
                   </div>
+                  <RatingChips value={c.rating} disabled={busy} onRate={(id) => act({ action: "review", id: c.id, decision: id }, `${c.name}: ${RATINGS.find((r) => r.id === id).label}.`)} />
                 </article>
               );
             })}
@@ -118,19 +120,20 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         </section>
       </div>
 
-      <section aria-labelledby="r-segn" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-          <H2 id="r-segn" sub="Dall'app o dal Comando rapido dell'iPhone: il radar legge il profilo e la prima storia in evidenza.">Ultime segnalazioni</H2>
-          <button style={btn} onClick={onSegnala}>Segnala una creator</button>
+      <section aria-labelledby="r-segn" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+          <H2 id="r-segn" sub="Chi l'ha trovata per primo e cosa c'è nella prima storia in evidenza.">Ultime segnalazioni</H2>
+          <button style={btnPrimary} onClick={onSegnala}>Segnala una creator</button>
         </div>
         {inbox.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0, fontSize: 14 }}>Ancora nessuna segnalazione.</p>
         ) : (
-          <Segnalazioni rows={inboxRows(inbox, 10)} creators={creators} onOpen={onOpen} />
+          <SignalList inbox={inbox} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />
         )}
       </section>
 
       {data.canAdmin && <HlReread st={data.hlReread} onReload={onReload} />}
+      {data.canAdmin && <WebCheck st={data.webCheck} onReload={onReload} />}
 
       <footer style={{ display: "flex", flexWrap: "wrap", gap: "6px 28px", fontSize: 13, color: CP.textMuted, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 16 }}>
         <span>{ref.lastCompletedAt ? `Ultimo giro dei numeri: ${fmtDate(ref.lastCompletedAt)}${ref.lastUpdated ? `, ${fmtFull(ref.lastUpdated)} account letti` : ""}` : "Numeri della ricerca di ottobre"}</span>
@@ -138,125 +141,6 @@ export default function RadarOggi({ newCut, data, creators, profilesBy, onOpen, 
         <span>Dati da profili pubblici, ridotti al minimo · nessun contatto prima del parere legale</span>
       </footer>
     </div>
-  );
-}
-
-// ---------- Ultime segnalazioni: una riga per creator, esito in un'etichetta corta ----------
-
-const handleOf = (x) => x.h || (String(x.text || "").match(/instagram\.com\/(?!reel\/|p\/)([A-Za-z0-9._]{1,30})/)?.[1]?.toLowerCase()) || null;
-
-// Segnalazioni ripetute della stessa creator: resta la più recente, con quante volte.
-function inboxRows(inbox, max) {
-  const out = []; const at = new Map();
-  for (const x of inbox) {
-    const h = handleOf(x);
-    if (h && at.has(h)) { out[at.get(h)].n++; continue; }
-    if (h) at.set(h, out.length);
-    out.push({ x, h, n: 1 });
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-function inboxVerdict(x) {
-  if (x.status === "in_lettura") return { key: "lettura", label: "In lettura", tone: "muted" };
-  if (x.status === "errore" || x.status === "non_trovata" || x.status === "non_instagram") return { key: "rifare", label: "Da rifare", tone: "attn" };
-  if (x.status === "cancellata") return { key: "vuote", label: "Tolta dal radar", tone: "muted" };
-  if (x.warn) return { key: "rifare", label: "Da rifare", tone: "attn" };
-  if (x.sig === "forte") return { key: "aprire", label: "A pagamento", tone: "gold", rank: 0 };
-  if (x.sig === "debole") return { key: "aprire", label: "Da guardare", tone: "primary", rank: 1 };
-  return { key: "vuote", label: "Senza link", tone: "muted" };
-}
-
-// Il messaggio senza la parte che ripete il nome («@x aggiunta al radar · …»).
-function inboxDetail(x, h) {
-  if (x.status === "in_lettura") return null;
-  let m = String(x.msg || "").replace(/\.$/, "");
-  m = m.replace(/^@\S+ (aggiunta al radar|era già nel radar: aggiunta la segnalazione)( · )?/, (_, w) => (w.startsWith("era") ? "Già nel radar · " : ""));
-  m = m.replace(/^da guardare: /, "").replace(/ · da guardare: /, " · ");
-  m = m.replace(/prima storia in evidenza NON letta \(Instagram non ha risposto\): segnalala di nuovo per riprovare/, "Instagram non ha risposto sulla prima storia in evidenza");
-  m = m.replace(/(^|· )nessun link né tag, in bio o nella prima storia in evidenza$/, "");
-  m = m.replace(/ · $/, "").trim();
-  return m ? m[0].toUpperCase() + m.slice(1) : null;
-}
-
-const shortBy = (by) => (by ? String(by).replace(/\s*\(fonte (\w+)\)/i, " · $1").split(" ").slice(0, 3).join(" ") : null);
-
-// Un colore per esito: oro = a pagamento, blu = indizio, rosso = lettura fallita (va rifatta).
-const toneColor = (t) => (t === "gold" ? CP.gold : t === "attn" ? CP.accentRed : t === "primary" ? CP.cool : CP.textMuted);
-const SEG_ORDER = { lettura: 0, aprire: 1, rifare: 2, vuote: 3 };
-const SEG_FILTERS = [
-  { id: "tutte", label: "Tutte", test: () => true },
-  { id: "pagamento", label: "A pagamento", test: (r) => r.v.key === "aprire" && r.v.rank === 0 },
-  { id: "guardare", label: "Da guardare", test: (r) => r.v.key === "aprire" && r.v.rank === 1 },
-  { id: "rifare", label: "Da rifare", test: (r) => r.v.key === "rifare" },
-  { id: "vuote", label: "Senza link", test: (r) => r.v.key === "vuote" },
-];
-
-/**
- * Le segnalazioni come lista da app: filtri in alto, un riquadro unico con una riga per
- * creator (anello del colore dell'esito, numeri del profilo, evidenza su una riga sola).
- */
-function Segnalazioni({ rows, creators, onOpen }) {
-  const [filter, setFilter] = useState("tutte");
-  const items = rows
-    .map((r) => ({ ...r, v: inboxVerdict(r.x), c: r.h ? creators.find((y) => y.handles.includes(r.h)) : null }))
-    .sort((a, b) => SEG_ORDER[a.v.key] - SEG_ORDER[b.v.key] || (a.v.rank ?? 0) - (b.v.rank ?? 0));
-  const chips = SEG_FILTERS.map((f) => ({ ...f, n: items.filter(f.test).length })).filter((f) => f.id === "tutte" || f.n > 0);
-  const active = chips.find((f) => f.id === filter) || chips[0];
-  const shown = items.filter(active.test);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <style>{`@keyframes ro-spin{to{transform:rotate(360deg)}}.ro-chips{scrollbar-width:none}.ro-chips::-webkit-scrollbar{display:none}.ro-sg-row:active{background:${CP.hover || "transparent"}}`}</style>
-      <div className="ro-chips" role="tablist" style={{ display: "flex", gap: 8, overflowX: "auto", margin: "0 -16px", padding: "0 16px" }}>
-        {chips.map((f) => {
-          const on = f.id === active.id;
-          return (
-            <button key={f.id} role="tab" aria-selected={on} onClick={() => setFilter(f.id)}
-              style={{ all: "unset", cursor: "pointer", flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 13.5, background: on ? CP.textPrimary : CP.surfaceAlt || CP.surface, color: on ? CP.bg : CP.textSecondary }}>
-              {f.label}<span style={{ fontSize: 12, opacity: 0.7, ...NUM }}>{f.n}</span>
-            </button>
-          );
-        })}
-      </div>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, borderRadius: 18, background: CP.panel || CP.surface, overflow: "hidden" }}>
-        {shown.map((r, i) => <SegRow key={r.x.id} {...r} last={i === shown.length - 1} onOpen={onOpen} />)}
-      </ul>
-    </div>
-  );
-}
-
-function SegRow({ x, h, n, c, v, last, onOpen }) {
-  const detail = inboxDetail(x, h);
-  const color = toneColor(v.tone);
-  const stats = c ? [c.fol ? `${fmtN(c.fol)} follower` : null, c.medv ? `${fmtN(c.medv)} view` : null].filter(Boolean).join(" · ") : "";
-  const reading = v.key === "lettura";
-  const inner = (
-    <>
-      <span style={{ position: "relative", flex: "0 0 auto", width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span aria-hidden="true" style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${v.tone === "muted" ? "transparent" : color}`, ...(reading ? { borderColor: `${CP.gold} transparent transparent transparent`, animation: "ro-spin 1s linear infinite" } : {}) }} />
-        <Initials name={h || "?"} size={40} pic={c?.pic} />
-      </span>
-      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 15.5, fontWeight: 600, color: v.key === "vuote" ? CP.textSecondary : CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h ? `@${h}` : "Un link"}</span>
-          {n > 1 && <span style={{ fontSize: 11.5, padding: "1px 6px", borderRadius: 6, background: CP.surfaceAlt || CP.surface, color: CP.textMuted, ...NUM }}>×{n}</span>}
-          <span style={{ marginLeft: "auto", flex: "0 0 auto", fontSize: 12, color: CP.textMuted }}>{fmtDate(x.at)}</span>
-        </span>
-        <span style={{ fontSize: 13, color: CP.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          <span style={{ color, fontWeight: 500 }}>{reading ? "Sto leggendo il profilo…" : v.label}</span>{stats ? ` · ${stats}` : ""}
-        </span>
-        {detail && <span style={{ fontSize: 13, color: CP.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail}</span>}
-      </span>
-      {c && <span aria-hidden="true" style={{ alignSelf: "center", fontSize: 22, lineHeight: 1, color: CP.textMuted }}>›</span>}
-    </>
-  );
-  const st = { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", width: "100%", boxSizing: "border-box", textAlign: "left" };
-  return (
-    <li style={{ position: "relative" }}>
-      {c ? <button className="ro-sg-row" onClick={() => onOpen(c)} style={{ all: "unset", cursor: "pointer", ...st }}>{inner}</button> : <div style={st}>{inner}</div>}
-      {!last && <span aria-hidden="true" style={{ position: "absolute", left: 76, right: 0, bottom: 0, height: 1, background: CP.borderSoft || CP.border }} />}
-    </li>
   );
 }
 
@@ -324,5 +208,125 @@ function HlReread({ st, onReload }) {
             : <button style={btn} disabled={busy} onClick={() => send("start")}>{st?.status ? "Rileggi quelle rimaste" : "Avvia la rilettura"}</button>}
       </div>
     </section>
+  );
+}
+
+/**
+ * OnlyFans cercato su Google (5/11/2026, solo admin): per chi tiene Instagram e OnlyFans separati.
+ * Gira da solo dalla notte (primo giro su tutto il radar, poi ogni settimana sui nuovi); qui si
+ * vede a che punto è e lo si ferma o riavvia.
+ */
+function WebCheck({ st, onReload }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const running = st?.status === "in_corso";
+  useEffect(() => {
+    if (!running || !onReload) return undefined;
+    const t = setInterval(() => onReload(), 30000);
+    return () => clearInterval(t);
+  }, [running, onReload]);
+  async function send(action) {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/admin/scouting/web-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Errore ${r.status}`);
+      onReload?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const found = st?.found || {};
+  const forte = (found.forte || 0) + (st?.prevFound?.forte || 0);
+  const simile = (found.simile || 0) + (st?.prevFound?.simile || 0);
+  const tally = st?.status ? `${fmtFull(st.done || 0)} di ${fmtFull(st.total || 0)} cercate · ${fmtFull(forte)} con OnlyFans trovato${simile ? ` e ${fmtFull(simile)} con un nome simile da confermare` : ""} · spesi ${usd(st.spentUsd)} su ${usd(st.capUsd)}` : null;
+  const head = !st?.status ? "Cerca su Google gli OnlyFans senza link"
+    : running ? "Ricerca su Google in corso"
+    : st.status === "fatta" ? `Ricerca su Google finita il ${fmtDate(st.endedAt)}`
+    : st.status === "tetto" ? "Ricerca su Google fermata: raggiunto il tetto di spesa"
+    : "Ricerca su Google fermata";
+  return (
+    <section aria-labelledby="r-web" style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: `1px solid ${CP.borderSoft || CP.border}`, paddingTop: 18 }}>
+      <h3 id="r-web" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>{head}</h3>
+      <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, maxWidth: 760 }}>
+        {!st?.status
+          ? "Per chi tiene Instagram e OnlyFans separati: il radar cerca su Google la sua pagina OnlyFans e la tiene solo se è davvero lei (porta al suo Instagram o ha il suo stesso nome). Parte da sola stanotte, poi ogni settimana sulle nuove. Meno di mezzo centesimo a creator, tetto 15 $."
+          : tally}
+      </p>
+      {st?.status && (forte > 0 || simile > 0) && <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>Le trovi in Esplora › Trovate su Google.</p>}
+      {st?.failed ? <p style={{ margin: 0, fontSize: 13, color: CP.textMuted }}>{fmtFull(st.failed)} ricerche non riuscite: si riprovano al giro della settimana dopo.</p> : null}
+      {st?.lastError && running && <p style={{ margin: 0, fontSize: 13, color: CP.attn }}>Ultimo intoppo: {st.lastError} — il giro riprova da solo.</p>}
+      {err && <p role="alert" style={{ margin: 0, fontSize: 13, color: CP.attn }}>{err}</p>}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {running
+          ? <button style={btn} disabled={busy} onClick={() => send("stop")}>Ferma</button>
+          : st?.status === "fatta"
+            ? null
+            : <button style={btn} disabled={busy} onClick={() => send("start")}>{st?.status ? "Riprendi la ricerca" : "Avvia adesso"}</button>}
+      </div>
+    </section>
+  );
+}
+
+// Schede di «Da guardare oggi»: entrano una dopo l'altra e si sollevano al passaggio (stile reel).
+const RO_CSS = `
+.ro-card{animation:roIn .45s cubic-bezier(.2,.7,.2,1) both;transition:transform .18s ease, box-shadow .18s ease}
+@media (hover:hover){.ro-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px -14px rgba(0,0,0,.35)}}
+@keyframes roIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ro-card{animation:none;transition:none}.ro-card:hover{transform:none}}
+`;
+
+// ---------- Ultime segnalazioni: filtri e segnalazioni ripetute (5/11/2026, dalla #467) ----------
+
+const handleOf = (x) => x.h || (String(x.text || "").match(/instagram\.com\/(?!reel\/|p\/)([A-Za-z0-9._]{1,30})/)?.[1]?.toLowerCase()) || null;
+
+// La stessa creator segnalata più volte resta una volta sola: la segnalazione più recente, con quante volte.
+export function groupSignals(inbox, max) {
+  const out = []; const at = new Map();
+  for (const x of inbox) {
+    const h = handleOf(x);
+    if (h && at.has(h)) { out[at.get(h)].n++; continue; }
+    if (out.length >= max) continue;
+    if (h) at.set(h, out.length);
+    out.push({ x, h, n: 1 });
+  }
+  return out;
+}
+
+// Esito della segnalazione per i filtri: stesso criterio della riga (link della creator, lettura fallita).
+function signalKind(x, c) {
+  if (x.status === "in_lettura") return "lettura";
+  if (["errore", "non_trovata", "non_instagram"].includes(x.status) || x.warn) return "rifare";
+  const s = c?.link?.strength || 0;
+  if (s >= 2) return "pagamento";
+  if (s >= 1 || c?.link) return "guardare";
+  return "vuote";
+}
+
+const SIGNAL_FILTERS = [["tutte", "Tutte"], ["pagamento", "A pagamento"], ["guardare", "Da guardare"], ["rifare", "Da rifare"], ["vuote", "Senza link"]];
+
+function SignalList({ inbox, me, creators, profilesBy, onOpen }) {
+  const [filter, setFilter] = useState("tutte");
+  const rows = useMemo(() => groupSignals(inbox, 12).map((r) => {
+    const c = r.h ? creators.find((y) => y.handles.includes(r.h)) : null;
+    return { ...r, kind: signalKind(r.x, c) };
+  }), [inbox, creators]);
+  const counts = rows.reduce((m, r) => ({ ...m, [r.kind]: (m[r.kind] || 0) + 1 }), {});
+  const chips = SIGNAL_FILTERS.filter(([id]) => id === "tutte" || counts[id]);
+  const active = chips.some(([id]) => id === filter) ? filter : "tutte";
+  const shown = rows.filter((r) => active === "tutte" || r.kind === active);
+  return (
+    <>
+      {chips.length > 2 && (
+        <div role="group" aria-label="Filtra le segnalazioni" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {chips.map(([id, label]) => <FilterChip key={id} label={`${label} ${id === "tutte" ? rows.length : counts[id]}`} active={active === id} onClick={() => setFilter(id)} />)}
+        </div>
+      )}
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {shown.slice(0, 8).map((r) => <SignalRow key={r.x.id} item={r.x} times={r.n} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />)}
+      </ul>
+    </>
   );
 }

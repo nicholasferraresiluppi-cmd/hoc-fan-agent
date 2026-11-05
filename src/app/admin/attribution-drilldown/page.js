@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, Download } from "lucide-react";
 import { CP, FONTS, creatorDotColor, alpha } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card, NUM, BTN_PRIMARY } from "@/components/ds";
 import { fmtInt } from "@/lib/format";
 
 /**
@@ -105,7 +105,7 @@ export default function AttributionDrilldownPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Controllo dati CP", href: "/admin/infloww-reconcile" }, { label: "Recupero vendite non registrate" }]}
         title="Recupero vendite non registrate"
@@ -224,4 +224,4 @@ export default function AttributionDrilldownPage() {
 }
 
 const ctl = { padding: "8px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: "none" };
+const btnPrimary = BTN_PRIMARY;

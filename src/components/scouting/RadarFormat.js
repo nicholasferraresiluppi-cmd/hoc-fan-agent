@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { FilterChip } from "@/components/ds";
 import { FORMATS, FORMAT_TESTS, FORMAT_CHOICE, FORMAT_TRIAL, OUR_CONCEPTS, FORMAT_ASOF } from "@/lib/scouting-formats";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
 import { SERIF, NUM, H2 } from "./radar-ui";
 
 const FILTERS = [
@@ -27,8 +28,18 @@ export default function RadarFormat() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
       <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <p style={{ margin: 0, ...SERIF, fontSize: 26, lineHeight: 1.25, maxWidth: 820 }}>I format esistono già. In Italia quasi nessuno li fa, e basta la ragazza da sola in casa.</p>
-        <p style={{ margin: 0, color: CP.textSecondary, maxWidth: 760 }}>Le idee le abbiamo avute: sette account a tema sono stati aperti e mai partiti. Quelli portati avanti con costanza crescono. Il problema è scegliere un format e tenerlo per mesi.</p>
+        <HeroHead
+          eyebrow="Radar creator · format"
+          title="I format esistono già:"
+          accent="in Italia quasi nessuno li fa"
+          sub="E basta la ragazza da sola in casa. Le idee le abbiamo avute: sette account a tema aperti e mai partiti, quelli portati avanti con costanza crescono. Il problema è scegliere un format e tenerlo per mesi."
+          numbers={<>
+            <HeroNum label="Format da fare da sola" value={home.length} strong />
+            <HeroNum label="Liberi in Italia" value={home.filter((x) => x.free).length} />
+            <HeroNum label="Avvicinano molto a OF" value={home.filter((x) => x.hi).length} />
+          </>}
+          style={{ marginBottom: 4 }}
+        />
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 14.5 }}>
             <thead><tr style={{ textAlign: "left", color: CP.textMuted, fontSize: 12.5 }}>
@@ -75,7 +86,7 @@ export default function RadarFormat() {
             lastFam = x.fam;
             return [
               head,
-              <article key={x.name} style={{ border: `1px solid ${CP.border}`, borderRadius: 12, padding: 18, display: "grid", gap: 10, background: CP.surface }}>
+              <article key={x.name} className="rx-card" style={{ border: `1px solid ${CP.border}`, borderRadius: 14, padding: 18, display: "grid", gap: 10, background: CP.surface }}>
                 <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
                   <h3 style={{ margin: 0, ...SERIF, fontSize: 24 }}>{x.name}</h3>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{tag(x.free, "Libero in Italia", "Già presente in Italia")}{tag(x.hi, "Avvicina molto a OF", "Vetrina")}{x.zero ? tag(true, "Costo zero", "") : null}</div>

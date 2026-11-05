@@ -8,7 +8,7 @@
  */
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, HelpCircle, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { useStyle } from "@/lib/theme-client";
 import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
@@ -151,6 +151,101 @@ export function FilterChip({ label, active, danger, attn, onClick, disabled, clo
   );
 }
 
+/*
+ * Regole d'uso (29/10/2026, pannello tester + Nicholas: «schede, filtri e scelte hanno lo stesso
+ * aspetto»). Tre aspetti per tre funzioni, ovunque:
+ *   - SCHEDE (cambiano la vista)          → <Tabs>: testo con la riga sotto, mai pillole
+ *   - FILTRI (restringono ciò che si vede) → <FilterChip>/tendine dentro una sola <FilterBar>
+ *   - MODALITÀ di tutta la pagina          → <Segmented> (es. Instagram | X)
+ *   - AZIONI                               → bottoni (un solo primario viola per schermata)
+ * Vedi docs/DESIGN.md «Regole d'uso».
+ */
+
+/**
+ * Pulsanti (regola d'uso 5, 30/10/2026): un solo aspetto per tutta l'app. Prima c'erano ~28 definizioni
+ * locali di «pulsante principale» con 6 misure diverse. BTN_PRIMARY = l'azione principale (una per schermata),
+ * BTN = secondario (bianco col bordo), BTN_PRIMARY_OFF(disabled) per i pulsanti che si spengono.
+ */
+export const BTN = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", minHeight: 38, borderRadius: 10, fontSize: 13.5, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}` };
+export const BTN_PRIMARY = { ...BTN, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}` };
+export const BTN_PRIMARY_OFF = (disabled) => (disabled ? { ...BTN_PRIMARY, background: CP.surfaceAlt, color: CP.textMuted, border: `1px solid ${CP.border}`, cursor: "not-allowed" } : BTN_PRIMARY);
+
+/**
+ * Aspetto di una scheda, condiviso da Tabs, PageTabs e CompNav (30/10/2026, Nicholas: «questi bottoni si
+ * vedono poco»). Resta una scheda — riga sotto, mai pillola — ma si capisce che è cliccabile: area di
+ * clic con margine, fondo tenue al passaggio (classe .hoc-tab in globals.css), quella aperta in viola
+ * con riga spessa e fondo leggero.
+ */
+export function tabStyle(on, { small = false, P = CP } = {}) {
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, whiteSpace: "nowrap", textDecoration: "none", cursor: "pointer",
+    background: on ? alpha(P.accent, "14") : "transparent", border: "none", borderRadius: "8px 8px 0 0",
+    borderBottom: `3px solid ${on ? P.accent : "transparent"}`, marginBottom: -1,
+    padding: small ? "7px 10px 7px" : "9px 14px 9px", fontSize: small ? 14 : 15, fontWeight: 500,
+    color: on ? P.accentSoftText : P.textSecondary, fontFamily: FONTS.body,
+  };
+}
+export const TABS_BAR = { display: "flex", alignItems: "flex-end", gap: 2, borderBottom: `1px solid ${CP.borderStrong}`, overflowX: "auto", scrollbarWidth: "none" };
+
+/** Schede della pagina o di una sezione: testo con la riga sotto quella aperta. items = [[key, label, badge?], …] */
+export function Tabs({ items, value, onChange, aside, small = false, style }) {
+  return (
+    <div role="tablist" className="ds-tabs" style={{ ...TABS_BAR, margin: "0 0 16px", ...style }}>
+      {items.map(([k, label, badge]) => {
+        const on = value === k;
+        return (
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={() => onChange(k)} className="hoc-tab" style={tabStyle(on, { small })}>
+            {label}
+            {badge != null && badge !== "" && <span style={{ fontSize: 12, fontWeight: 400, color: on ? CP.accentSoftText : CP.textMuted, ...NUM }}>{badge}</span>}
+          </button>
+        );
+      })}
+      {aside && <span style={{ marginLeft: "auto", paddingBottom: 6, flexShrink: 0 }}>{aside}</span>}
+    </div>
+  );
+}
+
+/** Modalità di tutta la pagina (es. piattaforma): bottoni uniti in un solo riquadro. items = [[key, label], …] */
+export function Segmented({ items, value, onChange, label, style }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, ...style }}>
+      {label && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{label}</span>}
+      <span role="radiogroup" style={{ display: "inline-flex", border: `1px solid ${CP.border}`, borderRadius: 10, padding: 2, background: CP.surface }}>
+        {items.map(([k, l]) => {
+          const on = value === k;
+          return (
+            <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)}
+              style={{ border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, background: on ? CP.accent : "transparent", color: on ? CP.accentInk : CP.textSecondary, fontWeight: on ? 500 : 400 }}>
+              {l}
+            </button>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
+/** L'unica barra dei filtri di una vista: sta sotto le schede; a destra «Azzera» se serve. */
+export function FilterBar({ children, onReset, style }) {
+  return (
+    <div className="ds-filterbar" style={{ ...card, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "10px 12px", margin: "0 0 14px", ...style }}>
+      {children}
+      {onReset && <button type="button" onClick={onReset} style={{ marginLeft: "auto", background: "transparent", border: "none", color: CP.textSecondary, fontSize: 13, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONTS.body }}>Azzera</button>}
+    </div>
+  );
+}
+
+/** Stato vuoto: cosa manca, perché, e il tasto per risolvere dentro il riquadro. */
+export function EmptyState({ title, children, action }) {
+  return (
+    <div style={{ ...card, textAlign: "center", padding: "26px 18px", margin: "0 0 14px" }}>
+      {title && <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, marginBottom: 4 }}>{title}</div>}
+      {children && <p style={{ fontSize: 13.5, color: CP.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>{children}</p>}
+      {action}
+    </div>
+  );
+}
+
 export function SectionTitle({ children, aside }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "0 0 10px", flexWrap: "wrap" }}>
@@ -172,6 +267,28 @@ export function Disclosure({ open, onToggle, title, summary, icon, children }) {
       </button>
       {open && <div style={{ padding: "0 16px 16px" }}>{children}</div>}
     </section>
+  );
+}
+
+/**
+ * Spiegazione a richiesta (30/10/2026, Nicholas: «tanto scritto, devo scorrere per arrivare ai dati»).
+ * Il «come si legge / come si calcola» non sta più aperto sopra i numeri: un tasto «?» lo apre sotto.
+ * In pagina resta solo la frase che dice cosa si vede.
+ */
+export function Spiega({ label = "Come si legge", children, style }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={style}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", padding: "2px 0", cursor: "pointer", fontSize: 13, color: open ? CP.accentSoftText : CP.textMuted, fontFamily: FONTS.body }}>
+        <HelpCircle size={15} />{label}
+      </button>
+      {open && (
+        <div style={{ ...card, padding: "12px 16px", marginTop: 8, display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55, color: CP.textSecondary, maxWidth: 920 }}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -209,7 +326,7 @@ export function EarlyMonthNote({ info, periodId, onSwitch }) {
  * testo fa da titolo, le altre «etichetta · valore» una sotto l'altra (data-l). Niente
  * più tabelle tagliate a destra da scorrere di lato (10/10/2026, dall'app iOS).
  */
-export function DataTable({ columns, rows, defaultSort, onRowClick, selected, minWidth = 600, empty = "Nessun dato.", maxHeight, density }) {
+export function DataTable({ columns, rows, defaultSort, onRowClick, onRowHover, selected, minWidth = 600, empty = "Nessun dato.", maxHeight, density }) {
   const [sort, setSort] = useState(defaultSort || null);
   // Navigazione da tastiera (solo con onRowClick): j/k o frecce spostano la riga
   // attiva, Invio la apre. Il focus sta sulla tabella (tabIndex 0); la riga
@@ -268,6 +385,7 @@ export function DataTable({ columns, rows, defaultSort, onRowClick, selected, mi
               <tr key={r.id ?? r.key ?? i} id={nav ? rowId(i) : undefined} className="ds-tr"
                 data-sel={sel ? "1" : undefined} data-active={nav && i === active ? "1" : undefined} aria-selected={nav ? Boolean(sel) : undefined}
                 onClick={onRowClick ? () => { if (nav) setActive(i); onRowClick(r); } : undefined}
+                onPointerEnter={onRowHover ? () => onRowHover(r) : undefined}
                 style={{ borderTop: `1px solid ${CP.borderSoft}`, cursor: onRowClick ? "pointer" : "default", background: sel ? CP.accentSoft : "transparent" }}>
                 {columns.map((c, ci) => (
                   <td key={c.key} className={ci === stickyIdx ? "ds-stk ds-first" : undefined} data-l={typeof c.label === "string" ? c.label : ""} style={{ padding: "9px 12px", textAlign: c.align || "left", color: c.muted ? CP.textSecondary : CP.textPrimary, verticalAlign: "middle", ...(c.align === "right" ? NUM : {}), ...(ci === stickyIdx ? { position: "sticky", left: 0, zIndex: 1, background: sel ? CP.accentSoft : CP.surface } : {}) }}>

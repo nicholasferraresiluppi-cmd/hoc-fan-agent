@@ -53,7 +53,6 @@ import {
 import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
 import { notifyWhatsApp } from "./whatsapp-notify.js";
 import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
-import { clickupSkillLabels } from "./hr-skills.js";
 import {
   hrSyncConfig, getListFields, getListInfo, getListMembers, listAllTasks, getTask, createTask, updateTask, setField, removeField,
   resolveTeamId, createWebhook, deleteWebhook, isTaskGone, ClickupError, HR_WEBHOOK_EVENTS, listWebhooks, getView, updateView,
@@ -225,6 +224,10 @@ export async function savePerson({ id = null, input = {}, allowed = EDITABLE_KEY
     person = { id: newPersonId(), createdAt: at, updatedAt: at, source, fields: {}, fieldUpdatedAt: {}, clickupTaskId: null, sync: { status: "pending" } };
     // persona nuova dal modulo (link condiviso o personale): fase "In ingresso" se non indicata
     if (source === "modulo" && !values.collaborationStatus) values.collaborationStatus = PHASE_ENTRY;
+    // 19/10/2026 (Nicholas): chi compila il modulo parte SEMPRE con il contratto da fare, anche se in
+    // passato ha già lavorato con noi: un contratto vecchio non vale. Se l'Area Partner ritrova un
+    // contratto valido lo allega e mette «Firmato» a mano. Nessun controllo automatico.
+    if (source === "modulo" && !values.hvContractStatus) values.hvContractStatus = "Da preparare";
   }
   const r = applyChanges(person, values, { at, by: actor, source });
   person = r.person;
@@ -574,7 +577,11 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const skippedKeys = new Set((person.sync?.skipped || []).map((x) => x.key));
   for (const k of Object.keys(fresh)) {
     if (!isEmptyValue(fresh[k]) || isEmptyValue(current.fields[k])) continue;
-    if (base[k] === undefined || skippedKeys.has(k) || k === "location") delete fresh[k];
+    if (base[k] === undefined || skippedKeys.has(k)) delete fresh[k];
+    // (c) campo specchio vuoto che su ClickUp non ha mai mostrato il testo dell'app (04/11/2026,
+    // incidente): l'indirizzo passato da «Location» a «Indirizzo» aveva una base del campo vecchio
+    // e il primo giro ha svuotato 93 indirizzi in app. Svuota solo chi cancella il testo che c'era.
+    else if (FIELD_BY_KEY[k]?.mirror && base[k] !== mirrorPrint(mirrorText(k, current.fields) || "")) delete fresh[k];
   }
 
   // campi specchio: testo cambiato ma non leggibile → si tiene l'app, lo si scrive nello storico
@@ -600,12 +607,8 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const { apply, keepApp } = resolveFieldConflicts(current, fresh, atIn);
 
   const { codiceFiscale: cfApply, ...applyRest } = apply;
-  // competenze cambiate da ClickUp: le etichette "Skills" seguono, come quando si salva in app
+  // 18/10/2026: il campo «Skills» di ClickUp è ritirato, le etichette non si derivano più dalle competenze
   const derivedPush = [];
-  if ("skillLevels" in applyRest && !("skills" in fresh)) {
-    const labels = clickupSkillLabels(applyRest.skillLevels);
-    if (!valuesEqual(current.fields.skills, labels)) { applyRest.skills = labels; derivedPush.push("skills"); }
-  }
   // fase cambiata da ClickUp (tendina o stato del task): l'altro dei due si allinea
   if ("collaborationStatus" in applyRest && await phaseNeedsAlign(applyRest.collaborationStatus, { hasDropdown, dropdown: m.fields.collaborationStatus, statusPhase: m.statusPhase })) {
     derivedPush.push("collaborationStatus");

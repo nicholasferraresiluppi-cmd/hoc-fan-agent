@@ -8,7 +8,16 @@
   font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
 }
 
+/* Niente rimbalzo della pagina intera su iPhone (21/10/2026): tirando oltre la fine si
+   spostavano i bordi e compariva uno spazio sotto la barra. Lo scorrimento dentro la pagina
+   resta normale; si perde solo il «tira giù per aggiornare» di Safari. */
+html {
+  background-color: var(--cp-bg);
+  overscroll-behavior: none;
+}
+
 body {
+  overscroll-behavior: none;
   font-family: var(--cp-font, 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif);
   touch-action: manipulation; /* niente zoom col doppio tocco (vedi viewport in layout.js) */
   background-color: var(--cp-bg);
@@ -105,6 +114,8 @@ h1, h2, h3, h4, h5, h6 {
   [data-style="v3"] .hoc-v3-tabbar { display: grid; }
   [data-style="v3"] .hoc-main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
   [data-style="v3"] .hoc-fb { bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+  /* avvisi fissi in basso (classe hoc-dock): sopra la barra delle schede, non sopra le schede */
+  [data-style="v3"] .hoc-dock { bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
   [data-style="v3"] .hoc-v3-cmdk-wrap { padding-top: 10vh !important; }
   [data-style="v3"] .hoc-v3-cmdk-foot { display: none !important; }
   /* target tattili 44px nel menu */
@@ -187,7 +198,7 @@ h1, h2, h3, h4, h5, h6 {
 .ds-tr:hover .me-contest, .ds-tr:focus-within .me-contest, .ds-tr[data-sel] .me-contest, .ds-tr[data-active] .me-contest, .me-contest:focus-visible { opacity: 1; }
 /* Telefono: il dettaglio del turno è un pannello dal basso */
 @media (max-width: 699px) {
-  .me-shift-sheet { position: fixed !important; left: 8px; right: 8px; bottom: 8px; z-index: 60; max-height: 80vh; overflow: auto; margin: 0 !important; box-shadow: 0 -12px 40px rgba(0,0,0,.35); }
+  .me-shift-sheet { position: fixed !important; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 60; max-height: 80vh; overflow: auto; margin: 0 !important; box-shadow: 0 -12px 40px rgba(0,0,0,.35); }
 }
 /* senza hover (tablet): 'Contesta' sempre visibile */
 @media (hover: none) { .ds-tr .me-contest { opacity: 1; } }
@@ -363,3 +374,8 @@ html.casa-intro[data-style="v3"]::after {
   .hoc-fb { padding: 10px !important; right: 12px !important; bottom: 12px !important; }
   .hoc-fb-label { display: none; }
 }
+
+/* Schede (ds.js tabStyle): fondo tenue al passaggio su quelle non aperte */
+.hoc-tab { transition: background-color .12s ease, color .12s ease; }
+.hoc-tab:not([aria-selected="true"]):not([aria-current]):hover { background-color: color-mix(in srgb, var(--cp-accent) 7%, transparent) !important; color: var(--cp-textPrimary) !important; }
+.hoc-tab:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: -2px; }

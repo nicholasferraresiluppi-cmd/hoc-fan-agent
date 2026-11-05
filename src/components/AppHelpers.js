@@ -65,7 +65,7 @@ export function FeedbackButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} data-track="Segnala o suggerisci" aria-label="Segnala o suggerisci"
-        className="hoc-fb" style={{ position: "fixed", right: 18, bottom: 18, zIndex: 60, display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.panel, color: CP.textSecondary, fontSize: 12, cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+        className="hoc-fb" style={{ position: "fixed", right: 18, bottom: "calc(18px + env(safe-area-inset-bottom))", zIndex: 60, display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 999, border: `1px solid ${CP.border}`, background: CP.panel, color: CP.textSecondary, fontSize: 12, cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
         <MessageSquarePlus size={15} /> <span className="hoc-fb-label">Segnala o suggerisci</span>
       </button>
       {open && (

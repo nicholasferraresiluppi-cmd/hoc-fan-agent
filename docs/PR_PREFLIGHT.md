@@ -83,6 +83,17 @@ Bug ricorrenti, tutti riscontrati su `/leaderboard/operational`.
 
 ---
 
+## 10. iPhone (app dalla schermata Home)
+
+Il rimbalzo, la zona della linea Home e la tastiera non si vedono in un browser automatico: li vede solo un iPhone vero (o il simulatore di Xcode), con l'app aperta dall'icona sulla schermata Home.
+
+- [ ] `node tests/iphone.mjs` passa (gira anche in CI a ogni PR): viewport con `viewportFit: "cover"`, niente rimbalzo della pagina, ogni elemento fisso in basso usa `env(safe-area-inset-bottom)`
+- [ ] Un avviso fisso in basso ha `className="hoc-dock"`, così sul telefono sta sopra la barra delle schede invece di coprirla
+- [ ] Un pannello che sale dal basso ha il padding `calc(Npx + env(safe-area-inset-bottom))`, così l'ultimo pulsante non finisce sotto la linea Home
+- [ ] Prova sul telefono: tirando oltre la fine della pagina non si muove niente e sotto la barra non compare uno spazio; i campi in fondo restano visibili con la tastiera aperta; nessuna pagina scorre di lato
+
+---
+
 ## Heuristics Nielsen filtrate per HOC
 
 Domande da farsi prima del merge UI:
@@ -128,6 +139,7 @@ Vedi `tests/smoke-leaderboard.mjs` per dettagli.
 
 | Data | Cosa | Da quale bug |
 |------|------|--------------|
+| 2026-10-21 | Sezione 10 (iPhone, `tests/iphone.mjs` in CI) | Striscia vuota sotto la barra delle schede e rimbalzo della pagina intera dall'app sulla schermata Home: mancava `viewport-fit=cover`, tutte le distanze dalla linea Home valevano 0 |
 | 2026-10-10 | Sezione 2 (4 stili + pannelli pieni, `check-overlay-bg.mjs`) | Calendario di Analisi vendite trasparente nello stile Casa: verificato solo nello stile vecchio chiaro. Stesso difetto trovato nel menu ⋮ della classifica operativa e nella tendina paesi del modulo HR |
 | 2026-05-20 | Sezione 1 (filtri/count) | "Tutte" senza count + counts pill sbagliati al filtro ITA |
 | 2026-05-20 | Sezione 2 (posizionamento) | Top 10 da cambiare in fondo alla pagina |

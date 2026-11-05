@@ -212,7 +212,18 @@ for (const p of personas) {
       return labels.length;
     });
     if (opened) await settle(page.goto(`${BASE}/guida`, { waitUntil: "domcontentloaded", timeout: 45000 }));
-    const fullMenu = await readMenu();
+    let fullMenu = await readMenu();
+    // ruolo ristretto (es. Social): niente menu laterale, le sue pagine sono le schede in alto (o la sola pagina di partenza)
+    if (!fullMenu.length) {
+      await settle(page.goto(`${BASE}/start`, { waitUntil: "domcontentloaded", timeout: 45000 }));
+      fullMenu = await page.evaluate(() => {
+        const seen = new Set();
+        const tabs = [...document.querySelectorAll("[data-restricted-tabs] a[href^='/']")].map((a) => ({ href: a.getAttribute("href"), label: (a.innerText || "").trim().split("\n")[0] }));
+        const home = { href: location.pathname, label: "Pagina di partenza" };
+        return [...tabs, home].filter((l) => l.href && !l.href.startsWith("/sign") && !seen.has(l.href) && seen.add(l.href));
+      });
+      if (fullMenu.length) log(`  ruolo ristretto: ${fullMenu.length} pagine dalle schede in alto`);
+    }
     log(`  menu: ${fullMenu.length} voci`);
     const menu = fullMenu.slice(0, MAX_PAGES);
     if (!menu.length) throw new Error("menu vuoto: nessuna voce da aprire");

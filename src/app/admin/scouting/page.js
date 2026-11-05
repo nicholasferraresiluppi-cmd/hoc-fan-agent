@@ -39,6 +39,10 @@ const TABS = [
 // Telefono (10/10/2026, richiesta Nicholas: "il radar deve essere comodo dal telefono").
 // Esplora e Mercato hanno un disegno apposta (useIsPhone); qui le regole di contorno.
 const PHONE_CSS = `
+.rx-card{animation:rxIn .4s cubic-bezier(.2,.7,.2,1) both;transition:transform .18s ease, box-shadow .18s ease}
+@media (hover:hover){.rx-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px -16px rgba(0,0,0,.35)}}
+@keyframes rxIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rx-card{animation:none;transition:none}.rx-card:hover{transform:none}}
 .rx-strip{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
 .rx-strip::-webkit-scrollbar{display:none}
 @media (max-width:699px){
@@ -48,9 +52,6 @@ const PHONE_CSS = `
   .rx-page .ds-h1{font-size:30px !important;line-height:1.08 !important}
   .rx-tabs{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;gap:22px !important;margin:0 -16px 20px !important;padding:0 16px}
   .rx-tabs::-webkit-scrollbar{display:none}
-  .ro-nums{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:18px 16px !important;padding:18px 0 !important}
-  .ro-nums > div > span:first-child{font-size:34px !important}
-  .ro-nums > div > span:last-child{font-size:12.5px !important}
   .ro-today{display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;gap:16px !important;margin:0 -16px;padding:0 16px 6px;scrollbar-width:none}
   .ro-today::-webkit-scrollbar{display:none}
   .ro-today > article{flex:0 0 86%;scroll-snap-align:start}
@@ -62,7 +63,10 @@ const PHONE_CSS = `
   .rs-stages{flex-direction:row !important;flex-wrap:wrap}
   .rs-stages button{padding:8px 12px !important;font-size:13.5px !important}
   .rc-scroll{overflow:visible !important}
-  [data-style="v3"] .rv-bar{bottom:calc(80px + env(safe-area-inset-bottom)) !important}
+  /* Valuta (21/10/2026): mentre si vota, via la barra dell'app e il pulsante dei commenti */
+  html.rv-focus .hoc-v3-tabbar, html.rv-focus .hoc-fb{display:none !important}
+  .rv-bar{bottom:calc(8px + env(safe-area-inset-bottom)) !important}
+  .rv-fig{font-size:17px !important}
   .rf-later > div{grid-template-columns:1fr !important;gap:4px !important}
   .rc-cols{grid-template-columns:1fr !important;min-width:0 !important}
 }`;
@@ -71,8 +75,8 @@ export default function ScoutingPage() {
   const { data, error, mutate, isLoading } = useSWR("/api/admin/scouting", fetcher, { revalidateOnFocus: false });
   const { data: inboxData, mutate: mutateInbox } = useSWR("/api/admin/scouting/segnala", fetcher, {
     revalidateOnFocus: false,
-    // finché una segnalazione è in lettura si riguarda ogni 5 secondi
-    refreshInterval: (d) => (d?.items || []).some((x) => x.status === "in_lettura") ? 5000 : 0,
+    // finché una segnalazione è in lettura si riguarda ogni 3 secondi (la finestra mostra i passi)
+    refreshInterval: (d) => (d?.items || []).some((x) => x.status === "in_lettura") ? 3000 : 0,
   });
   const { user } = useUser();
   const me = user?.fullName || user?.primaryEmailAddress?.emailAddress || "";
@@ -130,10 +134,10 @@ export default function ScoutingPage() {
     } finally { setBusy(false); }
   }
 
-  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Una alla volta, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
+  const line2 = sel || !data ? null : tab === "oggi" ? `${fmtFull(paid)} creator con un profilo a pagamento.` : tab === "mercato" ? "Dove c'è spazio, cosa funziona." : tab === "format" ? "I format che esistono già." : tab === "contatti" ? "Dalla scelta alla firma." : tab === "valuta" ? "Un voto per ognuna, nessuna saltata." : `${fmtFull(creators.length)} creator italiane.`;
 
   return (
-    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 20px 72px" }}>
+    <div className="rx-page" data-sel={sel ? "1" : undefined} style={{ maxWidth: 1600, margin: "0 auto", padding: "24px 20px 72px" }}>
       <style>{PHONE_CSS}</style>
       <PageHead
         crumbs={[{ label: "Admin", href: "/admin" }, { label: "Marketing" }]}
@@ -152,7 +156,7 @@ export default function ScoutingPage() {
         </nav>
       )}
 
-      {msg && <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
+      {msg && <div className="hoc-dock" style={{ position: "fixed", left: "50%", bottom: "calc(24px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 900, maxWidth: "calc(100% - 32px)" }}><Notice>{msg} <button onClick={() => setMsg(null)} style={{ ...btn, minHeight: 0, padding: "2px 10px", marginLeft: 8 }}>Ok</button></Notice></div>}
       {error && <Notice danger>{error.message}</Notice>}
       {isLoading && <p style={{ color: CP.textMuted }}>Caricamento…</p>}
       {data && creators.length === 0 && <Notice>Il radar è vuoto: si carica con lo script di importazione della ricerca (scripts/scouting-import.mjs) o segnalando una creator.</Notice>}
@@ -172,11 +176,11 @@ export default function ScoutingPage() {
         ) : tab === "contatti" ? (
           <RadarContatti creators={creators} onOpen={(c) => go("contatti", c.handles[0])} />
         ) : (
-          <RadarOggi newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} onReload={mutate} />
+          <RadarOggi me={me} newCut={newCut} data={data} creators={creators} profilesBy={profilesBy} onOpen={(c) => go("oggi", c.handles[0])} act={act} busy={busy} inbox={inbox} onSegnala={() => setSegnala(true)} onValuta={() => go("valuta")} onReload={mutate} />
         )
       )}
 
-      <RadarSegnala open={segnala} onClose={() => setSegnala(false)} me={me} onSent={() => mutateInbox()} />
+      <RadarSegnala open={segnala} onClose={() => setSegnala(false)} me={me} onSent={() => mutateInbox()} inbox={inbox} creators={creators} onOpen={(c) => go("oggi", c.handles[0])} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/people/[id] — scheda persona (Centro HR, SEED).
+ * /api/admin/hr/people/[id] — scheda persona (Centro HR, people.manage).
  *
  * GET   → { person (CF solo mascherato), log, cleanup (flag di questa scheda) }
  * PATCH → modifica campi; salva in app, poi spinge su ClickUp SOLO i campi cambiati.
@@ -12,13 +12,14 @@ import { getPerson, getLog, publicPerson, savePerson, listPeople, computeCleanup
 import { hrCryptoConfigured } from "@/lib/hr-crypto";
 import { pendingUploadsFor } from "@/lib/hr-uploads";
 import { after } from "next/server";
-import { getStore, getLinks, getAttached, buildView, reconcilePerson } from "@/lib/hr-contracts";
+import { getStore, getLinks, getAttached, buildView } from "@/lib/hr-contracts";
+import { syncContractMilestoneFor } from "@/lib/hr-contract-milestone";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   const p = await getPerson(id);
@@ -49,14 +50,14 @@ export async function GET(request, props) {
 }
 
 export async function PATCH(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: "JSON non valido." }, { status: 400 }); }
   const res = await savePerson({ id, input: body || {}, actor: az.userId, source: "app" });
   if (!res.ok) return Response.json({ error: res.errors.join(" ") }, { status: res.status });
-  // mansione cambiata → lo «Stato del contratto» si riallinea subito (anche su ClickUp), dopo la risposta
-  if (res.changed?.includes("mansioni")) after(() => reconcilePerson(id).catch(() => {}));
+  // 18/10/2026: stato del contratto, fase o mansione cambiati → «Contratti da recuperare» (Area Partner) subito
+  if (res.changed?.some((k) => ["hvContractStatus", "collaborationStatus", "mansioni"].includes(k))) after(() => syncContractMilestoneFor(id).catch(() => {}));
   return Response.json({ ok: true, person: publicPerson(res.person, { withCfMask: true }), changed: res.changed, cfNote: res.cfNote, sync: res.sync });
 }

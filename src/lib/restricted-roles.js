@@ -7,17 +7,26 @@
 // permesso, social.manage); qui si evita che la persona finisca su pagine che non la riguardano.
 
 export const RESTRICTED_ROLES = {
-  social: { home: "/admin/supervisor", paths: ["/admin/supervisor"], label: "Account social" },
-  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor"], label: "Radar creator" },
+  // 22/10/2026: + Warm-up, che diventa la pagina d'arrivo (è il lavoro di ogni giorno di chi ha questo ruolo)
+  social: { home: "/admin/warmup", paths: ["/admin/warmup", "/admin/editoriale", "/admin/supervisor"], label: "Social" },
+  // 18/10/2026: People Partner — CRM persone e contratti; Contabilità solo se il titolare gliel'ha aperta
+  // `needs`: pagina mostrata solo con quel permesso (la Contabilità la apre il titolare a mano)
+  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/admin/referral", "/admin/publisher-x", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
+  // 26/10/2026: chi ha portato un collega e non lavora in HOC Pro vede solo i suoi guadagni
+  referente: { home: "/me/porta-un-amico", paths: ["/me/porta-un-amico"], label: "Porta un amico" },
+  // 27/10/2026: il publisher su X vede solo i suoi fan e le sue buste
+  publisher: { home: "/me/publisher", paths: ["/me/publisher"], label: "I miei fan" },
+  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
 };
 
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */
-export function restrictionFor({ admin, roles } = {}) {
+export function restrictionFor({ admin, roles, capabilities = null } = {}) {
   if (admin) return null;
   const rs = (roles || []).filter(Boolean);
   if (!rs.length || !rs.every((r) => RESTRICTED_ROLES[r])) return null;
   const first = RESTRICTED_ROLES[rs[0]];
-  return { home: first.home, label: first.label, paths: [...new Set(rs.flatMap((r) => RESTRICTED_ROLES[r].paths))] };
+  const ok = (r, p) => { const need = RESTRICTED_ROLES[r].needs?.[p]; return !need || Boolean(capabilities?.[need]); };
+  return { home: first.home, label: first.label, paths: [...new Set(rs.flatMap((r) => RESTRICTED_ROLES[r].paths.filter((p) => ok(r, p))))] };
 }
 
 /** La pagina è tra quelle permesse? (senza restrizione: sempre) */

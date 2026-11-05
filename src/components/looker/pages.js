@@ -170,7 +170,7 @@ export function WelcomeMassUnlocks({ creators, setCreators }) {
   const d = swr.data;
   return (
     <LkPage title="Welcome mass unlocks"
-      description={'This dashboard displays the number of welcome unlocks that have been carried out, based on the specified amount (indicated in the sheet\'s table under "price_tag") for a specific date range. Subs_count refers to the number of subscriptions made since the new amount was entered (in the selected date range).'}
+      description="Dal 31/10/2026 il prezzo del benvenuto non viene più dal foglio (price_tag), che non era aggiornato: HOC Pro lo legge dalle chat (primo messaggio a pagamento entro 2 ore dall'iscrizione) o lo prende dai prezzi inseriti a mano in Benvenuto a pagamento. Un cambio di prezzo = una riga in più. subs_count = nuovi iscritti del periodo di quel prezzo; unlocks_count = chi ha comprato un messaggio a quel prezzo entro 72 ore."
       filters={<Filters data={d} creators={creators} setCreators={setCreators} range={range} setRange={setRange} isLoading={swr.isLoading} />}>
       <State swr={swr}>
         {d && d.view === "lk-welcome" && (() => {
@@ -179,17 +179,20 @@ export function WelcomeMassUnlocks({ creators, setCreators }) {
           const subs = rows.reduce((s, r) => s + r.subs, 0);
           const unlocks = rows.reduce((s, r) => s + r.unlocks, 0);
           return (
-          <LkGrid cols="minmax(max-content, 1.2fr) minmax(0, 1fr)">
+          <LkGrid cols="minmax(0, 1fr)">
             <LkTable maxHeight={440}
               columns={[
                 { key: "name", label: "creator_name", width: 180 },
+                { key: "from", label: "dal", render: (r) => fmt.day(r.from) },
+                { key: "to", label: "al", render: (r) => fmt.day(r.to) },
                 { key: "amount", label: "amount", align: "right", render: (r) => fmt.num(r.amount) },
+                { key: "origin", label: "fonte", render: (r) => (r.origin === "manual" ? `a mano${r.tool ? ` · ${r.tool}` : ""}` : "chat") },
                 { key: "subs", label: "subs_count", align: "right", render: (r) => fmt.int(r.subs) },
                 { key: "unlocks", label: "unlocks_count", align: "right", render: (r) => fmt.int(r.unlocks) },
                 { key: "revenue", label: "Revenue", align: "right", render: (r) => fmt.num(r.revenue) },
                 { key: "cr", label: "CR Subs/Unlocks", align: "right", render: (r) => fmt.pct(r.cr), heat: true, heatColor: CP.accentGreen },
               ]}
-              rows={rows} total={{ name: "", amount: "", subs, unlocks, revenue: rows.reduce((s, r) => s + r.revenue, 0), cr: subs ? unlocks / subs : null }}
+              rows={rows} total={{ name: "", from: "", to: "", amount: "", origin: "", subs, unlocks, revenue: rows.reduce((s, r) => s + r.revenue, 0), cr: subs ? unlocks / subs : null }}
               initialSort={{ key: "name", dir: "desc" }} />
             <LkLine x={d.daily.map((p) => p.day)} xFmt={fmt.day} height={380}
               series={[{ label: "unlocks_count", values: d.daily.map((p) => p.unlocks), color: CP.accentRed }, { label: "subs_count", values: d.daily.map((p) => p.subs), color: seriesColor(9), axis: "right" }]} />

@@ -12,6 +12,7 @@ import {
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
   classifyUrl, bestLink, linkWhere, highlightHint, linkOrHint, sigFromLink, signalWhat, parseHighlightRows, applyHighlightRead, hlRereadCandidates, whyLines, pickToday, parseInstagramLink, marketByGroup,
+  knownBefore, signalOrigin, sameAsSuggestions,
 } from "../src/lib/scouting-core.js";
 
 let n = 0;
@@ -231,6 +232,38 @@ const candP = [
 ];
 eq(hlRereadCandidates(candP, crmR, new Set(["cancellata"])), ["segn", "base"], "da rileggere: da valutare, senza profilo a pagamento, mai lette coi tag; prima le segnalate");
 
+
+// chi l'aveva già trovata (21/10/2026): segnalazione di un account già nel radar
+{
+  const D = (d) => Date.UTC(2026, 9, d, 10);
+  const radar = { h: "sassa.santo", src: "profili simili", firstSeen: D(9), sig: "debole" };
+  const crmC = { stage: "scartata", reviewedAt: D(12), reviewedBy: "Claudia", notes: [{ at: D(15), by: "Giulia", text: "Segnalata da Giulia: reel virale" }, { at: D(16), by: "x", text: "nota qualsiasi" }] };
+  const k = knownBefore(radar, crmC);
+  eq([k.how, k.by, k.signals, k.lastSignal.by, k.stage, k.reviewedBy], ["profili simili", null, 1, "Giulia", "scartata", "Claudia"], "fatti noti prima della segnalazione");
+  eq(knownBefore(null, crmC), null, "non nel radar = null");
+  const o = signalOrigin({ status: "gia_nel_radar", at: D(22), by: "Nicholas", known: k }, { me: "nicholas" });
+  eq([o.kind, o.who, o.title], ["gia", "radar", "L'aveva già trovata il radar"], "trovata dal radar");
+  ok(o.line.includes("cercando tra i profili collegati") && o.line.includes("scartata da Claudia") && o.line.includes("segnalata un'altra volta"), `riga: ${o.line}`);
+  const mineK = knownBefore({ h: "a", src: "segnalata", by: "Nicholas Ferraresi Luppi", firstSeen: D(17) }, { notes: [{ at: D(17), by: "Nicholas Ferraresi Luppi", text: "Segnalata da Nicholas Ferraresi Luppi" }] });
+  const o2 = signalOrigin({ status: "gia_nel_radar", at: D(22), by: "Nicholas Ferraresi Luppi", known: mineK }, { me: "Nicholas Ferraresi Luppi" });
+  eq([o2.who, o2.title], ["persona", "L'avevi già segnalata tu"], "già segnalata da me");
+  ok(o2.line.includes("non ancora valutata") && !o2.line.includes("altra volta"), "la prima segnalazione non conta come «un'altra volta»");
+  eq(signalOrigin({ status: "nuova", by: "Nicholas" }, { me: "Nicholas" }).title, "Trovata da te", "nuova = trovata da chi segnala");
+  eq(signalOrigin({ status: "nuova", by: "Giulia" }, { me: "Nicholas" }).title, "Trovata da Giulia", "nuova di un altro");
+  const subito = signalOrigin({ status: "in_lettura", pre: { h: "a", known: k } }, { me: "Nicholas" });
+  eq([subito.kind, subito.title], ["lettura", "L'aveva già trovata il radar"], "chi l'aveva trovata si sa SUBITO, prima della verifica");
+  eq(o.short, "Trovata dal radar il 9 ott · scartata da Claudia il 12 ott", "riga corta dell'elenco");
+  eq(signalOrigin({ status: "in_lettura", pre: { h: "a", known: null } }).title, "Non è nel radar", "subito: nuova");
+  // segnalazioni di prima del 21/10 (senza `known`): dal profilo, solo se c'era già prima
+  const old = signalOrigin({ status: "gia_nel_radar", at: D(17), by: "Nicholas" }, { me: "Nicholas", profile: radar });
+  eq(old.title, "L'aveva già trovata il radar", "segnalazione vecchia: origine dal profilo");
+  eq(signalOrigin({ status: "errore", msg: "boom" }).kind, "errore", "errore");
+  // stessa persona: stesso link in bio
+  const ps = [{ h: "mara.back", url: "https://onlyfans.com/maraxx" }, { h: "mara.main", url: "https://onlyfans.com/maraxx" }, { h: "altra", url: "" }];
+  eq(sameAsSuggestions(ps, { creators: {} }, "mara.back").map((x) => x.h), ["mara.main"], "proposta: stessa persona di un altro account");
+  eq(sameAsSuggestions(ps, { creators: {}, dismissed: ["mara.back|mara.main"] }, "mara.back"), [], "proposta scartata non torna");
+}
+
 console.log(`scouting: ${n} asserzioni ok`);
 
 // --- foto profilo (link a tempo di Instagram) e gancio della riga, 10/10/2026
@@ -296,6 +329,55 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.equal(crm.creators["h:b"].stage, "da_valutare"); assert.equal(crm.creators["h:b"].reviewedAt, undefined);
   assert.throws(() => review(crm, "h:x", "firmata"));
   console.log("coda valuta: ok");
+}
+
+// --- voto a 4 livelli, engagement, filtri e ordinamento della coda (21/10/2026)
+{
+  const { review, unreview, reviewQueue, buildCreators, ratingOf, parseEr, passRanges, parseRefreshItem: pri, setStage: ss } = await import("../src/lib/scouting-core.js");
+  // engagement: testo con %, frazione, ripiego su like+commenti, valori assurdi
+  assert.equal(parseEr("3.4%"), 3.4);
+  assert.equal(parseEr("0.034"), 3.4);
+  assert.equal(parseEr("12"), 12, "numero > 1 senza % = già percento");
+  assert.equal(parseEr(null, { likes: 900, comments: 100, fol: 20000 }), 5);
+  assert.equal(parseEr("N/A"), null);
+  assert.equal(parseEr("250%"), null, "oltre 100% = dato sporco");
+  assert.equal(pri({ Account: "x", "Followers Count": 1000, "Median ER": "2.5%" }).er, 2.5);
+  // il voto: fase e coda
+  let crm = review({ creators: {} }, "h:a", "no", "N");
+  assert.equal(crm.creators["h:a"].stage, "scartata"); assert.equal(crm.creators["h:a"].rating, 1);
+  crm = review(crm, "h:b", "forse", "N");
+  assert.equal(crm.creators["h:b"].stage, "da_valutare", "forse resta da valutare");
+  crm = review(crm, "h:c", "top", "N");
+  assert.equal(crm.creators["h:c"].stage, "interessante"); assert.equal(crm.creators["h:c"].rating, 4);
+  // cambiare idea: da Sì a Forse torna da valutare; Annulla torna alla fase di prima del primo voto
+  crm = review(crm, "h:c", "forse", "N");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare");
+  crm = review(crm, "h:c", "si", "N");
+  crm = unreview(crm, "h:c");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare"); assert.equal(crm.creators["h:c"].rating, undefined);
+  // un voto non fa tornare indietro una creator già contattata
+  crm = ss(crm, "h:d", "contattata");
+  crm = review(crm, "h:d", "no", "N");
+  assert.equal(crm.creators["h:d"].stage, "contattata"); assert.equal(crm.creators["h:d"].rating, 1);
+  // le decisioni del primo giro valgono come voti, senza riscrivere il CRM
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "interessante" }), 3);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "scartata" }), 1);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "da_valutare" }), 2);
+  assert.equal(ratingOf({ stage: "interessante" }), null, "interessante dalla scheda senza voto");
+  assert.equal(review({ creators: {} }, "h:z", "vista", "N").creators["h:z"].rating, 2, "vecchio «vista» = Forse");
+  // coda: «forse» = da rivedere; ordinamento e filtri
+  const cs = buildCreators([
+    { h: "a", sig: "forte", fol: 10000, medv: 5000, er: 2 }, { h: "b", sig: "forte", fol: 400000, medv: 90000, er: 1 },
+    { h: "e", sig: "forte", fol: 80000, medv: 60000, er: 7 }, { h: "f", sig: "forte", fol: 120000, medv: 20000 },
+  ], crm);
+  assert.deepEqual(reviewQueue(cs, { scope: "forse" }).map((c) => c.handles[0]), ["b"]);
+  assert.deepEqual(reviewQueue(cs, { sort: "er" }).map((c) => c.handles[0]), ["e", "f"], "senza engagement in fondo");
+  assert.deepEqual(reviewQueue(cs, { sort: "fol" }).map((c) => c.handles[0]), ["f", "e"]);
+  assert.deepEqual(reviewQueue(cs, { ranges: { er: "3" } }).map((c) => c.handles[0]), ["e"], "dato mancante non passa un filtro attivo");
+  assert.deepEqual(reviewQueue(cs, { ranges: { fol: "50-300", medv: "50k" } }).map((c) => c.handles[0]), ["e"]);
+  ok(passRanges({ fol: 50000 }, { fol: "50-300" }) && !passRanges({ fol: 300000 }, { fol: "50-300" }), "min incluso, max escluso");
+  assert.equal(cs.find((c) => c.handles[0] === "b").rating, 2);
+  console.log("voto e filtri: ok");
 }
 
 // --- catena dei seguiti: folAt/fing arrivano sulla creator (14/10/2026)

@@ -1,5 +1,5 @@
 /**
- * /api/admin/hr/contracts/[id]/pdf — apre il PDF del contratto (SEED, 09/10/2026).
+ * /api/admin/hr/contracts/[id]/pdf — apre il PDF del contratto (people.manage, 09/10/2026).
  * Passa da Dropbox Sign al volo: in HOC Pro non resta nessuna copia del file.
  */
 import { authorize, CAPABILITIES } from "@/lib/rbac";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request, props) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const { id } = await props.params;
   // solo contratti che conosciamo (niente proxy aperto verso qualunque id)

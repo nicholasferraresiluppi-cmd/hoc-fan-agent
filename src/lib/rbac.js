@@ -3,6 +3,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin, isUserIdAdminRaw, adminMfaOk } from "@/lib/admin";
 import { viewAsFor } from "@/lib/view-as";
 import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
+import { memoAuthz, forgetAuthz } from "@/lib/authz-cache";
 
 /**
  * RBAC — Role-Based Access Control.
@@ -21,11 +22,14 @@ import { getClerkUser, forgetClerkUser } from "@/lib/clerk-user";
  */
 
 // "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
-export const ROLES = ["social", "smm", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+export const ROLES = ["referente", "publisher", "social", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
+  referente: { label: "Referente", emoji: "🎁", color: "#A78BFA", description: "Porta un amico — vede solo quanto guadagna sulle persone che ha portato" },
+  publisher: { label: "Publisher", emoji: "📣", color: "#7C6CF0", description: "Publisher su X — vede solo i fan che porta, le sue buste e quanto ha maturato" },
   social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
   smm: { label: "Social Media Manager", emoji: "🎬", color: "#D9B46A", description: "Radar creator, format e mercato, account social" },
+  people: { label: "People Partner", emoji: "🤝", color: "#14B8A6", description: "Area Partner — CRM persone, documenti e contratti" },
   operator: { label: "Operator", emoji: "💬", color: "#10B981", description: "Chatter in training — vede i suoi dati" },
   team_lead: { label: "Team Lead", emoji: "👥", color: "#3B82F6", description: "Lead del team — vede il suo team" },
   sales_manager: { label: "Sales Manager", emoji: "📈", color: "#F5A623", description: "SM — vede tutto, override score" },
@@ -56,10 +60,18 @@ export const CAPABILITIES = {
   USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
   SCOUTING_USE: "scouting.use",               // Radar creator: guardare, valutare, segnalare, caricare reel (15/10/2026, ruolo SMM)
   SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
+  PEOPLE_MANAGE: "people.manage",
+  REFERRAL_MANAGE: "referral.manage",         // Porta un amico (/admin/referral): referenti, persone portate, storie, pagamenti (26/10/2026)             // CRM persone (/admin/hr): schede, documenti, contratti, link del modulo (18/10/2026, Area Partner)
 };
 
 // "all" = tutta l'org | "team" = solo proprio team | "own" = solo sé stesso | "none" = nessun accesso
 export const ROLE_CAPABILITIES = {
+  // 26/10/2026: chi ha portato qualcuno («Porta un amico»). Nessun permesso: la sua pagina
+  // (/me/porta-un-amico) mostra SOLO i suoi dati, abbinati dal server all'account (lib/referral).
+  referente: {},
+  // 27/10/2026: publisher su X. Nessun permesso: /me/publisher mostra SOLO le sue buste,
+  // riconosciuto dal server per email verificata (lib/publisher-x). Mai fee, mai nomi dei fan.
+  publisher: {},
   // 13/10/2026: solo Account social; chi ha solo questo ruolo vede l'app ridotta a quella pagina (lib/restricted-roles)
   social: {
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
@@ -69,6 +81,12 @@ export const ROLE_CAPABILITIES = {
   smm: {
     [CAPABILITIES.SCOUTING_USE]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
+  },
+  // 18/10/2026: People Partner (Area Partner, ex HR) — il CRM persone senza diventare admin
+  // (niente comp, score, denaro). La contabilità resta a parte: la apre il titolare da /contabilita.
+  people: {
+    [CAPABILITIES.PEOPLE_MANAGE]: "all",
+    [CAPABILITIES.REFERRAL_MANAGE]: "all", // 26/10/2026: l'HR gestisce «Porta un amico»
   },
   operator: {
     [CAPABILITIES.TRAINING_DO]: "own",
@@ -121,6 +139,8 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.COPILOT_PILOT]: "all",
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
     [CAPABILITIES.SCOUTING_USE]: "all",
+    [CAPABILITIES.PEOPLE_MANAGE]: "all",
+    [CAPABILITIES.REFERRAL_MANAGE]: "all",
   },
 };
 
@@ -154,6 +174,7 @@ export async function getCustomRole(id) {
 }
 
 export async function saveCustomRole(role) {
+  forgetAuthz();
   if (!role || !role.id || !role.name) throw new Error("role id+name required");
   if (!role.id.startsWith("c:")) role.id = `c:${role.id}`;
   // sanitize capabilities
@@ -178,6 +199,7 @@ export async function saveCustomRole(role) {
 }
 
 export async function deleteCustomRole(id) {
+  forgetAuthz();
   if (!id) return;
   await kv.del(`custom_role:${id}`);
   await kv.srem("custom_roles:all", id);
@@ -194,6 +216,9 @@ export async function deleteCustomRole(id) {
 
 export async function getUserRoles(userId) {
   if (!userId) return ["operator"];
+  return memoAuthz("roles", userId, () => computeUserRoles(userId));
+}
+async function computeUserRoles(userId) {
   // "Vedi come…" (lib/view-as): solo per un admin vero e solo sulla sua sessione
   try {
     const va = await viewAsFor(userId);
@@ -253,6 +278,7 @@ export async function getStoredRoles(userId) {
 }
 
 export async function setUserRoles(userId, roles) {
+  forgetAuthz(userId);
   if (!userId) throw new Error("userId required");
   const arr = Array.isArray(roles) ? roles.filter(Boolean) : [];
   // purge old set
@@ -285,6 +311,10 @@ async function resolveRoleCapabilities(roleId) {
 }
 
 export async function getEffectiveCapabilities(userId) {
+  // copia: chi la riceve può aggiungerci pseudo-permessi (es. /api/whoami) senza sporcare la memoria
+  return { ...(await memoAuthz("caps", userId, () => computeEffectiveCapabilities(userId))) };
+}
+async function computeEffectiveCapabilities(userId) {
   const roles = await getUserRoles(userId);
   const out = {};
   for (const r of roles) {
@@ -302,6 +332,9 @@ export async function getEffectiveCapabilities(userId) {
  */
 export async function getUserRole(userId) {
   if (!userId) return "operator";
+  return memoAuthz("role", userId, () => computeUserRole(userId));
+}
+async function computeUserRole(userId) {
   try {
     if (await isUserIdAdmin(userId)) return "admin";
   } catch {}
@@ -321,6 +354,7 @@ export async function getUserRole(userId) {
 
 export async function setUserRole(userId, role) {
   if (!userId) throw new Error("userId required");
+  forgetAuthz(userId);
   if (!ROLES.includes(role)) throw new Error(`Invalid role: ${role}`);
   await kv.set(`role:${userId}`, role);
   // Mirror su Clerk

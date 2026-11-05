@@ -17,7 +17,7 @@ import { Plus } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { Modal } from "@/components/cp-style";
-import { PageHead, Metric, Notice, DataTable, card } from "@/components/ds";
+import { PageHead, Metric, Notice, DataTable, card, BTN_PRIMARY } from "@/components/ds";
 
 const PLATFORM_LABEL = { twitter: "Twitter/X", reddit: "Reddit", instagram: "Instagram", tiktok: "TikTok", other: "Altro" };
 
@@ -56,7 +56,7 @@ export default function SocialAccountsPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Marketing" }, { label: "Account social" }]}
         title="Account social"
@@ -166,4 +166,4 @@ const input = {
   width: "100%", boxSizing: "border-box", padding: "8px 10px", background: CP.surface, border: `1px solid ${CP.border}`,
   borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none",
 };
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", background: CP.accent, color: CP.accentInk, border: "1px solid transparent", borderRadius: 8, fontSize: 14, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;
