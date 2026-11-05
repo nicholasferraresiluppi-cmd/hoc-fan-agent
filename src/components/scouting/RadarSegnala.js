@@ -229,18 +229,22 @@ function FoundLine({ link }) {
  * Tutta la riga apre la scheda. Le segnalazioni di prima del 21/10 non hanno `known`:
  * l'origine si ricava dal profilo (src, firstSeen, by).
  */
-export function SignalRow({ item: x, me, creators, profilesBy, onOpen }) {
-  const c = x.h ? creators.find((y) => y.handles.includes(x.h)) : null;
-  const o = signalOrigin(x, { me, profile: x.h ? profilesBy?.[x.h] : null });
+export function SignalRow({ item: x, me, creators, profilesBy, onOpen, times = 1 }) {
+  // l'account si legge anche dal link mentre la segnalazione è in lettura: mai l'indirizzo intero
+  const parsed = x.h ? null : parseInstagramLink(x.text);
+  const h = x.h || x.pre?.h || parsed?.handle || null;
+  const c = h ? creators.find((y) => y.handles.includes(h)) : null;
+  const o = signalOrigin(x, { me, profile: h ? profilesBy?.[h] : null });
   const tone = o.kind === "nuova" ? CP.gold : o.kind === "errore" || x.warn ? CP.attn : o.kind === "lettura" ? CP.textMuted : CP.textSecondary;
   const pill = o.kind === "nuova" ? "Nuova" : o.kind === "gia" ? "Già nel radar" : o.kind === "lettura" ? "In verifica" : "Non letta";
   const link = c?.link;
   const body = (
     <>
-      <Initials name={c?.name || x.h || "?"} pic={c?.pic} size={44} gold={o.kind === "nuova"} />
+      <Initials name={c?.name || h || "?"} pic={c?.pic} size={44} gold={o.kind === "nuova"} />
       <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 15, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.h ? `@${x.h}` : x.text.slice(0, 40)}</span>
+          <span style={{ fontWeight: 600, fontSize: 15, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h ? `@${h}` : parsed?.code ? "Un reel di Instagram" : x.text.slice(0, 40)}</span>
+          {times > 1 && <span title={`Segnalata ${times} volte`} style={{ flex: "0 0 auto", fontSize: 11.5, padding: "1px 6px", borderRadius: 6, background: CP.surfaceAlt || CP.surface, color: CP.textMuted, fontVariantNumeric: "tabular-nums" }}>×{times}</span>}
           <span style={{ flex: "0 0 auto", fontSize: 11.5, letterSpacing: ".02em", color: tone, border: `1px solid ${o.kind === "nuova" ? alpha(CP.gold, "77") : CP.border}`, borderRadius: 999, padding: "1px 8px" }}>{pill}</span>
         </span>
         <span style={{ fontSize: 13.5, color: o.kind === "errore" ? CP.attn : CP.textSecondary }}>

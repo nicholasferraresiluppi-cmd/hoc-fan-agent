@@ -8,6 +8,7 @@ import { pickToday, movers, whyLines, reviewQueue, RATINGS } from "@/lib/scoutin
 import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
 import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
 import { SignalRow } from "./RadarSegnala";
+import { FilterChip } from "@/components/ds";
 
 
 export default function RadarOggi({ me, newCut, data, creators, profilesBy, onOpen, act, busy, inbox, onSegnala, onValuta, onReload }) {
@@ -127,9 +128,7 @@ export default function RadarOggi({ me, newCut, data, creators, profilesBy, onOp
         {inbox.length === 0 ? (
           <p style={{ color: CP.textSecondary, margin: 0, fontSize: 14 }}>Ancora nessuna segnalazione.</p>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {inbox.slice(0, 6).map((x) => <SignalRow key={x.id} item={x} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />)}
-          </ul>
+          <SignalList inbox={inbox} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />
         )}
       </section>
 
@@ -278,3 +277,56 @@ const RO_CSS = `
 @keyframes roIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.ro-card{animation:none;transition:none}.ro-card:hover{transform:none}}
 `;
+
+// ---------- Ultime segnalazioni: filtri e segnalazioni ripetute (5/11/2026, dalla #467) ----------
+
+const handleOf = (x) => x.h || (String(x.text || "").match(/instagram\.com\/(?!reel\/|p\/)([A-Za-z0-9._]{1,30})/)?.[1]?.toLowerCase()) || null;
+
+// La stessa creator segnalata più volte resta una volta sola: la segnalazione più recente, con quante volte.
+export function groupSignals(inbox, max) {
+  const out = []; const at = new Map();
+  for (const x of inbox) {
+    const h = handleOf(x);
+    if (h && at.has(h)) { out[at.get(h)].n++; continue; }
+    if (out.length >= max) continue;
+    if (h) at.set(h, out.length);
+    out.push({ x, h, n: 1 });
+  }
+  return out;
+}
+
+// Esito della segnalazione per i filtri: stesso criterio della riga (link della creator, lettura fallita).
+function signalKind(x, c) {
+  if (x.status === "in_lettura") return "lettura";
+  if (["errore", "non_trovata", "non_instagram"].includes(x.status) || x.warn) return "rifare";
+  const s = c?.link?.strength || 0;
+  if (s >= 2) return "pagamento";
+  if (s >= 1 || c?.link) return "guardare";
+  return "vuote";
+}
+
+const SIGNAL_FILTERS = [["tutte", "Tutte"], ["pagamento", "A pagamento"], ["guardare", "Da guardare"], ["rifare", "Da rifare"], ["vuote", "Senza link"]];
+
+function SignalList({ inbox, me, creators, profilesBy, onOpen }) {
+  const [filter, setFilter] = useState("tutte");
+  const rows = useMemo(() => groupSignals(inbox, 12).map((r) => {
+    const c = r.h ? creators.find((y) => y.handles.includes(r.h)) : null;
+    return { ...r, kind: signalKind(r.x, c) };
+  }), [inbox, creators]);
+  const counts = rows.reduce((m, r) => ({ ...m, [r.kind]: (m[r.kind] || 0) + 1 }), {});
+  const chips = SIGNAL_FILTERS.filter(([id]) => id === "tutte" || counts[id]);
+  const active = chips.some(([id]) => id === filter) ? filter : "tutte";
+  const shown = rows.filter((r) => active === "tutte" || r.kind === active);
+  return (
+    <>
+      {chips.length > 2 && (
+        <div role="group" aria-label="Filtra le segnalazioni" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {chips.map(([id, label]) => <FilterChip key={id} label={`${label} ${id === "tutte" ? rows.length : counts[id]}`} active={active === id} onClick={() => setFilter(id)} />)}
+        </div>
+      )}
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {shown.slice(0, 8).map((r) => <SignalRow key={r.x.id} item={r.x} times={r.n} me={me} creators={creators} profilesBy={profilesBy} onOpen={onOpen} />)}
+      </ul>
+    </>
+  );
+}
