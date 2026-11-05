@@ -10,14 +10,14 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { Info, Shuffle, Wallet, Sparkles, Gauge, Users } from "lucide-react";
+import { Info, Shuffle } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import ScoreTutorialModal from "@/components/ScoreTutorialModal";
 import { useSmartPeriod } from "@/lib/use-smart-period";
 import { fmt$, fmtInt, fmtPct, fmtDelta, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, Disclosure, DataTable, Notice, EarlyMonthNote, NUM } from "@/components/ds";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
-import { Donut, KpiCard } from "@/components/VetroCharts";
+import { RankBars } from "@/components/VetroCharts";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -206,22 +206,22 @@ function VetroOverview({ data, prev, official, rows, total, isCurrent, prevName,
   const pt = prev?.avg_sales_per_shift_agency;
   const perDelta = pt ? (data.avg_sales_per_shift_agency - pt) / pt : null;
   const pctTxt = (v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v * 100))}%`;
-  const kpis = [
-    { icon: Wallet, tone: 0, label: `Venduto delle creator${isCurrent ? " finora" : ""}`, value: fmt$(total),
-      sub: official?.current?.sales ? `di ${fmt$(official.current.sales)} ufficiali` : prev?.total_sales_agency ? `${prevName}: ${fmt$(prev.total_sales_agency)}` : null },
-    { icon: Users, tone: 1, label: "Creator attive", value: fmtInt(data.creators_count),
-      sub: `${fmtInt(data.operators_count)} operatori${prev?.creators_count ? ` · ${prevName}: ${prev.creators_count} creator` : ""}` },
-    { icon: Gauge, tone: 3, label: "Venduto per turno", value: fmt$(data.avg_sales_per_shift_agency),
-      sub: perDelta == null ? null : <span style={{ color: perDelta >= 0 ? CP.accentGreen : CP.textSecondary }}>{pctTxt(perDelta)} sul {prevName}</span> },
-    { icon: Sparkles, tone: 4, label: "Venduto medio per creator", value: fmt$(data.avg_sales_per_creator), sub: monthLabel },
-  ];
-  const mix = [...rows].filter((r) => r.total_sales > 0).sort((a, b) => b.total_sales - a.total_sales).map((r) => ({ label: r.alias, value: r.total_sales }));
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): la pagina Creator serve a «dove si vende, e dove si
+  // vende meglio a turno» → al posto di quattro riquadri e di una ciambella con troppe fette, due classifiche
+  // a barre: chi porta il venduto (quota sul totale) e il venduto per turno con la tacca della media
+  // dell'agenzia (verde chi sta sopra, almeno MIN_PER_SHIFTS turni); sotto chi si è mosso.
+  const MIN_PER_SHIFTS = 5;
+  const href = (r) => `/leaderboard/creators/${encodeURIComponent(r.alias)}?period_id=${periodId}`;
+  const avgPer = data.avg_sales_per_shift_agency;
+  const bySales = [...rows].filter((r) => r.total_sales > 0).sort((a, b) => b.total_sales - a.total_sales).map((r) => ({ label: r.alias, value: r.total_sales, href: href(r) }));
+  const byPer = [...rows].filter((r) => r.per != null && (r.total_shifts || 0) >= MIN_PER_SHIFTS).sort((a, b) => b.per - a.per)
+    .map((r) => ({ label: r.alias, value: r.per, href: href(r), good: avgPer != null && r.per >= avgPer }));
   const moved = rows.filter((r) => r.move != null);
   const ups = [...moved].filter((r) => r.move > 0).sort((a, b) => b.move - a.move).slice(0, 5);
   const downs = [...moved].filter((r) => r.move < 0).sort((a, b) => a.move - b.move).slice(0, 5);
   const maxM = Math.max(0.01, ...ups.map((r) => r.move), ...downs.map((r) => -r.move));
   const bar = (r, up) => (
-    <Link key={r.id} href={`/leaderboard/creators/${encodeURIComponent(r.alias)}?period_id=${periodId}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr) 52px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, textDecoration: "none", padding: "3px 0" }}>
+    <Link key={r.id} href={href(r)} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr) 52px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, textDecoration: "none", padding: "3px 0" }}>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.alias}</span>
       <span style={{ height: 8, borderRadius: 99, background: CP.track, overflow: "hidden" }}>
         <span style={{ display: "block", height: "100%", width: `${(Math.abs(r.move) / maxM) * 100}%`, borderRadius: 99, background: up ? "var(--vt-c1)" : "var(--vt-c2)" }} />
@@ -229,40 +229,52 @@ function VetroOverview({ data, prev, official, rows, total, isCurrent, prevName,
       <span style={{ textAlign: "right", color: up ? CP.accentGreen : CP.textSecondary, ...NUM }}>{pctTxt(r.move)}</span>
     </Link>
   );
+  const head = (title, sub) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{title}</div>
+      <div style={{ fontSize: 12.5, color: CP.textMuted, ...NUM }}>{sub}</div>
+    </div>
+  );
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 14 }}>
-        {kpis.map((k, i) => <KpiCard key={k.label} i={i} icon={k.icon} tone={k.tone} label={k.label} value={<VetroNum value={k.value} />} sub={k.sub} />)}
+      <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 2px 10px", ...NUM }}>
+        {fmtInt(data.creators_count)} creator attive, {fmtInt(data.operators_count)} operatori · venduto <b style={{ color: CP.textPrimary, fontWeight: 500 }}><VetroNum value={fmt$(total)} /></b>
+        {official?.current?.sales ? ` di ${fmt$(official.current.sales)} ufficiali` : ""}{isCurrent ? " finora" : ""}
       </div>
-      {(mix.length > 0 || moved.length > 0) && (
+      {(bySales.length > 0 || byPer.length > 0) && (
         <div className="vt-row21" style={{ marginBottom: 14 }}>
-          <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Chi si è mosso di più</div>
-              <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto per turno sul {prevName || "mese prima"}</div>
-            </div>
-            {ups.length === 0 && downs.length === 0 ? (
-              <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun confronto col mese prima.</div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
-                <div>
-                  <button onClick={() => onView("up")} style={moveHead}>In miglioramento</button>
-                  {ups.length ? ups.map((r) => bar(r, true)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
-                </div>
-                <div>
-                  <button onClick={() => onView("down")} style={moveHead}>In calo</button>
-                  {downs.length ? downs.map((r) => bar(r, false)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
-                </div>
-              </div>
-            )}
-          </section>
-          {mix.length > 0 && (
-            <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
-              <Donut items={mix} center={fmt$(total)} centerSub={monthLabel} />
+          {bySales.length > 0 && (
+            <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+              {head("Chi porta il venduto", `${monthLabel} · quota sul totale`)}
+              <RankBars items={bySales} limit={10} />
+            </section>
+          )}
+          {byPer.length > 0 && (
+            <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+              {head("Venduto per turno", perDelta == null ? `almeno ${MIN_PER_SHIFTS} turni` : <><span style={{ color: perDelta >= 0 ? CP.accentGreen : CP.textMuted }}>{pctTxt(perDelta)}</span> sul {prevName}, agenzia</>)}
+              <RankBars items={byPer} limit={10} mark={avgPer} markLabel={`media dell'agenzia ${fmt$(avgPer)} a turno · in verde chi sta sopra`} />
             </section>
           )}
         </div>
+      )}
+      {moved.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 3, borderRadius: 22, padding: 18, minWidth: 0, marginBottom: 14 }}>
+          {head("Chi si è mosso di più", `venduto per turno sul ${prevName || "mese prima"}`)}
+          {ups.length === 0 && downs.length === 0 ? (
+            <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun confronto col mese prima.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
+              <div>
+                <button onClick={() => onView("up")} style={moveHead}>In miglioramento</button>
+                {ups.length ? ups.map((r) => bar(r, true)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
+              </div>
+              <div>
+                <button onClick={() => onView("down")} style={moveHead}>In calo</button>
+                {downs.length ? downs.map((r) => bar(r, false)) : <div style={{ fontSize: 13, color: CP.textMuted }}>Nessuna.</div>}
+              </div>
+            </div>
+          )}
+        </section>
       )}
     </>
   );

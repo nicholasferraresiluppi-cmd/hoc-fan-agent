@@ -30,7 +30,9 @@ import {
   retryFailedPages, retryFailedDetails, finalizeSync,
 } from "@/lib/creatorspro-sync";
 
-export const maxDuration = 60;
+// 300 (era 60, 27/10/2026): con la catena fermata da Vercel al 4º salto ogni tick deve fare
+// più lavoro possibile; il cron di vercel.json lo rilancia ogni 10 minuti di notte.
+export const maxDuration = 300;
 
 const progKey = (p) => `cp:cron:progress:${p}`;
 const TTL_PROG = 40 * 24 * 3600;
@@ -40,16 +42,16 @@ const STALE_MS = 20 * 3600 * 1000;   // refresh giornaliero, con margine
 // Resta sotto la vita dello stato sync (2 giorni, creatorspro-sync).
 const RESTART_MS = 40 * 3600 * 1000;
 const FRESH_MS = 90 * 1000;          // guardia anti-sovrapposizione (solo chain 0)
-const BUDGET_MS = 30000;
+const BUDGET_MS = 230000;
 // Un passo (batch da 15 buste) può durare 30-40s su CreatorsPro lento: si COMINCIA un passo
-// nuovo solo nei primi 20s, così il tick chiude sotto i 60s di Vercel e fa in tempo a
+// nuovo solo nei primi 230s, così il tick chiude sotto i 300s di Vercel e fa in tempo a
 // concatenare il successivo (un tick ucciso a metà non concatena e la catena si ferma).
-const STEP_START_MS = 20000;
+const STEP_START_MS = 230000;
 const PREPARE_PAGES = 3;
 // 15 (era 30): un batch lento di CreatorsPro partito a fine budget sforava i 60s di Vercel,
 // il tick veniva ucciso prima di concatenare il successivo e la catena si fermava.
 const BATCH_SIZE = 15;
-// Un mese pieno: ~10 link di prepare + ~25-30 batch (2-5 per tick) + code.
+// Un mese pieno: ~10 link di prepare + ~46 batch (6-10 per tick da 300s) + code.
 const MAX_CHAIN = 120;
 
 // Mese corrente + precedente fino al giorno 20, OPPURE finché il precedente non ha

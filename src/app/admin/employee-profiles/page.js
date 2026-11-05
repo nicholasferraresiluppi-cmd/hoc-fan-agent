@@ -10,7 +10,8 @@ import useSWR, { mutate } from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt, MONTHS_IT } from "@/lib/format";
-import { PageHead, HeroMetric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { PageHead, HeroMetric, SectionTitle, Notice, DataTable, card, BTN_PRIMARY } from "@/components/ds";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -38,8 +39,7 @@ const fmtDay = (s) => (s ? new Date(s + "T12:00:00Z").toLocaleDateString("it-IT"
 const lbl = { display: "block", fontSize: 13, color: CP.textSecondary, marginBottom: 6 };
 const inp = { width: "100%", padding: "9px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" };
 const btn = { padding: "8px 14px", background: CP.surface, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontFamily: FONTS.body };
-const btnPrimary = { ...btn, background: CP.accent, border: `1px solid ${CP.accent}`, color: CP.accentInk, fontWeight: 500 };
-
+const btnPrimary = BTN_PRIMARY;
 export default function EmployeeProfilesPage() {
   const [formEmployee, setFormEmployee] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
@@ -98,10 +98,10 @@ export default function EmployeeProfilesPage() {
   }
 
   async function handleDelete(employee) {
-    if (!confirm(`Rimuovere il profilo di "${employee}"?\nLa scheda operatore resta visibile, ma senza data di ingresso né tempo in agenzia.`)) return;
+    if (!(await confirmDialog({ title: `Rimuovere il profilo di "${employee}"?`, message: "La scheda operatore resta visibile, ma senza data di ingresso né tempo in agenzia.", ok: "Rimuovi", danger: true }))) return;
     const res = await fetch(`${profilesUrl}?employee=${encodeURIComponent(employee)}`, { method: "DELETE" });
     const data = await res.json();
-    if (!res.ok || data.error) alert(data.error || "Errore");
+    if (!res.ok || data.error) alertDialog(data.error || "Errore");
     else await mutate(profilesUrl);
   }
 

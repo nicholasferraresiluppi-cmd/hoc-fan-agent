@@ -9,7 +9,7 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { lastWeeks } from "@/lib/warmup-plan";
-import { parseInstagram, parseX, mergeReading, weeklyFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
+import { parseInstagram, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 
 const API = "https://api.apify.com/v2";
@@ -105,7 +105,7 @@ export async function getRunState() {
 export async function loadPublicSummaries(ids, platforms = {}) {
   if (!ids.length) return {};
   const stores = await kv.mget(...ids.map(PUB));
-  const weeks = lastWeeks(13).map((w) => w.key);
+  const weeks = lastWeeks(18).map((w) => w.key); // i post si tengono 120 giorni
   const out = {};
   ids.forEach((id, i) => {
     const s = stores[i];
@@ -116,6 +116,9 @@ export async function loadPublicSummaries(ids, platforms = {}) {
       last: s.last || null,
       days: Object.fromEntries(days.map((d) => [d, s.days[d]])),
       weekly: weeklyFromStore(s, weeks),
+      daily: dailyFromStore(s, 120),
+      posts: postsFromStore(s, platforms[id] || "ig"),
+      linkDays: s.link && !s.link.missing ? s.link.days || {} : null,
       reach: reachCheck(s, platforms[id] || "ig"),
       link: s.link ? { url: s.link.url, from: s.link.from, name: s.link.name || null, created: s.link.created || null, total: s.link.total || null, lastDay: s.link.lastDay || null, missing: Boolean(s.link.missing) } : null,
     };

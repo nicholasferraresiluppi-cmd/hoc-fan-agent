@@ -37,9 +37,22 @@
  * Correlazione, non causa. Le ore in fascia dipendono anche dalla disponibilità
  * delle persone (altro lavoro, fuso orario): la pagina dà una priorità, non un
  * calendario.
+ *
+ * v4 (27/10/2026) — BRAVURA PER FASCIA. Nicholas: "dici bravura 0,95 ma bravo dove?
+ * vorrei sapere quanto è bravo per fascia oraria rispetto agli altri". Per ogni
+ * persona e fascia: bravura in quella fascia = bravura generale (Infloww) × quanto,
+ * nei turni CP, rende in quella fascia rispetto alle sue altre (forma personale:
+ * l'eccesso di CP sulla persona è un fattore unico della persona, si semplifica nel
+ * rapporto). La forma personale si RESTRINGE verso 1 in proporzione a quanto si
+ * ripete nei dati: peso = ore ÷ (ore + K), con K tarato a ogni giro dalla prova
+ * pari/dispari (`personal`): oggi la fascia personale si ripete poco (r ≈ 0,2), quindi
+ * con 60 ore in una fascia il numero si sposta di circa un quarto dello scarto
+ * misurato. Così "Andrea nel 22-3 rende meno" esce solo se i dati lo reggono, e
+ * se un giorno la fascia personale comparisse davvero, K scende e i numeri si aprono
+ * da soli. Il misurato grezzo resta nel dato (`raw`) per chi vuole guardarlo.
  */
 
-export const FASCE_VERSION = "fasce-3";
+export const FASCE_VERSION = "fasce-4";
 
 export const SLOTS = [
   { id: "22-3", label: "22–3", from: 22, to: 1 },
@@ -217,7 +230,44 @@ function slotIndex(pieces, minCmp) {
     }
   }
   const out = new Map();
-  for (const [k, a] of acc) if (a.h >= minCmp && a.exp > 0 && a.rev > 0) out.set(k, a.rev / a.exp);
+  for (const [k, a] of acc) if (a.h >= minCmp && a.exp > 0 && a.rev > 0) out.set(k, { idx: a.rev / a.exp, h: a.h });
+  return out;
+}
+
+export const SLOT_MIN_H = 15; // ore confrontabili in una fascia per darle un numero
+export const SLOT_DIFF = 0.1; // scarto dalla propria bravura che vale la pena dire
+
+/**
+ * K del restringimento dalla prova pari/dispari: affidabilità r a h ore (metà dati)
+ * = h ÷ (h + K) → K = h × (1 − r) ÷ r. r stretta in [0,05; 0,8]: con r ≈ 0 la
+ * fascia personale resta ferma sulla bravura generale, mai uno zero diviso.
+ */
+export function shrinkK(st) {
+  const r = Math.min(0.8, Math.max(0.05, Number(st?.personal) || 0));
+  const h = Number(st?.personal_h) || 40;
+  return Math.round((h * (1 - r)) / r);
+}
+
+/**
+ * Bravura per fascia di una persona. `slots` = { id: { rev, exp, cmp_h } } dai turni
+ * CP (venduto e atteso dai colleghi nella stessa cella), `idx` = bravura generale
+ * (Infloww), `k` = shrinkK. Restituisce { id: { v, h, raw, w } }: v = bravura in
+ * quella fascia (ristretta), raw = misurato senza restringere, w = peso (0-1).
+ */
+export function slotBravura(slots, idx, k) {
+  let rev = 0;
+  let exp = 0;
+  for (const sl of Object.values(slots || {})) { rev += sl.rev || 0; exp += sl.exp || 0; }
+  const base = exp > 0 && rev > 0 ? rev / exp : null;
+  const out = {};
+  for (const [id, sl] of Object.entries(slots || {})) {
+    const h = sl.cmp_h || 0;
+    if (idx == null || base == null || h < SLOT_MIN_H || !(sl.exp > 0)) { out[id] = { v: null, h: Math.round(h), raw: null, w: 0 }; continue; }
+    const shape = Math.max(sl.rev, 0.01 * sl.exp) / sl.exp / base;
+    const w = h / (h + k);
+    const v = idx * Math.exp(w * Math.log(shape));
+    out[id] = { v: Math.round(v * 100) / 100, h: Math.round(h), raw: Math.round(idx * shape * 100) / 100, w: Math.round(w * 100) / 100 };
+  }
   return out;
 }
 
@@ -246,7 +296,7 @@ export function stability(pieces) {
     if (!w) continue;
     const [op, slot] = k.split("|");
     const l = byOp.get(op) || [];
-    l.push([slot, Math.log(v), Math.log(w)]);
+    l.push([slot, Math.log(v.idx), Math.log(w.idx), Math.min(v.h, w.h)]);
     byOp.set(op, l);
   }
   const pa = [];
@@ -257,8 +307,11 @@ export function stability(pieces) {
     const mb = l.reduce((s, x) => s + x[2], 0) / l.length;
     for (const x of l) { pa.push(x[1] - ma); pb.push(x[2] - mb); }
   }
+  const hs = [];
+  for (const l of byOp.values()) if (l.length >= 2) for (const x of l) hs.push(x[3]);
+  hs.sort((a, b) => a - b);
   const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
-  return { general: r2(corr(ga, gb)), general_n: ga.length, personal: r2(corr(pa, pb)), personal_n: pa.length };
+  return { general: r2(corr(ga, gb)), general_n: ga.length, personal: r2(corr(pa, pb)), personal_n: pa.length, personal_h: hs.length ? Math.round(hs[hs.length >> 1]) : null };
 }
 
 /**
@@ -388,6 +441,13 @@ export function buildFasce(pieces, { now = Date.now(), names = {}, bravuraOf = n
       for (const [id, sl] of Object.entries(o.slots)) {
         op_.slots = op_.slots || {};
         op_.slots[id] = (op_.slots[id] || 0) + sl.h;
+        // venduto e atteso dai colleghi per fascia, su tutte le pagine (bravura per fascia)
+        op_.cmp = op_.cmp || {};
+        const c = op_.cmp[id] || { rev: 0, exp: 0, cmp_h: 0 };
+        if (sl.cmp_h > 0) { c.rev += sl.rev * (sl.cmp_h / sl.h); c.exp += sl.exp; c.cmp_h += sl.cmp_h; }
+        op_.cmp[id] = c;
+        // ore nelle fasce di punta DI QUESTA pagina, per fascia (bravura in punta)
+        if (primeSet.has(id)) { op_.prime_by = op_.prime_by || {}; op_.prime_by[id] = (op_.prime_by[id] || 0) + sl.h; }
       }
       opPages.set(op, op_);
     }
@@ -417,14 +477,22 @@ export function buildFasce(pieces, { now = Date.now(), names = {}, bravuraOf = n
   }
   pages.sort((a, b) => b.h - a.h);
 
+  const st = stability(pieces);
+  const k = shrinkK(st);
   const operators = [];
   for (const [op, o] of opPages) {
     const b = bra.get(op);
     const idx = b?.idx ?? null;
     const primeShare = o.valued_h >= MIN_OP_HOURS_PAGE ? o.prime_h / o.valued_h : null;
+    const sb = slotBravura(o.cmp, idx, k);
+    // bravura NELLE SUE ore di punta: media delle fasce pesata sulle ore di punta
+    let pw = 0;
+    let pv = 0;
+    for (const [id, h] of Object.entries(o.prime_by || {})) if (sb[id]?.v != null) { pw += h; pv += h * sb[id].v; }
+    const primeIdx = pw > 0 ? pv / pw : idx;
     let verdict = null;
     if (idx != null && primeShare != null && active(op)) {
-      if (idx <= WEAK && primeShare >= PRIME_HEAVY) verdict = "togliere";
+      if (primeIdx <= WEAK && primeShare >= PRIME_HEAVY) verdict = "togliere";
       else if (idx >= STRONG && primeShare < PRIME_LIGHT) verdict = "portare";
     }
     operators.push({
@@ -438,6 +506,8 @@ export function buildFasce(pieces, { now = Date.now(), names = {}, bravuraOf = n
       prime_h: Math.round(o.prime_h),
       est: o.est,
       slots: Object.fromEntries(Object.entries(o.slots || {}).map(([k, v]) => [k, Math.round(v)])),
+      slot_idx: sb,
+      prime_idx: r(primeIdx),
       pages: o.pages,
       last_day: lastDay.get(op) || null,
       active: active(op),
@@ -455,7 +525,7 @@ export function buildFasce(pieces, { now = Date.now(), names = {}, bravuraOf = n
     pages,
     operators,
     overall: Object.fromEntries(Object.entries(all.slots).map(([id, v]) => [id, { h: Math.round(v.h), sph_adj: v.sph_adj == null ? null : Math.round(v.sph_adj) }])),
-    stability: stability(pieces),
+    stability: { ...st, k },
   };
 }
 

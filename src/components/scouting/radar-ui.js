@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { linkWhere, RATINGS, RATING_LABEL } from "@/lib/scouting-core";
+import { BTN_PRIMARY } from "@/components/ds";
 
 export const NUM = { fontVariantNumeric: "tabular-nums" };
 export const SERIF = { fontFamily: FONTS.signature, fontWeight: 400, letterSpacing: "-0.01em" };
@@ -16,7 +17,7 @@ export const igProfile = (h) => `https://www.instagram.com/${encodeURIComponent(
 export const igReel = (sc) => `https://www.instagram.com/reel/${encodeURIComponent(sc)}/`;
 
 export const btn = { padding: "9px 16px", borderRadius: 999, border: `1px solid ${CP.border}`, background: "transparent", color: CP.textPrimary, fontSize: 13.5, cursor: "pointer", fontFamily: FONTS.body, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40 };
-export const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, borderColor: CP.accent, fontWeight: 600 };
+export const btnPrimary = BTN_PRIMARY;
 export const btnQuiet = { ...btn, border: "none", color: CP.textSecondary, padding: "9px 6px" };
 export const input = { padding: "10px 12px", borderRadius: 10, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, minWidth: 0 };
 

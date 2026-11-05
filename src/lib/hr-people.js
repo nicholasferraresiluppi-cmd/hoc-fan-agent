@@ -577,7 +577,11 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   const skippedKeys = new Set((person.sync?.skipped || []).map((x) => x.key));
   for (const k of Object.keys(fresh)) {
     if (!isEmptyValue(fresh[k]) || isEmptyValue(current.fields[k])) continue;
-    if (base[k] === undefined || skippedKeys.has(k) || k === "location") delete fresh[k];
+    if (base[k] === undefined || skippedKeys.has(k)) delete fresh[k];
+    // (c) campo specchio vuoto che su ClickUp non ha mai mostrato il testo dell'app (04/11/2026,
+    // incidente): l'indirizzo passato da «Location» a «Indirizzo» aveva una base del campo vecchio
+    // e il primo giro ha svuotato 93 indirizzi in app. Svuota solo chi cancella il testo che c'era.
+    else if (FIELD_BY_KEY[k]?.mirror && base[k] !== mirrorPrint(mirrorText(k, current.fields) || "")) delete fresh[k];
   }
 
   // campi specchio: testo cambiato ma non leggibile → si tiene l'app, lo si scrive nello storico

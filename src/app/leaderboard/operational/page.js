@@ -28,6 +28,7 @@ import { fmt$, fmtInt, fmtPct, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, DataTable, Notice, card, NUM } from "@/components/ds";
 
 import { tierLabel } from "@/lib/tier-label";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -167,10 +168,7 @@ function shortPeriod(pid) {
  * ================================================= */
 
 async function excludeEmployee(employee, reason, label, { note, scope }) {
-  const msg = scope === "underperformers"
-    ? `Escludere "${employee}" dalla leaderboard?\nReason: ${label}\n\nScompare da TUTTA la classifica, non solo dal pannello "da cambiare".`
-    : `Escludere "${employee}" dalla leaderboard?\nReason: ${label}\n\nTornerà visibile rimuovendolo da /admin/leaderboard-exclusions.`;
-  if (!confirm(msg)) return false;
+  if (!(await confirmDialog({ title: `Escludere "${employee}" dalla leaderboard?`, message: `Reason: ${label}\n\n${scope === "underperformers" ? "Scompare da TUTTA la classifica, non solo dal pannello \"da cambiare\"." : "Tornerà visibile rimuovendolo da /admin/leaderboard-exclusions."}`, ok: "Escludi", danger: true }))) return false;
   try {
     const res = await fetch("/api/admin/leaderboard-exclusions", {
       method: "POST",
@@ -178,16 +176,16 @@ async function excludeEmployee(employee, reason, label, { note, scope }) {
       body: JSON.stringify({ employee, reason, note }),
     });
     const data = await res.json();
-    if (!res.ok || data.error) { alert(data.error || "Errore esclusione"); return false; }
+    if (!res.ok || data.error) { alertDialog(data.error || "Errore esclusione"); return false; }
     return true;
   } catch (err) {
-    alert(String(err));
+    alertDialog(String(err));
     return false;
   }
 }
 
 async function ignoreEmployee(employee) {
-  if (!confirm(`Ignorare "${employee}" dalla lista "da cambiare"?\n\nResta nella leaderboard ma non viene più conteggiato qui. Puoi ripristinarlo dal pannello "ignorati" sotto.`)) return false;
+  if (!(await confirmDialog(`Ignorare "${employee}" dalla lista "da cambiare"?\n\nResta nella leaderboard ma non viene più conteggiato qui. Puoi ripristinarlo dal pannello "ignorati" sotto.`))) return false;
   try {
     const res = await fetch("/api/admin/underperformers-ignored", {
       method: "POST",
@@ -195,10 +193,10 @@ async function ignoreEmployee(employee) {
       body: JSON.stringify({ employee, note: "Ignorato dal pannello Action Center" }),
     });
     const data = await res.json();
-    if (!res.ok || data.error) { alert(data.error || "Errore"); return false; }
+    if (!res.ok || data.error) { alertDialog(data.error || "Errore"); return false; }
     return true;
   } catch (err) {
-    alert(String(err));
+    alertDialog(String(err));
     return false;
   }
 }
@@ -379,10 +377,10 @@ function IgnoredPanel({ onChange }) {
   const entries = Object.entries(ignored).sort((a, b) => (b[1].ignored_at || 0) - (a[1].ignored_at || 0));
 
   async function restore(name) {
-    if (!confirm(`Rimettere "${name}" nel computo da-cambiare?`)) return;
+    if (!(await confirmDialog(`Rimettere "${name}" nel computo da-cambiare?`))) return;
     const res = await fetch(`/api/admin/underperformers-ignored?employee=${encodeURIComponent(name)}`, { method: "DELETE" });
     const d = await res.json();
-    if (!res.ok || d.error) { alert(d.error || "Errore"); return; }
+    if (!res.ok || d.error) { alertDialog(d.error || "Errore"); return; }
     await mutate("/api/admin/underperformers-ignored");
     if (onChange) onChange();
   }

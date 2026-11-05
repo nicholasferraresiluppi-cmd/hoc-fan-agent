@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Loader2, Radio, ArrowRight, RefreshCw, CheckCircle2 } from "lucide-react";
 import { CP, FONTS, creatorDotColor } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, DataTable, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, DataTable, card, NUM, BTN_PRIMARY } from "@/components/ds";
 
 /**
  * /admin/infloww-agency — Revenue di TUTTE le creator (vista portfolio).
@@ -317,5 +317,5 @@ function avgActive(creators = []) {
   return Math.round(act.reduce((s, c) => s + c.net, 0) / act.length);
 }
 
-const btnPrimary = { display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", background: CP.accent, color: CP.accentInk, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: "pointer" };
+const btnPrimary = BTN_PRIMARY;
 const btnGhost = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "transparent", color: CP.textSecondary, border: `1px solid ${CP.border}`, borderRadius: 8, fontSize: 13, fontFamily: FONTS.body, cursor: "pointer" };

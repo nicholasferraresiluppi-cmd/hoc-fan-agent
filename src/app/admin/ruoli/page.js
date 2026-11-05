@@ -25,6 +25,9 @@ import { WELCOME_FIELDS, composeWelcome, welcomeVars } from "@/lib/welcome-card"
 import { PageHead, SectionTitle, Disclosure, Notice, DataTable, card } from "@/components/ds";
 import { WORKSPACES, WORKSPACE_IDS, defaultWorkspace } from "@/lib/workspaces";
 import { memberIssues } from "@/lib/member-coherence";
+import { confirmDialog, promptDialog } from "@/components/AppDialogs";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, MixBar, RankBars, HotTile } from "@/components/VetroCharts";
 
 const btn = (primary) => ({
   display: "inline-flex",
@@ -58,6 +61,8 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   // ?q=email (es. dal dopo-uscita in Persone HR): la persona da trovare è già filtrata
   const [filter, setFilter] = useState("");
+  const [onlyFix, setOnlyFix] = useState(false);
+  const inVetro = useInVetro();
   useEffect(() => { try { const q = new URLSearchParams(window.location.search).get("q"); if (q) setFilter(q); } catch {} }, []);
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -139,7 +144,7 @@ export default function MembersPage() {
   };
 
   const revoke = async (inv) => {
-    if (!confirm(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`)) return;
+    if (!(await confirmDialog(`Annullare l'invito a ${inv.email}? Il link nell'email smetterà di funzionare.`))) return;
     setBusy(inv.id);
     const r = await fetch(`/api/admin/invitations?id=${encodeURIComponent(inv.id)}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}));
@@ -151,10 +156,10 @@ export default function MembersPage() {
   // Accesso: sospendi (reversibile) / riattiva / elimina (definitivo, conferma con l'email)
   const memberAction = async (row, action) => {
     let confirmText = null;
-    if (action === "suspend" && !confirm(`Sospendere l'accesso di ${row.name}? Esce subito dall'app e non può più entrare. Ruoli e dati restano: puoi riattivarlo quando vuoi.`)) return;
-    if (action === "reactivate" && !confirm(`Riattivare l'accesso di ${row.name}? Rientra con i ruoli di prima.`)) return;
+    if (action === "suspend" && !(await confirmDialog({ title: `Sospendere l'accesso di ${row.name}?`, message: "Esce subito dall'app e non può più entrare. Ruoli e dati restano: puoi riattivarlo quando vuoi.", ok: "Sospendi", danger: true }))) return;
+    if (action === "reactivate" && !(await confirmDialog(`Riattivare l'accesso di ${row.name}? Rientra con i ruoli di prima.`))) return;
     if (action === "delete") {
-      confirmText = prompt(`Eliminare DEFINITIVAMENTE l'account di ${row.name}? Non si può annullare (di solito basta sospendere).\n\nPer confermare scrivi la sua email: ${row.email || ""}`);
+      confirmText = await promptDialog(`Eliminare DEFINITIVAMENTE l'account di ${row.name}? Non si può annullare (di solito basta sospendere).\n\nPer confermare scrivi la sua email: ${row.email || ""}`);
       if (confirmText == null) return;
     }
     setBusy(row.userId);
@@ -169,7 +174,7 @@ export default function MembersPage() {
   // Admin (ex pagina Accessi): rendere/togliere admin. La revoca toglie anche Clerk e ruoli (API access).
   const toggleAdmin = async (row) => {
     const on = !row.admin;
-    if (!confirm(on ? `Rendere ${row.name} amministratore? Vedrà i dati di tutti e potrà cambiare impostazioni e accessi.` : `Togliere ${row.name} dagli amministratori?`)) return;
+    if (!(await confirmDialog(on ? `Rendere ${row.name} amministratore? Vedrà i dati di tutti e potrà cambiare impostazioni e accessi.` : { title: `Togliere ${row.name} dagli amministratori?`, ok: "Togli", danger: true }))) return;
     setBusy(row.userId);
     const r = await fetch("/api/admin/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: on ? "add" : "remove", userId: row.userId }) });
     const j = await r.json().catch(() => ({}));
@@ -205,6 +210,7 @@ export default function MembersPage() {
 
   const allRows = roles?.rows || [];
   const rows = allRows.filter((r) => {
+    if (onlyFix && !memberIssues(r).length) return false;
     if (!filter) return true;
     const f = filter.toLowerCase();
     return (r.name || "").toLowerCase().includes(f) || (r.email || "").toLowerCase().includes(f);
@@ -300,7 +306,12 @@ export default function MembersPage() {
         <Notice>Non hai i permessi per gestire i membri. Se ti serve, chiedi a un admin.</Notice>
       )}
 
-      {!loading && canManage && (
+      {!loading && canManage && inVetro && (
+        <MembersTop rows={allRows} pending={canInvite ? pending.length : null} toFix={toFix} storedOf={storedOf} roleLabel={roleLabel}
+          onFix={() => { setOnlyFix(true); setFilter(""); document.getElementById("membri-lista")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+          onPending={() => document.getElementById("membri-inviti")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+      )}
+      {!loading && canManage && !inVetro && (
         <div style={{ fontSize: 13, color: CP.textSecondary, margin: "0 0 16px" }}>
           {allRows.length} {allRows.length === 1 ? "membro" : "membri"}
           {canInvite && ` · ${pending.length} ${pending.length === 1 ? "invito in attesa" : "inviti in attesa"}`}
@@ -315,7 +326,7 @@ export default function MembersPage() {
 
       {/* Inviti in attesa */}
       {!loading && canInvite && pending.length > 0 && (
-        <section style={{ marginBottom: 24 }}>
+        <section id="membri-inviti" style={{ marginBottom: 24, scrollMarginTop: 80 }}>
           <SectionTitle aside="hanno ricevuto l'email ma non hanno ancora creato l'account">Inviti in attesa · {pending.length}</SectionTitle>
           {resent?.url && (
             <div style={{ ...card, padding: "12px 16px", marginBottom: 10, display: "grid", gap: 8 }}>
@@ -327,7 +338,7 @@ export default function MembersPage() {
               </div>
             </div>
           )}
-          <div style={card}>
+          <div className={inVetro ? "vt-glass" : undefined} style={card}>
             {pending.map((inv, i) => (
               <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${CP.borderSoft}` : "none", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
@@ -352,9 +363,10 @@ export default function MembersPage() {
 
       {/* Membri */}
       {!loading && canManage && (
-        <section style={{ marginBottom: 28 }}>
+        <section id="membri-lista" style={{ marginBottom: 28, scrollMarginTop: 80 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
             <SectionTitle aside="clic sulle intestazioni per ordinare">Membri · {allRows.length}</SectionTitle>
+            {onlyFix && <button type="button" style={smallBtn} onClick={() => setOnlyFix(false)}>Solo da sistemare · mostra tutti</button>}
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -374,7 +386,7 @@ export default function MembersPage() {
           />
 
           {editRow && (
-            <div ref={editRef} style={{ ...card, padding: "14px 16px", marginTop: 12 }}>
+            <div ref={editRef} className={inVetro ? "vt-glass" : undefined} style={{ ...card, padding: "14px 16px", marginTop: 12 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Ruoli e accessi di {editRow.name}</div>
                 <div style={{ fontSize: 12, color: CP.textMuted }}>{editRow.email}</div>
@@ -689,7 +701,7 @@ function OperatorInvites({ onSent }) {
   const chosen = [...sel];
   const send = async () => {
     if (!chosen.length) return;
-    if (!window.confirm(`Mandare l'invito a ${chosen.length} operatori?\n\nRiceveranno un'email da HOC Pro per creare l'account. Al primo accesso vedranno solo le loro pagine personali (score, compenso, percorso).`)) return;
+    if (!(await confirmDialog(`Mandare l'invito a ${chosen.length} operatori?\n\nRiceveranno un'email da HOC Pro per creare l'account. Al primo accesso vedranno solo le loro pagine personali (score, compenso, percorso).`))) return;
     setBusy(true); setResult(null);
     const all = [];
     for (let i = 0; i < chosen.length; i += 50) {
@@ -804,7 +816,7 @@ function WelcomeEditor() {
               <button style={{ ...btn(true), opacity: busy || !dirty ? 0.6 : 1 }} disabled={busy || !dirty} onClick={() => call("PUT", { template: draft }, () => "Salvato: i prossimi inviti useranno questo testo.")}>Salva</button>
               <button style={btn(false)} disabled={busy || !dirty} onClick={() => setDraft(data.template)}>Annulla modifiche</button>
               <button style={btn(false)} disabled={busy} onClick={() => call("POST", { template: draft, sample }, (j) => `Prova mandata a ${j.to}.`)}>Mandami una prova</button>
-              <button style={btn(false)} disabled={busy} onClick={() => window.confirm("Tornare al testo originale?") && call("PUT", { reset: true }, () => "Testo originale ripristinato.")}>Testo originale</button>
+              <button style={btn(false)} disabled={busy} onClick={async () => { if (await confirmDialog("Tornare al testo originale?")) call("PUT", { reset: true }, () => "Testo originale ripristinato."); }}>Testo originale</button>
               {dirty && <span style={{ fontSize: 12, color: CP.accentSoftText }}>Modifiche non salvate</span>}
             </div>
             {msg && <div style={{ fontSize: 13, color: msg.bad ? CP.accentRed : CP.textSecondary }}>{msg.text}</div>}
@@ -819,5 +831,42 @@ function WelcomeEditor() {
         </div>
       )}
     </Disclosure>
+  );
+}
+
+// Vetro: «chi entra in HOC Pro, con che ruolo, e cosa va sistemato?». «Da sistemare» è un errore di
+// configurazione degli accessi (non un giudizio sulla persona): può essere rossa.
+function MembersTop({ rows, pending, toFix, storedOf, roleLabel, onFix, onPending }) {
+  const banned = rows.filter((r) => r.banned).length;
+  const never = rows.filter((r) => !r.banned && !r.last_sign_in_at).length;
+  const roleCount = {};
+  for (const r of rows) {
+    if (r.admin) roleCount.Admin = (roleCount.Admin || 0) + 1;
+    for (const rid of storedOf(r).filter((x) => x !== "admin")) { const l = roleLabel(rid); roleCount[l] = (roleCount[l] || 0) + 1; }
+  }
+  const byRole = Object.entries(roleCount).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
+  const n = (v) => String(v);
+  return (
+    <div className="vt-row21" style={{ marginBottom: 18 }}>
+      <div style={{ display: "grid", gap: 14, alignContent: "start", minWidth: 0 }}>
+        <Panel title={`${rows.length} ${rows.length === 1 ? "membro" : "membri"}`} aside="chi è già entrato almeno una volta" i={0}>
+          <MixBar format={n} items={[
+            { label: "Entrati", value: rows.length - banned - never, color: CP.accentGreen },
+            { label: "Mai entrati", value: never },
+            { label: "Sospesi", value: banned, color: "var(--vt-cx)" },
+          ]} />
+        </Panel>
+        {byRole.length > 0 && (
+          <Panel title="Per ruolo" aside="una persona con più ruoli conta in ognuno" i={1}>
+            <RankBars items={byRole} format={n} limit={8} total={0} />
+          </Panel>
+        )}
+      </div>
+      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+        <HotTile i={2} lvl={toFix ? "2" : "0"} label="Da sistemare" value={n(toFix)}
+          sub={toFix ? "ruoli o creator che non tornano: clic per vederli" : "accessi coerenti per tutti"} onClick={toFix ? onFix : undefined} />
+        {pending != null && <HotTile i={3} label="Inviti in attesa" value={n(pending)} sub={pending ? "hanno l'email ma non hanno ancora creato l'account" : "nessun invito in sospeso"} onClick={pending ? onPending : undefined} />}
+      </div>
+    </div>
   );
 }

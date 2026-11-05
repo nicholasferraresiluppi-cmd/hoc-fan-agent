@@ -1,5 +1,5 @@
 /**
- * GET /api/me/referral — «Porta un collega», vista di chi ha portato qualcuno.
+ * GET /api/me/referral — «Porta un amico», vista di chi ha portato qualcuno.
  * Solo i SUOI dati: il referente si trova dal server (userId già collegato o
  * email verificata dell'account), mai da un parametro del client.
  * Chi non è referente riceve le regole del programma e basta.

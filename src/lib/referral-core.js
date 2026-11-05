@@ -1,5 +1,5 @@
 /**
- * «Porta un collega» — logica PURA del programma referral (26/10/2026).
+ * «Porta un amico» — logica PURA del programma referral (26/10/2026).
  *
  * Niente KV, niente rete: funzioni deterministiche, provate da tests/referral.mjs.
  * Il lato server (KV, Infloww, inviti) sta in referral.js.
@@ -44,8 +44,15 @@
  * pagati restano congelati all'importo del pagamento.
  */
 
+// ref-4 (29/10/2026): il programma è una PROVA e vale per chi scrive all'Area
+// Partner (Claudia) entro il 30 novembre 2026 (decisione di Nicholas). Conta il
+// giorno del primo contatto (`contactedAt`, se l'HR lo scrive; altrimenti il
+// giorno in cui la persona è stata inserita): chi arriva dopo resta registrato,
+// ma i suoi premi non maturano. Le storie concordate dopo la scadenza idem.
+// Le persone e le storie entro la data non cambiano rispetto a ref-3.
 export const REFERRAL_RULES = {
-  version: "ref-3",
+  version: "ref-4",
+  campaignUntil: "2026-11-30", // ultimo giorno per scrivere all'Area Partner (null = nessuna scadenza)
   storyEur: 50,            // 2 storie Instagram pubblicate entro 30 giorni, concordate con l'HR
   storiesRequired: 2,
   storyWindowDays: 30,
@@ -61,6 +68,21 @@ export const REFERRAL_RULES = {
   fxMin: 0.5,
   fxMax: 1.5,
 };
+
+const romeDay = (ms) => (ms ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(ms)) : null);
+
+/** Giorno del primo contatto con l'Area Partner: quello scritto dall'HR, altrimenti il giorno dell'inserimento. */
+export function contactDay(r) {
+  return r?.contactedAt || romeDay(r?.createdAt) || null;
+}
+
+/** La persona rientra nella prova? (senza data = sì: non si toglie un premio per un dato mancante) */
+export function inCampaign(r, rules = REFERRAL_RULES) {
+  const d = contactDay(r);
+  return !rules.campaignUntil || !d || d <= rules.campaignUntil;
+}
+
+const itDay = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "");
 
 /** Cambio inserito dall'HR: numero tra fxMin e fxMax (accetta la virgola), o null. */
 export function parseFx(v, rules = REFERRAL_RULES) {
@@ -166,7 +188,7 @@ export function validateRecruit(input = {}) {
     inflowwName: s(input.inflowwName).slice(0, 120) || null,
     note: s(input.note).slice(0, 1000) || null,
   };
-  for (const [k, label] of [["interviewAt", "Colloquio"], ["trainingAt", "Formazione"], ["firstShiftAt", "Primo turno"], ["exitedAt", "Uscita"]]) {
+  for (const [k, label] of [["contactedAt", "Primo contatto"], ["interviewAt", "Colloquio"], ["trainingAt", "Formazione"], ["firstShiftAt", "Primo turno"], ["exitedAt", "Uscita"]]) {
     const r = optDate(input[k], label);
     if (r.error) return r;
     out[k] = r.value;
@@ -236,6 +258,7 @@ export function storyMilestone(story, { today, paid = {}, rules = REFERRAL_RULES
   const inTime = (story.publishedAt || []).filter((d) => d <= dueBy);
   const base = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy, published: (story.publishedAt || []).length, amountEur: rules.storyEur };
   if (paid[key]) return { ...base, status: "pagato", amountEur: paid[key].amountEur, paidAt: paid[key].paidAt };
+  if (rules.campaignUntil && story.agreedAt > rules.campaignUntil) return { ...base, status: "perso", outOfCampaign: true, why: `Fuori dalla prova: storie concordate dopo il ${itDay(rules.campaignUntil)}` };
   if (inTime.length >= rules.storiesRequired) return { ...base, status: "maturato", unlockedAt: inTime[rules.storiesRequired - 1] };
   if (today > dueBy) return { ...base, status: "perso", why: `Servivano ${rules.storiesRequired} storie entro il ${dueBy}` };
   return { ...base, status: "in_attesa", why: `${inTime.length}/${rules.storiesRequired} storie, entro il ${dueBy}` };
@@ -326,6 +349,11 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     }
     out.push(pay(key, m));
   }
+  // fuori dalla prova: la persona resta registrata, ma niente matura (il già pagato resta)
+  if (!inCampaign(r, rules)) {
+    const why = `Fuori dalla prova: primo contatto il ${itDay(contactDay(r))}, la prova valeva fino al ${itDay(rules.campaignUntil)}`;
+    return out.map((m) => (m.status === "pagato" ? m : { ...m, status: "perso", outOfCampaign: true, why }));
+  }
   return out;
 }
 
@@ -333,7 +361,7 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
 export function recruitSteps(r, milestones = [], { today } = {}) {
   const ret = milestones.filter((m) => m.kind === "shifts");
   const steps = [
-    { key: "referred", label: "Segnalata", done: true, at: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : null },
+    { key: "referred", label: "Segnalata", done: true, at: contactDay(r) },
     { key: "interview", label: "Colloquio", done: Boolean(r.interviewAt), at: r.interviewAt || null },
     { key: "training", label: "Formazione", done: r.trainingPassed === true, failed: r.trainingPassed === false, at: r.trainingAt || null },
     { key: "first_shift", label: "Primo turno", done: Boolean(r.firstShiftAt && r.trainingPassed === true), at: r.firstShiftAt || null },
@@ -371,6 +399,7 @@ export function referrerView(recruit, milestones, steps) {
     id: recruit.id,
     name: recruit.name,
     exited: Boolean(recruit.exitedAt),
+    outOfCampaign: !inCampaign(recruit),
     steps: steps.steps,
     next: steps.next,
     milestones: milestones.map((m) => ({
@@ -555,4 +584,72 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
   trend.splice(0, Math.max(0, trend.length - 12));
 
   return { today, funnel, storyStats, channel, quality, avgRate, economics, trend, minDecided: MIN_DECIDED, minShiftsRate: MIN_SHIFTS_RATE };
+}
+
+// ── Missioni e buste (27/10/2026) ───────────────────────────────────────────
+//
+// Idea di Nicholas: ogni premio è una MISSIONE che si sblocca; quando si
+// sblocca l'HR lo vede e il premio finisce nella BUSTA del mese del referente.
+// Nessun numero nuovo: missioni e buste leggono le stesse voci di
+// recruitMilestones/storyMilestone (una sola fonte, niente drift).
+
+/**
+ * Avanzamento di una missione: { done, target, unit } o null se non misurabile.
+ * first_shift: tappe fatte su 3 (colloquio, formazione superata, primo turno).
+ */
+export function missionProgress(m, recruit = {}) {
+  if (m.kind === "shifts") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shifts), target: m.shifts, unit: "turni" };
+  if (m.kind === "commission") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shiftsTo), target: m.shiftsTo, unit: "turni" };
+  if (m.kind === "story") return { done: Math.min(m.published || 0, REFERRAL_RULES.storiesRequired), target: REFERRAL_RULES.storiesRequired, unit: "storie" };
+  if (m.kind === "first_shift") {
+    const d = [recruit.interviewAt, recruit.trainingPassed === true, recruit.firstShiftAt && recruit.trainingPassed === true].filter(Boolean).length;
+    return { done: d, target: 3, unit: "tappe" };
+  }
+  return null;
+}
+
+/** Mese della busta di una voce: mese in cui si è sbloccata (o, se non si sa, in cui è stata pagata; altrimenti oggi). */
+export function payslipMonth(m, today) {
+  return (m.unlockedAt || m.paidAt || today).slice(0, 7);
+}
+
+/**
+ * Buste: per referente e per mese, le voci sbloccate (da pagare) o pagate.
+ * recruits: [{ id, name, referrerId, milestones }], stories: [{ referrerId, milestone }].
+ * → [{ referrerId, name, month, lines:[…], totalEur, paidEur, dueEur, waitingFxUsd }], ordinate per mese desc, poi nome.
+ */
+export function buildPayslips({ referrers = [], recruits = [], stories = [], today }) {
+  const byKey = new Map();
+  const add = (referrerId, m, recruitName) => {
+    if (m.status !== "maturato" && m.status !== "pagato") return;
+    const month = payslipMonth(m, today);
+    const k = `${referrerId}|${month}`;
+    if (!byKey.has(k)) byKey.set(k, { referrerId, name: referrers.find((r) => r.id === referrerId)?.name || "—", month, lines: [] });
+    byKey.get(k).lines.push({ key: m.key, label: m.label, recruitName: recruitName || null, status: m.status, amountEur: m.amountEur, amountUsd: m.amountUsd ?? null, unlockedAt: m.unlockedAt || null, paidAt: m.paidAt || null, fxMissing: m.amountEur == null });
+  };
+  for (const r of recruits) for (const m of r.milestones || []) add(r.referrerId, m, r.name);
+  for (const s of stories) add(s.referrerId, s.milestone, null);
+  const out = [...byKey.values()].map((b) => {
+    const eur = (st) => round2(b.lines.filter((l) => l.status === st && l.amountEur != null).reduce((a, l) => a + l.amountEur, 0));
+    const lines = b.lines.sort((x, y) => String(x.unlockedAt || "").localeCompare(String(y.unlockedAt || "")));
+    return { ...b, lines, paidEur: eur("pagato"), dueEur: eur("maturato"), totalEur: round2(eur("pagato") + eur("maturato")), waitingFxUsd: round2(lines.filter((l) => l.fxMissing && l.amountUsd != null).reduce((a, l) => a + l.amountUsd, 0)) };
+  });
+  return out.sort((a, b) => b.month.localeCompare(a.month) || a.name.localeCompare(b.name, "it"));
+}
+
+/** CSV di una o più buste (separatore «;» e virgola decimale, come lo apre Excel in italiano). */
+export function payslipsCsv(slips = []) {
+  const n = (v) => (v == null ? "" : String(v).replace(".", ","));
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [["Mese", "Referente", "Premio", "Persona portata", "Sbloccato", "Importo €", "Importo $", "Stato", "Pagato il"].map(q).join(";")];
+  for (const b of slips) for (const l of b.lines) {
+    rows.push([b.month, b.name, l.label, l.recruitName || "", l.unlockedAt || "", n(l.amountEur), n(l.amountUsd), l.status === "pagato" ? "pagato" : l.fxMissing ? "manca il cambio" : "da pagare", l.paidAt || ""].map((v, i) => (i === 5 || i === 6 ? v : q(v))).join(";"));
+  }
+  return rows.join("\n");
+}
+
+/** Cose che l'HR deve fare adesso: premi sbloccati da pagare + mesi senza cambio. */
+export function hrInbox({ toPay = [], fxMonths = [], fx = {} } = {}) {
+  const fxMissing = fxMonths.filter((m) => fx[m] == null).length;
+  return { toPay: toPay.length, fxMissing, count: toPay.length + fxMissing };
 }

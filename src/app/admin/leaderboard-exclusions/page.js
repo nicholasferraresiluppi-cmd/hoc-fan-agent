@@ -14,6 +14,7 @@ import Link from "next/link";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, DataTable, FilterChip, card } from "@/components/ds";
 import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -118,18 +119,18 @@ export default function LeaderboardExclusionsPage() {
   }
 
   async function handleRemove(employee) {
-    if (!confirm(`Rimuovere l'esclusione per "${employee}"?\nTornerà visibile nella leaderboard al prossimo calcolo.`)) return;
+    if (!(await confirmDialog({ title: `Rimuovere l'esclusione per "${employee}"?`, message: "Tornerà visibile nella leaderboard al prossimo calcolo.", ok: "Rimuovi" }))) return;
     try {
       const res = await fetch(`${exclUrl}?employee=${encodeURIComponent(employee)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || data.error) {
-        alert(data.error || "Errore nella rimozione");
+        alertDialog(data.error || "Errore nella rimozione");
       } else {
         await mutate(exclUrl);
         await mutate(auditUrl);
       }
     } catch (err) {
-      alert(String(err));
+      alertDialog(String(err));
     }
   }
 

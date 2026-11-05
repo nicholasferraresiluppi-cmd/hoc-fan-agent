@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FlaskConical, Play, Trash2, Plus, CheckCircle2, History, ChevronDown, ChevronRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, Disclosure, FilterChip, NUM, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/score-config-drafts
@@ -184,7 +185,7 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
     setConfirmText("");
   }
   async function onDelete() {
-    if (!window.confirm(`Eliminare la bozza "${draft.name}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare la bozza "${draft.name}"?`, ok: "Elimina", danger: true }))) return;
     await call(`/api/admin/score-config-drafts?id=${encodeURIComponent(draft.id)}`, { method: "DELETE" });
   }
 

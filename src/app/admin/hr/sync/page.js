@@ -17,6 +17,7 @@ import { fmtInt } from "@/lib/format";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, Metric, card } from "@/components/ds";
 import { FIELD_BY_KEY, PHASE_LABELS, taskStatusNamesFor } from "@/lib/hr-fields";
 import { btnPrimary, btnGhost, SYNC_LABEL, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
+import { confirmDialog } from "@/components/AppDialogs";
 
 function Row({ ok, label, children }) {
   return (
@@ -80,7 +81,7 @@ export default function HrSyncPage() {
   const [fieldsOpen, setFieldsOpen] = useState(false);
 
   const run = async (action) => {
-    if (action === "register_webhook" && !confirm(`Registro il webhook verso ${data?.webhookEndpoint}? Se ce n'era già uno viene sostituito.`)) return;
+    if (action === "register_webhook" && !(await confirmDialog({ title: `Registro il webhook verso ${data?.webhookEndpoint}?`, message: "Se ce n'era già uno viene sostituito.", ok: "Registra" }))) return;
     setBusy(action); setMsg(null);
     try {
       const j = await postJson("/api/admin/hr/sync", { action });
@@ -205,7 +206,7 @@ function ViewsCard({ last, onDone }) {
   const [err, setErr] = useState(null);
   const report = res || last;
   const go = async (action, apply = false) => {
-    if (apply && !confirm("Applico le modifiche alle viste del New CRM su ClickUp?")) return;
+    if (apply && !(await confirmDialog("Applico le modifiche alle viste del New CRM su ClickUp?"))) return;
     setBusy(action + (apply ? ":apply" : "")); setErr(null);
     try { const j = await postJson("/api/admin/hr/sync", { action, apply }); setRes(j); await onDone?.(); }
     catch (e) { setErr(e.message); } finally { setBusy(null); }

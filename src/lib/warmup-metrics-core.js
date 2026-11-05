@@ -106,6 +106,59 @@ export function mergeReading(store, reading) {
   return s;
 }
 
+/**
+ * Giorno per giorno (29/10/2026, per il periodo a scelta in Dati): follower letti quel giorno e i
+ * post USCITI quel giorno con il loro ultimo conteggio. Solo dati automatici: quelli a mano sono
+ * settimanali. Ultimi `n` giorni con almeno una lettura o un post.
+ */
+export function dailyFromStore(store, n = 120) {
+  const out = {};
+  if (!store || store.v !== METRICS_VERSION) return out;
+  const blank = () => ({ followers: null, posts: 0, views: null, viewsN: 0, likes: 0, comments: 0 });
+  for (const [d, r] of Object.entries(store.days || {})) out[d] = { ...blank(), followers: r.followers ?? null };
+  for (const p of Object.values(store.posts || {})) {
+    const d = romeDay(p.ts);
+    if (!d) continue;
+    const row = out[d] || (out[d] = blank());
+    row.posts++;
+    row.likes += p.likes || 0; row.comments += (p.comments || 0) + (p.reposts || 0);
+    if (p.views != null) { row.views = (row.views || 0) + p.views; row.viewsN++; }
+  }
+  const keep = Object.keys(out).sort().slice(-n);
+  return Object.fromEntries(keep.map((d) => [d, out[d]]));
+}
+
+/** I post degli ultimi giorni in forma corta, per «i post migliori» del periodo. */
+export function postsFromStore(store, platform) {
+  if (!store || store.v !== METRICS_VERSION) return [];
+  return Object.values(store.posts || {}).filter((p) => p.ts).map((p) => ({
+    id: p.id, ts: p.ts, kind: p.kind || null, views: p.views ?? null, likes: p.likes ?? null, comments: p.comments ?? null,
+    url: platform === "x" ? `https://x.com/i/status/${p.id}` : `https://www.instagram.com/p/${p.id}/`,
+  })).sort((a, b) => b.ts - a.ts);
+}
+
+/** Clic, iscritti e ricavo del tracking link tra due giorni compresi (differenza dei totali). */
+export function linkRange(linkDays, from, to, created) {
+  const days = Object.keys(linkDays || {}).sort();
+  const inR = days.filter((d) => d >= from && d <= to);
+  if (!inR.length) return null;
+  const end = linkDays[inR[inR.length - 1]];
+  const b = [...days].reverse().find((d) => d < from);
+  const start = b ? linkDays[b] : created && created >= from ? { clicks: 0, subs: 0, revenue: 0 } : null;
+  if (!start) return { partial: true, clicks: null, subs: null, revenue: null };
+  return { clicks: end.clicks - start.clicks, subs: end.subs - start.subs, revenue: Math.round((end.revenue - start.revenue) * 100) / 100 };
+}
+
+/** I numeri di un giorno come i campi del grafico (IG: follower totali e view; X: nuovi follower e view medie). */
+export function dailyPrefill(platform, row, prevRow) {
+  if (!row) return {};
+  if (platform === "x") return {
+    followers: row.followers != null && prevRow?.followers != null ? row.followers - prevRow.followers : null,
+    views: row.viewsN ? Math.round(row.views / row.viewsN) : null,
+  };
+  return { followers: row.followers, views: row.views };
+}
+
 /** Settimana per settimana: follower (fine, differenza), post pubblicati e loro numeri. */
 export function weeklyFromStore(store, weekKeys) {
   const out = {};

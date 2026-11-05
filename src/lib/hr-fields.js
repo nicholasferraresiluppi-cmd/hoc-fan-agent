@@ -46,7 +46,7 @@ export const GENDERS = ["Female", "Male", "Non-Binary", "I prefer not to declare
 export const GENDER_LABELS = { Female: "Donna", Male: "Uomo", "Non-Binary": "Non binario", "I prefer not to declare it": "Preferisco non dirlo" };
 // Come la persona è arrivata da noi (03/10/2026, decisione del titolare): serve a tenere
 // vivo il confronto reference ↔ annunci e a riconoscere il premio reference. Dal 26/10/2026
-// il premio è il programma «Porta un collega» (lib/referral-core.js, /admin/referral), che
+// il premio è il programma «Porta un amico» (lib/referral-core.js, /admin/referral), che
 // propone queste schede all'HR. La prima voce apre la domanda "Chi ti ha segnalato?".
 export const SOURCE_REFERRAL = "Me l'ha consigliato qualcuno";
 export const SOURCE_AD = "Ho visto un annuncio o un post sui social";
@@ -135,7 +135,10 @@ export const FIELDS = [
   { key: "gender", label: "Genere", section: "anagrafica", type: "option", cu: "Gender", options: GENDERS, labels: GENDER_LABELS },
   { key: "birthPlace", label: "Luogo di nascita", section: "anagrafica", type: "birth", appOnly: true, mirror: "Luogo di nascita" },
   { key: "residenceComune", label: "Comune di residenza", section: "anagrafica", type: "comune", appOnly: true, mirror: "Comune di residenza" },
-  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", cu: "Location" },
+  // 04/11/2026: su ClickUp l'indirizzo va come TESTO nel campo «Indirizzo». Il campo mappa «Location»
+  // vuole le coordinate, il modulo raccoglie solo via e civico: l'indirizzo finiva nel blocco in
+  // descrizione e chi prepara il contratto non lo trovava tra i campi (93 schede su 94).
+  { key: "location", label: "Indirizzo", section: "anagrafica", type: "location", appOnly: true, mirror: "Indirizzo" },
   { key: "residenceCap", label: "CAP", section: "anagrafica", type: "text", appOnly: true, mirror: "CAP" },
   { key: "codiceFiscale", label: "Codice fiscale", section: "anagrafica", type: "cf", cu: "Codice fiscale", extra: true, sensitive: true },
   { key: "personalEmail", label: "Email personale", section: "anagrafica", type: "email", cu: "Personal Email" },
@@ -180,6 +183,8 @@ export const FIELDS = [
   // La chiave resta hvContractStatus (esisteva già: rinominarla avrebbe staccato i dati salvati). Non è nel modulo pubblico.
   { key: "hvContractStatus", label: "Stato del contratto", section: "contratto", type: "option", cu: "HV Contract Status", choices: CONTRACT_STATUSES, options: CONTRACT_LABELS },
   { key: "partitaIva", label: "Partita IVA", section: "contratto", type: "bool", cu: "Partita IVA", extra: true },
+  // 28/10/2026 (Nicholas): a chi risponde «sì» si chiede anche il numero. Campo ClickUp «Numero partita IVA» (testo).
+  { key: "partitaIvaNumero", label: "Numero partita IVA", section: "contratto", type: "text", cu: "Numero partita IVA", extra: true, validate: "piva", max: 40 },
   // Documenti (in app solo riferimenti: i file stanno su ClickUp)
   { key: "idDocument", label: "Documento d'identità", section: "documenti", type: "fileRef", cu: "Documento d'identità", extra: true, readOnly: true },
   { key: "cvUpload", label: "CV caricato dal modulo", section: "documenti", type: "fileRef", readOnly: true, appOnly: true },
@@ -199,7 +204,7 @@ export const SECTIONS = [
 export const FORM_KEYS = [
   "firstName", "surname", "dateOfBirth", "nationality", "gender", "birthPlace", "residenceComune", "location", "residenceCap", "personalEmail", "personalPhone",
   "skillLevels", "otherSkills", "pastRoles", "learnWish",
-  "spokenLanguages", "partitaIva", "codiceFiscale", "personalInterests", "linkedin",
+  "spokenLanguages", "partitaIva", "partitaIvaNumero", "codiceFiscale", "personalInterests", "linkedin",
   "source", "referredBy",
 ];
 // Campi che l'admin può modificare dalla scheda
@@ -265,6 +270,38 @@ export function validateCodiceFiscale(input) {
   if (cfControlChar(v.slice(0, 15)) !== v[15]) return { ok: false, error: "Il carattere di controllo non torna: controlla di averlo scritto bene." };
   return { ok: true, value: v };
 }
+// ── Partita IVA (28/10/2026) ────────────────────────────────────────────────
+// Italiana: 11 cifre (anche con «IT» davanti), ultima cifra di controllo (algoritmo tipo Luhn).
+// Chi lavora da fuori ha il numero IVA del suo paese: 5-20 caratteri tra lettere, cifre, punti,
+// trattini e barre, con almeno 5 cifre (stessa apertura del codice fiscale estero).
+export function pivaControlDigit(first10) {
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    let d = Number(first10[i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+/** @returns {{ok:true, value:string, foreign?:true} | {ok:false, error:string}} */
+export function validatePartitaIva(input) {
+  const v = s(input).toUpperCase().replace(/\s+/g, "");
+  if (!v) return { ok: false, error: "Numero partita IVA vuoto." };
+  const it = /^(IT)?(\d+)$/.exec(v);
+  if (it) {
+    const n = it[2];
+    if (n.length !== 11) {
+      if (it[1] || n.length < 11) return { ok: false, error: "La partita IVA italiana ha 11 cifre. Se è di un altro paese, scrivila con la sigla del paese davanti (per esempio ES…)." };
+    } else {
+      if (pivaControlDigit(n.slice(0, 10)) !== n[10]) return { ok: false, error: "L'ultima cifra non torna: controlla di averla scritta bene." };
+      return { ok: true, value: n };
+    }
+  }
+  if (/^IT/.test(v)) return { ok: false, error: "La partita IVA italiana ha 11 cifre." };
+  if (FOREIGN_TAX_RE.test(v) && (v.match(/\d/g) || []).length >= 5) return { ok: true, value: v, foreign: true };
+  return { ok: false, error: "Il numero non sembra una partita IVA: controlla di averlo scritto tutto." };
+}
+
 export function maskCf(cf) {
   const v = s(cf);
   if (v.length < 4) return "••••••••••••••••";
@@ -273,6 +310,6 @@ export function maskCf(cf) {
 
 // ── Modulo pubblico e file ──────────────────────────────────────────────────
 // testo in /hr/privacy (03/10/2026): informativa art. 13 GDPR per i dati della collaborazione
-export const PRIVACY_VERSION = "2026-10-03.2"; // .2: frase sullo spazio temporaneo dei documenti
+export const PRIVACY_VERSION = "2026-10-28.1"; // 28/10: si raccoglie anche il numero di partita IVA (.2 del 03/10: spazio temporaneo dei documenti)
 // 50 MB (03/10/2026, alzato da 20 su richiesta di Nicholas): i file vanno diretti sul Blob privato, non più nel corpo della funzione (~4,5 MB)
 export const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;

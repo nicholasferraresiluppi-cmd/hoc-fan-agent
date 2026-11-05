@@ -28,14 +28,16 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import { Loader2, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, Sun, Moon, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, AlertTriangle, Download, FlaskConical, RotateCcw, Plus, X, ArrowUp, ArrowDown } from "lucide-react";
 import { CP, FONTS, DATA_SCALE } from "@/lib/brand";
 import { useTheme, setTheme as setAppTheme } from "@/lib/theme-client";
 import CompNav from "@/components/CompNav";
 import HowToRead from "@/components/HowToRead";
 import CreatorPicker from "@/components/CreatorPicker";
 import { fmt$, fmtSigned$, fmtPct, fmtPts, fmtInt, fmtDelta } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, SectionTitle, Disclosure, Notice, card, NUM } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { RankBars, Panel, HotTile, CompareBars } from "@/components/VetroCharts";
 
 /* ------------------------------------------------------------------ */
 /* Palette e formati                                                   */
@@ -96,6 +98,7 @@ export default function CompCalendarPage() {
   const [showShifts, setShowShifts] = useState(false);
   const [simByProfile, setSimByProfile] = useState(null);
   const [onlyChanged, setOnlyChanged] = useState(true);
+  const inVetro = useInVetro();
 
   const P = CP; // i token seguono il tema (CSS variables)
   const S = DATA_SCALE[theme];
@@ -107,7 +110,6 @@ export default function CompCalendarPage() {
       if (q === "light" || q === "dark") setAppTheme(q);
     } catch {}
   }, []);
-  const toggleTheme = () => setAppTheme(theme === "light" ? "dark" : "light");
 
   async function load(c, p) {
     setLoading(true); setError(null); setData(null); setPrev(null); setCandidates(null); setFocus(null);
@@ -212,9 +214,6 @@ export default function CompCalendarPage() {
           crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Calendario compensi" }]}
           title="Calendario compensi"
           subtitle="Quanto ci costano gli operatori su una creator, chi rende e dove, e cosa succederebbe cambiando gli scaglioni."
-          actions={<button onClick={toggleTheme} style={{ ...st.ghostBtn, padding: "6px 10px" }} title="Cambia tema">
-            {theme === "light" ? <Moon size={14} /> : <Sun size={14} />} {theme === "light" ? "Tema scuro" : "Tema chiaro"}
-          </button>}
         />
 
         <CompNav palette={P} />
@@ -251,7 +250,11 @@ export default function CompCalendarPage() {
 
         {agg && (
           <>
-            {/* 1. La risposta: un numero principale, col confronto */}
+            {/* 1. La risposta: un numero principale, col confronto (vetro: anche chi rende e cosa guardare) */}
+            {inVetro ? (
+              <CalendarTop agg={agg} aggPrev={aggPrev} costPct={costPct} costPrev={costPrev} prevName={prevName} creator={creator}
+                issuesCount={issuesCount} focus={focus} setFocus={setFocus} />
+            ) : (
             <HeroMetric
               label="Costo operatori sul venduto"
               value={fmtPct(costPct, 1)}
@@ -264,9 +267,11 @@ export default function CompCalendarPage() {
                 <Metric label="Operatori" value={fmtInt(agg.operators.length)} delta={dl(agg.operators.length, aggPrev?.operators.length)} />
               </div>
             </HeroMetric>
+            )}
 
-            {/* 2. Cosa guardare: filtri */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
+            {/* 2. Cosa guardare: filtri (in una sola barra) */}
+            {/* col vetro le due schede qui sopra aprono gli stessi filtri: la barra serve solo a dire cosa è acceso */}
+            {(!inVetro || focus) && <FilterBar style={{ marginBottom: 22 }} onReset={focus ? () => setFocus(null) : undefined}>
               <FilterChip active={focus === "issues"} danger={issuesCount > 0} onClick={() => setFocus(focus === "issues" ? null : "issues")}
                 label={issuesCount ? `${issuesCount} turni da controllare` : "Nessun turno da controllare"} disabled={!issuesCount} />
               <FilterChip active={focus === "gaps"} onClick={() => setFocus(focus === "gaps" ? null : "gaps")}
@@ -275,7 +280,7 @@ export default function CompCalendarPage() {
                 <FilterChip active onClick={() => setFocus(null)} label={`Solo ${focus.operator}`} closable />
               )}
               {focus === "issues" && <span style={{ fontSize: 13, color: P.textSecondary }}>{agg.issueSummary}</span>}
-            </div>
+            </FilterBar>}
 
             {/* 3. Chi rende: per operatore, ordinabile */}
             <SectionTitle aside="Clicca un operatore per vedere solo i suoi turni. Chi ha meno di 5 turni va in fondo quando ordini per resa.">Operatori su questa creator</SectionTitle>
@@ -550,6 +555,51 @@ export default function CompCalendarPage() {
 /* ------------------------------------------------------------------ */
 /* Aggregazione (logica invariata rispetto alla v2, + anomalie leggibili) */
 /* ------------------------------------------------------------------ */
+// Vetro (30/10/2026): la domanda è «quanto ci costano gli operatori su questa creator, e chi rende?».
+// A sinistra chi rende di più (venduto per turno, almeno MIN_SHIFTS turni) con la tacca della media
+// della creator, verde chi sta sopra; un tocco evidenzia i suoi turni nella griglia. A destra il costo
+// sul venduto contro il mese prima e le due cose da guardare come schede che aprono il filtro.
+function CalendarTop({ agg, aggPrev, costPct, costPrev, prevName, creator, issuesCount, focus, setFocus }) {
+  const avg = agg.rows.length ? agg.totSales / agg.rows.length : null;
+  const ops = agg.operators
+    .filter((o) => o.turni >= MIN_SHIFTS)
+    .map((o) => ({ ...o, per: o.turni ? o.sales / o.turni : 0 }))
+    .sort((a, b) => b.per - a.per);
+  const few = agg.operators.length - ops.length;
+  const items = ops.slice(0, 12).map((o) => ({
+    label: o.name, value: o.per, good: avg != null && o.per >= avg,
+    onClick: () => setFocus(focus && typeof focus === "object" && focus.operator === o.name ? null : { operator: o.name }),
+  }));
+  const totSlots = agg.days.length * agg.mainSlots.length;
+  return (
+    <div className="vt-row21" style={{ gap: 12, marginBottom: 14 }}>
+      <Panel i={0} title={`Chi rende di più su ${creator}`} aside={`venduto per turno${few > 0 ? ` · ${few} con meno di ${MIN_SHIFTS} turni fuori` : ""} · tocca per vedere i suoi turni`}>
+        {items.length ? <RankBars items={items} format={fmt$} limit={12} valueWidth={72} mark={avg ?? undefined} markLabel={avg != null ? `Media della creator: ${fmt$(avg)} a turno · in verde chi sta sopra` : undefined} />
+          : <div style={{ fontSize: 13.5, color: CP.textSecondary }}>Nessun operatore con almeno {MIN_SHIFTS} turni in questo mese.</div>}
+      </Panel>
+      <div className="vt-side" style={{ display: "grid", gap: 12, minWidth: 0, alignContent: "start" }}>
+        <Panel i={1}>
+          <div style={{ fontSize: 13, color: CP.textSecondary }}>Costo operatori sul venduto</div>
+          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: "-0.02em", margin: "2px 0 10px", ...NUM }}>{fmtPct(costPct, 1)}</div>
+          {costPrev != null && <CompareBars format={(v) => fmtPct(v, 1)} items={[{ label: "questo mese", value: costPct }, { label: prevName, value: costPrev }]} />}
+          <div style={{ fontSize: 12.5, color: CP.textMuted, marginTop: 8, ...NUM }}>
+            Venduto {fmt$(agg.totSales)} · pagato {fmt$(agg.totEarn)} · {fmtInt(agg.rows.length)} turni · {fmtInt(agg.operators.length)} operatori
+            {aggPrev ? ` · ${prevName}: ${fmt$(aggPrev.totSales)} venduto` : ""}
+          </div>
+        </Panel>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+          <HotTile i={2} lvl={issuesCount ? "2" : "0"} label="Da controllare" value={fmtInt(issuesCount)} active={focus === "issues"}
+            sub={issuesCount ? "turni con pagamento o profilo da verificare · tocca per vederli" : "nessun turno da verificare"}
+            onClick={issuesCount ? () => setFocus(focus === "issues" ? null : "issues") : undefined} />
+          <HotTile i={3} lvl={agg.emptyCells ? "ink" : "0"} label="Fasce scoperte" value={fmtInt(agg.emptyCells)} active={focus === "gaps"}
+            sub={agg.emptyCells ? `su ${fmtInt(totSlots)} fasce del mese · tocca per vederle` : "tutte le fasce coperte"}
+            onClick={agg.emptyCells ? () => setFocus(focus === "gaps" ? null : "gaps") : undefined} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function aggregate(data) {
   const rows = data.rows.map((r) => {
     const share = r.sales_total_shift > 0 ? r.sales_on_creator / r.sales_total_shift : (r.mono ? 1 : 0);

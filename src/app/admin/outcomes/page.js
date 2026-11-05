@@ -9,6 +9,7 @@ import { useUser } from "@clerk/nextjs";
 import { CP, FONTS } from "@/lib/brand";
 import { fmt$, fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { alertDialog } from "@/components/AppDialogs";
 
 function currentISOWeek() {
   const d = new Date();
@@ -68,10 +69,10 @@ export default function OutcomesPage() {
         setForm({ ...form, revenue: "", ppvCount: "", customCount: "", retentionRate: "", churnCount: "", notes: "" });
         loadOutcomes();
       } else {
-        alert(data.error || "Errore");
+        alertDialog(data.error || "Errore");
       }
     } catch (e) {
-      alert(e.message);
+      alertDialog(e.message);
     }
   }
 

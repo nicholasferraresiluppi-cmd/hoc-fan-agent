@@ -28,6 +28,9 @@ import {
 } from "@/lib/warmup-store";
 import { kv } from "@vercel/kv";
 import { refreshPublicMetrics, getRunState, apifyConfigured } from "@/lib/warmup-metrics";
+import { scheduledForProfiles, publishFromTask } from "@/lib/editoriale-store";
+import { pubKindOfTask } from "@/lib/editoriale-core";
+import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 const LOG_TYPES = new Set(["accesso", "account", "task", "flag", "traguardo", "utente", "profilo", "dati", "stato"]);
@@ -63,6 +66,11 @@ export async function GET(request) {
   }
   await notePerson(g.by.userId, g.by.name);
   const [state, people, pubRun] = await Promise.all([loadState(), listPeople(), getRunState().catch(() => null)]);
+  // Editoriale: cosa c'è in calendario ieri, oggi e domani (giorni UTC larghi: il browser sceglie il suo)
+  const now = Date.now();
+  const days = [-1, 0, 1].map((d) => new Date(now + d * 86400000).toISOString().slice(0, 10));
+  const ed = await scheduledForProfiles(state.profiles.filter((p) => p.platform !== "x" && p.creator), days).catch(() => ({}));
+  for (const p of state.profiles) p.ed = ed[p.id] || null;
   return Response.json({ ...state, people, pubRun: { ...(pubRun || {}), configured: apifyConfigured() }, me: { id: g.by.userId, name: g.by.name, admin: g.admin } }, noStore);
 }
 
@@ -106,7 +114,15 @@ export async function POST(request) {
       const r = await setTask(id, String(body.day || ""), String(body.task || ""), Boolean(body.on), by);
       if (!r.ok) return fail(r);
       await appendLog(id, logs, by, "task", uname);
-      return Response.json({ ok: true });
+      // task di pubblicazione: il contenuto in calendario quel giorno risulta pubblicato nell'Editoriale
+      let published = null;
+      if (pubKindOfTask(body.task)) {
+        try {
+          const acc = (await loadSupervisor()).accounts.find((a) => a.id === id);
+          if (acc?.platform === "instagram" && acc.creator) published = await publishFromTask({ id, creator: acc.creator, username: "@" + acc.username }, String(body.day), String(body.task), Boolean(body.on), by);
+        } catch {}
+      }
+      return Response.json({ ok: true, published: published ? { id: published.id, title: published.title, status: published.status } : null });
     }
     if (body.action === "timer") {
       const r = await setTimer(id, String(body.day || ""), String(body.task || ""), body.sec);
