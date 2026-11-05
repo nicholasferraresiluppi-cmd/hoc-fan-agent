@@ -72,6 +72,7 @@ eq(matchWebResults("mysteria.ita", [r("https://onlyfans.com/u94299833", "Mysteri
 eq(matchWebResults("michelle002841", [r("https://onlyfans.com/godessmichelle", "Michelle", "")]), null, "Michelle = nome di battesimo");
 eq(matchWebResults("claariissa_", [r("https://onlyfans.com/clarissa.x", "Clarissa", "")]), null, "Clarissa = nome di battesimo");
 eq(matchWebResults("giuliascarozza_", [r("https://onlyfans.com/giuliascarozzavip", "Giulia Scarozza Vip", "")])?.how, "titolo", "handle attaccato ma nome e cognome nel titolo: prova");
+eq(matchWebResults("principessa.23", [r("https://onlyfans.com/principessaj", "Principessa", "")])?.how, "simile", "il numero nell'handle non è una seconda parola");
 eq(matchWebResults("martina.rinaldii", [r("https://onlyfans.com/martinarin05", "Martina rinaldi", "")])?.how, "titolo", "nome e cognome nel titolo, indirizzo vicino");
 console.log("trovate: ok");
 
