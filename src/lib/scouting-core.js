@@ -982,9 +982,10 @@ export function matchWebResults(h, results) {
     else {
       const us = webStem(user);
       const near = us.length >= 5 && stem.length >= 7 && (us.includes(stem) || stem.includes(us));
-      // handle di UNA parola ("sinister", "michelle"): il titolo uguale lo può avere chiunque, prova solo
-      // se l'indirizzo è quello a numeri di default (giro del 5/11: @sssinister_ → "Sinister" di un'altra)
-      const strong = /^u\d+$/.test(user) || (near && webTokens(handle).length > 1);
+      // UNA parola sola in handle e titolo ("sinister", "michelle"): il titolo uguale lo può avere chiunque,
+      // prova solo con l'indirizzo a numeri di default (giro del 5/11: @sssinister_ → "Sinister" di un'altra);
+      // nome e cognome nel titolo ("Giulia Scarozza Vip") restano una prova
+      const strong = /^u\d+$/.test(user) || (near && (webTokens(handle).length > 1 || webTokens(title.replace(/\s+/g, "_")).length > 1));
       if (stem.length >= 7 && webStem(title) === stem) how = strong ? "titolo" : "simile";
       else if (near && us.length >= 7) how = "simile";
     }
