@@ -24,6 +24,7 @@ eq(webUserOf("https://onlyfans.com/2727886873/irenemarinaroo"), "irenemarinaroo"
 eq(webUserOf("https://onlyfans.com/Sara_YourDream"), "sara_yourdream", "utente in minuscolo");
 eq(webUserOf("https://onlyfans.com/legal"), null, "pagine di servizio non sono profili");
 eq(webUserOf("https://fapello.com/eugenia-bellomia/"), null, "siti di contenuti rubati mai");
+eq(webUserOf("https://onlyfans.com/@francesca-tocca/media"), null, "pagine generate per un nome (/@…) non sono profili");
 console.log("ricerca: ok");
 
 // ---------- trovate ----------
@@ -69,6 +70,10 @@ eq(matchWebResults("marinaroprivate", [r("https://onlyfans.com/noemyferretti", "
 m = matchWebResults("giuliadelellis103", [r("https://onlyfans.com/hotgiulia_free", "Giulia De Lellis", "")]);
 eq([m?.how, m?.strength], ["simile", 1], "il nome di una famosa su un indirizzo di un'altra: da guardare, mai certo (pagine false)");
 eq(matchWebResults("giulia", [r("https://onlyfans.com/giulia", "Giulia", "")]), null, "handle di un nome solo: mai certo");
+eq(matchWebResults("rosalba", [r("https://onlyfans.com/ross94alba", "Rosalba", "Hola mis amores, soy yo, Ross")]), null, "primo giro: @rosalba ≠ una Rosalba spagnola");
+eq(matchWebResults("vittoria", [r("https://onlyfans.com/vittoriamonti", "Vittoria", "")]), null, "primo giro: @vittoria ≠ vittoriamonti");
+eq(matchWebResults("rosalba", [r("https://onlyfans.com/x123", "Ro", "https://instagram.com/rosalba")])?.how, "ig", "anche col nome solo, la pagina che porta al suo Instagram vale");
+eq(matchWebResults("francescatocca", [r("https://onlyfans.com/@francesca-tocca/media", "https://onlyfans.com/@francesca-tocca/media", "Nessuna informazione disponibile per questa pagina.")]), null, "primo giro: pagina /@… senza profilo dietro");
 eq(matchWebResults("soryu_geggy_cosplay", []), null, "niente risultati → niente");
 eq(matchWebResults("anna.rossi", [r("https://onlyfans.com/x", "Post — OnlyFans", "@anna.rossi.free ti aspetta")]), null, "@handle seguito da altro non è lei");
 console.log("scartate: ok");

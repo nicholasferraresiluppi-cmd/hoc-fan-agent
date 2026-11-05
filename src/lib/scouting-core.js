@@ -891,6 +891,25 @@ const WEB_HOW = {
 };
 const WEB_HOSTS = /(^|\.)(onlyfans\.com|fansly\.com|fanvue\.com)$/;
 const WEB_NOISE = new Set(["official", "officiale", "ufficiale", "real", "the", "its", "im", "iam", "private", "privato", "privata", "backup", "back", "up", "reel", "reels", "of", "vip", "ita", "italy", "xx", "xo"]);
+// Nomi di battesimo comuni (radice: senza doppie): un handle fatto solo di uno di questi non identifica nessuno.
+const FIRST_NAMES = new Set([
+  "alesandra", "alesia", "alice", "amanda", "amelia", "ana", "analisa", "anastasia", "angela",
+  "angelica", "antonela", "ariana", "ashley", "asia", "aurora", "azura", "barbara", "beatrice",
+  "benedeta", "bianca", "britany", "camila", "carla", "carlota", "carmen", "caterina", "cecilia",
+  "chiara", "chloe", "claudia", "cristina", "dalila", "daniela", "debora", "denise", "diana",
+  "elena", "eleonora", "elisa", "elisabeta", "ema", "emanuela", "emily", "erica", "erika", "eva",
+  "federica", "fiorela", "francesca", "gaia", "giada", "giana", "ginevra", "gioia", "giorgia",
+  "giovana", "giulia", "giuliana", "giusepina", "greta", "hanah", "ilaria", "irene", "isabela",
+  "jasmin", "jasmine", "jenifer", "jesica", "kate", "katie", "kimberly", "laura", "lavinia",
+  "letizia", "lily", "lisa", "lorena", "lucia", "ludovica", "luisa", "madalena", "madison",
+  "manuela", "mara", "margherita", "maria", "mariana", "marika", "marina", "marta", "martina",
+  "matilde", "megan", "melanie", "melisa", "michela", "miriam", "monica", "nadia", "natalia",
+  "natalie", "nicole", "noemi", "olivia", "paola", "patrizia", "rachel", "rachele", "rebeca",
+  "roberta", "rosa", "rosalba", "rosela", "sabrina", "samantha", "sara", "serena", "silvia",
+  "simona", "sofia", "sonia", "sophia", "sophie", "stefania", "stela", "teresa", "tiziana",
+  "valentina", "valeria", "vanesa", "veronica", "victoria", "viola", "virginia", "vitoria", "ylenia",
+  "zoe",
+]);
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Parole del nome per la ricerca: "carla.fitness_official" → "carla fitness". */
@@ -913,7 +932,9 @@ export function webUserOf(url) {
     if (!WEB_HOSTS.test(u.hostname.replace(/^www\./, "").toLowerCase())) return null;
     const seg = u.pathname.split("/").filter(Boolean);
     const user = /^\d+$/.test(seg[0] || "") ? seg[1] : seg[0];
-    if (!user || OF_PATHS_NOT_PROFILES.test(user)) return null;
+    // "/@francesca-tocca/media": pagine che OnlyFans genera per un nome, senza un profilo dietro
+    // (Google: "Nessuna informazione disponibile"), primo giro del 5/11/2026 — non sono una prova
+    if (!user || user.startsWith("@") || OF_PATHS_NOT_PROFILES.test(user)) return null;
     return user.toLowerCase();
   } catch {
     return null;
@@ -933,6 +954,9 @@ export function matchWebResults(h, results) {
   const handle = normHandle(h);
   const stem = webStem(handle);
   if (!handle) return null;
+  // handle = solo un nome di battesimo ("rosalba", "vittoria"): l'unica prova che regge è la pagina
+  // che porta al suo Instagram (primo giro: @rosalba abbinata a una "Rosalba" spagnola)
+  const onlyName = FIRST_NAMES.has(stem);
   const igRe = new RegExp(`(instagram\\.com/|@)${reEsc(handle)}(?![a-z0-9_.])`, "i");
   const rank = { ig: 4, titolo: 3, utente: 2, simile: 1 };
   let best = null;
@@ -943,6 +967,7 @@ export function matchWebResults(h, results) {
     const title = String(r.title || "").replace(/\s*onlyfans\s*$/i, "").trim();
     let how = null;
     if (igRe.test(text)) how = "ig";
+    else if (onlyName) continue;
     else if (stem.length >= 7 && webStem(user) === stem) how = "utente";
     else {
       const us = webStem(user);
