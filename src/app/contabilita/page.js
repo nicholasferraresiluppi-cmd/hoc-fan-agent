@@ -18,8 +18,9 @@ import useSWR from "swr";
 import { Plus, Loader2, Lock, Trash2, Check } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card } from "@/components/ds";
+import { PageHead, FilterChip, Notice, DataTable, SectionTitle, Metric, card, Tabs } from "@/components/ds";
 import { computeMonth, monthLabel, nextMonthId, personKey, normalizeTiers, namesMatch } from "@/lib/compensi-core";
+import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -192,7 +193,7 @@ function AccessPanel() {
   if (error) return <Notice danger>{error.message}</Notice>;
   if (!data) return <div style={{ color: CP.textMuted }}>Carico…</div>;
   const grant = async () => { setErr(null); try { await send("/api/contabilita/accesso", "POST", { email }); setEmail(""); mutate(); } catch (e) { setErr(e.message); } };
-  const revoke = async (id) => { if (!confirm("Togliere l'accesso alla contabilità?")) return; await send(`/api/contabilita/accesso?userId=${encodeURIComponent(id)}`, "DELETE"); mutate(); };
+  const revoke = async (id) => { if (!(await confirmDialog({ title: "Togliere l'accesso alla contabilità?", ok: "Togli", danger: true }))) return; await send(`/api/contabilita/accesso?userId=${encodeURIComponent(id)}`, "DELETE"); mutate(); };
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <Notice>
@@ -283,19 +284,19 @@ export default function ContabilitaPage() {
     } catch (e) { setSaveErr(e.message); } finally { setSaving(false); }
   };
   const newMonth = async () => {
-    if (dirty && !confirm("Ci sono modifiche non salvate in questo mese. Continuare?")) return;
+    if (dirty && !(await confirmDialog("Ci sono modifiche non salvate in questo mese. Continuare?"))) return;
     const latest = months[0];
     const target = latest ? nextMonthId(latest) : thisMonth();
-    if (!confirm(`Creare ${monthLabel(target)}${latest ? ` copiando ${monthLabel(latest)} (righe e regole; pagato, extra, revenue e cambio da rifare)` : ""}?`)) return;
-    try { await send(`/api/contabilita/mese?m=${target}`, "POST", { from: latest || null }); await mutateHome(); setMonth(target); } catch (e) { alert(e.message); }
+    if (!(await confirmDialog(`Creare ${monthLabel(target)}${latest ? ` copiando ${monthLabel(latest)} (righe e regole; pagato, extra, revenue e cambio da rifare)` : ""}?`))) return;
+    try { await send(`/api/contabilita/mese?m=${target}`, "POST", { from: latest || null }); await mutateHome(); setMonth(target); } catch (e) { alertDialog(e.message); }
   };
   const fetchFx = async () => {
     setFxBusy(true);
-    try { const r = await fetcher(`/api/contabilita/tasso?m=${month}`); update((d) => ({ ...d, fx: { rate: r.rate, source: r.source } })); } catch (e) { alert(e.message); } finally { setFxBusy(false); }
+    try { const r = await fetcher(`/api/contabilita/tasso?m=${month}`); update((d) => ({ ...d, fx: { rate: r.rate, source: r.source } })); } catch (e) { alertDialog(e.message); } finally { setFxBusy(false); }
   };
   const setPaidPerson = (key, paid) => update((d) => ({ ...d, lines: d.lines.map((l) => (personKey(l.person) === key ? { ...l, paid } : l)) }));
   const saveLine = (l, isNew) => { update((d) => ({ ...d, lines: isNew ? [...d.lines, { ...l, id: l.id || `l_${Math.random().toString(16).slice(2, 14)}` }] : d.lines.map((x) => (x.id === l.id ? l : x)) })); setEditing(null); };
-  const delLine = (id) => { if (!confirm("Eliminare questa riga?")) return; update((d) => ({ ...d, lines: d.lines.filter((x) => x.id !== id) })); setEditing(null); };
+  const delLine = async (id) => { if (!(await confirmDialog({ title: "Eliminare questa riga?", ok: "Elimina", danger: true }))) return; update((d) => ({ ...d, lines: d.lines.filter((x) => x.id !== id) })); setEditing(null); };
   const blankLine = (team = "") => ({ id: null, team, mansione: "", person: "", projects: "", method: "fisso", fixedEur: "", rule: null, extras: [], note: "", paid: false });
 
   const ql = q.trim().toLowerCase();
@@ -304,7 +305,7 @@ export default function ContabilitaPage() {
   const tabs = [["persone", "Da pagare"], ["squadre", "Per squadra"], ["revenue", "Revenue e cambio"], ["crm", "Incrocio CRM"], ...(home.owner ? [["accessi", "Accessi"]] : [])];
 
   return (
-    <div style={{ padding: "24px 16px 80px", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità" }]}
         title="Compensi team"
@@ -318,7 +319,7 @@ export default function ContabilitaPage() {
 
       {months.length === 0 && <Notice>Nessun mese ancora. Crea il primo con «Nuovo mese».</Notice>}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-        {months.map((m) => <FilterChip key={m} label={monthLabel(m)} active={m === month} onClick={() => { if (dirty && !confirm("Modifiche non salvate: cambiare mese le perde. Continuare?")) return; setMonth(m); }} />)}
+        {months.map((m) => <FilterChip key={m} label={monthLabel(m)} active={m === month} onClick={async () => { if (dirty && !(await confirmDialog("Modifiche non salvate: cambiare mese le perde. Continuare?"))) return; setMonth(m); }} />)}
       </div>
       {saveErr && <Notice danger>{saveErr}</Notice>}
       {mErr && <Notice danger>{mErr.message}</Notice>}
@@ -334,10 +335,8 @@ export default function ContabilitaPage() {
         {calc.totals.problems > 0 && <Notice danger>{calc.totals.problems} righe in gamification non si possono calcolare per intero (manca il cambio o la revenue di un progetto): per ora vale il minimo garantito. Vedi «Revenue e cambio».</Notice>}
         {draft.importedFrom && <Notice>Importato da {draft.importedFrom}. Le righe sono quelle del foglio così com'erano; le regole di gamification trovate nel foglio «Calcolo» sono allegate alle righe dei sales manager come proposta da confermare.</Notice>}
 
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
-          {tabs.map(([k, t]) => <FilterChip key={k} label={t} active={tab === k} onClick={() => setTab(k)} />)}
-          {(tab === "persone" || tab === "squadre") && <input style={{ ...input, maxWidth: 240, marginLeft: "auto" }} placeholder="Cerca persona, squadra, mansione" value={q} onChange={(e) => setQ(e.target.value)} />}
-        </div>
+        <Tabs items={tabs} value={tab} onChange={setTab}
+          aside={(tab === "persone" || tab === "squadre") ? <input style={{ ...input, maxWidth: 240 }} placeholder="Cerca persona, squadra, mansione" value={q} onChange={(e) => setQ(e.target.value)} /> : null} />
 
         {tab === "persone" && (
           <DataTable

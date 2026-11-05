@@ -11,6 +11,8 @@ import { Loader2, RefreshCw, Plus, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice } from "@/components/ds";
+import HeroHead, { BigNum } from "@/components/HeroHead";
+import { alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -95,7 +97,7 @@ function LinkActions({ h, onDone }) {
   const [day, setDay] = useState(new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   if (!h.link) return null;
-  const go = async (body) => { setBusy(true); try { await post(body); setMode(null); onDone(); } catch (e) { alert(e.message); } finally { setBusy(false); } };
+  const go = async (body) => { setBusy(true); try { await post(body); setMode(null); onDone(); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
   if (mode) {
     return (
       <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -273,12 +275,12 @@ export default function ReteAmiciPage() {
     const tot4 = sum((t) => t.total4);
     return { friends4: sum((t) => t.byKind.friends.last4), tot4, friends: sum((t) => t.byKind.friends.fans), total: sum((t) => t.total), links: (data?.links || []).filter((l) => !l.until).length };
   }, [targets, data]);
-  const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/rete-amici?refresh=1"), { revalidate: false }); } catch (e) { alert(e.message); } finally { setBusy(false); } };
+  const refresh = async () => { setBusy(true); try { await mutate(await fetcher("/api/admin/rete-amici?refresh=1"), { revalidate: false }); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
   const changed = async () => { await refresh(); };
   const cur = targets.find((t) => t.target_id === open);
 
   return (
-    <div style={{ padding: "24px 16px 80px", maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 1600, margin: "0 auto" }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Rete amici" }]}
         title="Rete amici"
@@ -293,18 +295,18 @@ export default function ReteAmiciPage() {
       {data && !targets.length && <Notice>Nessun amico segnato. {canEdit ? "Aggiungi la prima coppia: la pagina che mostra e l'amico mostrato." : "Le coppie le segna un admin."}</Notice>}
 
       {targets.length > 0 && (<>
-        <div style={{ background: CP.textPrimary, color: CP.bg, borderRadius: 18, padding: "22px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 10 }}>
-          <div>
-            <div style={{ fontSize: 13, opacity: 0.65 }}>Iscritti dagli amici · ultime 4 settimane</div>
-            <div style={{ fontSize: 44, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{int(S.friends4)}</div>
-            <div style={{ fontSize: 13, opacity: 0.65, marginTop: 4 }}>su {int(S.tot4)} nuovi iscritti delle pagine mostrate ({pct(S.tot4 ? S.friends4 / S.tot4 : null)})</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "auto auto", columnGap: 18, rowGap: 3, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
-            <span style={{ opacity: 0.65 }}>Ultime 13 settimane</span><span style={{ textAlign: "right" }}>{int(S.friends)} su {int(S.total)}</span>
-            <span style={{ opacity: 0.65 }}>Amici segnati</span><span style={{ textAlign: "right" }}>{int(S.links)}</span>
-            <span style={{ opacity: 0.65 }}>Pagine mostrate</span><span style={{ textAlign: "right" }}>{int(targets.length)}</span>
-          </div>
-        </div>
+        <HeroHead
+          eyebrow="Iscritti dagli amici · ultime 4 settimane"
+          title={`${int(S.friends4)} su ${int(S.tot4)} nuovi iscritti`}
+          accent={S.tot4 ? `(${pct(S.friends4 / S.tot4)})` : null}
+          sub="Nuovi iscritti delle pagine mostrate tra gli amici, senza tracking link, che erano già iscritti alla pagina che le mostra."
+          numbers={<>
+            <BigNum label="Dagli amici in 13 sett." value={S.friends} strong />
+            <BigNum label="Nuovi iscritti in 13 sett." value={S.total} />
+            <BigNum label="Amici segnati" value={S.links} />
+            <BigNum label="Pagine mostrate" value={targets.length} />
+          </>}
+        />
         <div style={{ ...muted, marginBottom: 14, lineHeight: 1.5 }}>
           «Dagli amici» è il massimo che la scheda può aver portato: comprende anche post, messaggi di massa o S4S senza link della stessa pagina. Per la parte della sola scheda si guarda il prima/dopo quando un amico viene aggiunto o tolto. {data.cached ? "Calcolato oggi." : ""}
         </div>

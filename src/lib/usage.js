@@ -8,12 +8,16 @@
  *       "e\t{pagina}\t{messaggio}"              → errori JS
  *       "s\t{pagina}\tsum" / "s\t{pagina}\tn"   → profondità di scorrimento (somma %, n)
  *       "l\t{pagina}\tsum" / "l\t{pagina}\tn"   → tempo di caricamento (somma ms, n)
+ *       "n\t{da}\t{a}"                         → passaggi tra pagine ("(ingresso)" = prima della visita)
+ *       "t\t{pagina}\tsum" / "t\t{pagina}\tn"   → secondi in primo piano (somma, n)
+ *       "q\t{pagina}"                           → aperture <10 s senza clic
+ *       "b\t{pagina}\t{codice}"                → aperture con una chiamata ai dati fallita (401/403/404/5xx/rete)
  *
  * Una HINCRBY per pagina aperta: costo trascurabile, nessun dato personale oltre
  * (chi, quale pagina, che giorno).
  */
 import { kv } from "@vercel/kv";
-import { dayId, lastDays, matchRoute } from "@/lib/usage-core";
+import { dayId, lastDays, matchRoute, ENTRY, BLOCK_CODES } from "@/lib/usage-core";
 import ROUTES from "@/lib/app-routes.generated.json";
 
 const TTL = 400 * 24 * 3600;
@@ -44,6 +48,12 @@ export async function recordEvents(events) {
   const incs = {};
   const inc = (f, v = 1) => { incs[f] = (incs[f] || 0) + v; };
   for (const e of events.slice(0, 20)) {
+    if (e?.type === "nav") {
+      const to = matchRoute(String(e.to || ""), ROUTES);
+      const from = e.from === ENTRY ? ENTRY : matchRoute(String(e.from || ""), ROUTES);
+      if (to && from) inc(`n\t${from}\t${to}`);
+      continue;
+    }
     const page = matchRoute(String(e?.path || ""), ROUTES);
     if (!page) continue;
     if (e.type === "click") {
@@ -52,6 +62,9 @@ export async function recordEvents(events) {
     } else if (e.type === "rage") inc(`r\t${page}\t${safe(e.label)}`);
     else if (e.type === "error") inc(`e\t${page}\t${safe(e.label)}`);
     else if (e.type === "scroll" && Number.isFinite(e.pct)) { inc(`s\t${page}\tsum`, Math.max(0, Math.min(100, Math.round(e.pct)))); inc(`s\t${page}\tn`); }
+    else if (e.type === "time" && Number.isFinite(e.s) && e.s >= 0) { inc(`t\t${page}\tsum`, Math.min(1800, Math.round(e.s))); inc(`t\t${page}\tn`); }
+    else if (e.type === "quick") inc(`q\t${page}`);
+    else if (e.type === "block" && BLOCK_CODES.includes(e.code)) inc(`b\t${page}\t${e.code}`);
     else if (e.type === "load" && Number.isFinite(e.ms) && e.ms < 120000) { inc(`l\t${page}\tsum`, Math.round(e.ms)); inc(`l\t${page}\tn`); }
   }
   const entries = Object.entries(incs);

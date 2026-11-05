@@ -10,6 +10,7 @@ import { useState, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, Notice, DataTable, FilterChip, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 const URL_API = "/api/admin/group-languages";
@@ -105,7 +106,7 @@ export default function GroupLanguagesPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Cancellare TUTTE le lingue assegnate a mano? I gruppi torneranno alla lingua letta dal nome (e quelli senza «ITA»/«ENG» nel nome resteranno senza lingua).")) return;
+    if (!(await confirmDialog({ title: "Cancellare TUTTE le lingue assegnate a mano?", message: "I gruppi torneranno alla lingua letta dal nome (e quelli senza «ITA»/«ENG» nel nome resteranno senza lingua).", ok: "Cancella", danger: true }))) return;
     setSaving(true);
     try {
       const res = await fetch(URL_API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) });
@@ -149,7 +150,7 @@ export default function GroupLanguagesPage() {
   const rows = filtered.map((g) => ({ id: g, group: g, d: display[g], current: pendingOverrides[g] !== undefined ? pendingOverrides[g] : (overrides[g] || "") }));
 
   return (
-    <div style={{ padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Lingue gruppi" }]}
         title="Lingua dei gruppi"

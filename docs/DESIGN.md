@@ -11,6 +11,21 @@
 3. **Niente nero puro, niente bianco puro.** Quasi-neri bluastri, quasi-bianchi freddi.
 4. **Flat.** Niente gradienti, glow, blur o ombre decorative. La profondità si costruisce con superfici e bordi.
 
+## 1b. Regole d'uso — come si comportano schede, filtri e tasti (29/10/2026)
+
+Nate dal pannello dei tester (SM, Board, TL, publisher, designer) sulle foto di Social, Bilancio, Le mie creator, Persone, S4S e Analisi vendite: «schede, filtri e scelte hanno lo stesso aspetto». Ogni regola si verifica guardando una pagina.
+
+1. **Testata uguale ovunque**: breadcrumb → titolo → UNA riga di descrizione → al massimo un'azione primaria (viola) a destra del titolo (`PageHead`).
+2. **Le schede sono testo sottolineato** (`<Tabs>` in `ds.js`, `PageTabs` per le pagine unite), subito sotto la testata, mai pillole. Al massimo due livelli: schede della pagina e schede di una sezione (`small`).
+3. **I filtri stanno in UNA barra** (`<FilterBar>`) sotto le schede: pillole (`FilterChip`/`Seg`) e tendine; «Azzera» a destra quando c'è qualcosa da azzerare. Una pillola è sempre un filtro.
+4. **Le modalità di tutta la pagina** (es. Instagram | X) sono un `<Segmented>` (bottoni uniti in un riquadro), accanto alle schede: né schede né filtri.
+5. **Le azioni sono bottoni**, mai pillole. Un solo primario viola per schermata; i secondari bianchi con bordo; quelli ripetuti su ogni riga di un elenco sono secondari o link. Un'azione che apre una scelta (es. «Aggiungi profilo») apre una finestra con le sue scelte, non mette i suoi campi nella barra dei filtri.
+6. **Stato vuoto in tre parti** (`<EmptyState>`): cosa manca, perché, e il tasto per risolvere DENTRO il riquadro.
+7. **Niente spiegazioni aperte in pagina**: introduzione di una riga; il resto in «Come si legge», chiuso, in fondo (`Disclosure` o `<details>`).
+8. **Comandi di prova, sviluppo e stile non stanno mai dentro le pagine** (dal 29/10 `VetroSwitch` non mostra nulla: lo stile è uno solo, il vetro bianco). Etichette solo in italiano.
+
+Applicate per prime a Social (schede, Dati, Contenuti, Radar) e alle schede in cima alle pagine unite (`PageTabs`). Le altre pagine si portano una alla volta.
+
 ## 2. Token — fonte di verità
 
 ```css

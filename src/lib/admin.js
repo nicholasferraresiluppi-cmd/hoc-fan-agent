@@ -1,3 +1,4 @@
+import { memoAuthz } from "@/lib/authz-cache";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { viewAsFor } from "@/lib/view-as";
@@ -83,6 +84,9 @@ export async function adminMfaOk(userId) {
 }
 
 export async function isUserIdAdmin(userId) {
+  return memoAuthz("admin", userId, () => computeIsUserIdAdmin(userId));
+}
+async function computeIsUserIdAdmin(userId) {
   if (!(await isUserIdAdminRaw(userId))) return false;
   // "Vedi come…": un admin in anteprima è admin solo se lo è il ruolo simulato
   const va = await viewAsFor(userId);

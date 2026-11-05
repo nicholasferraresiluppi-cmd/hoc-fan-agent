@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
-import {
+import { Headphones,
   Trophy, BarChart3, DollarSign, Users, Flame, Swords, HeartHandshake,
   GraduationCap, ClipboardCheck, Target, Brain, Award,
   LayoutDashboard, UserCog, Sparkles, Bot,
@@ -20,19 +20,23 @@ import {
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle, ArrowLeftRight, Send,
-  Snowflake, Megaphone, Share2, Shield, Building2, BookUser, Radar,
+  Snowflake, Megaphone, Share2, Shield, Sunrise, Building2, BookUser, Radar, UserPlus,
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
+import { useRouter } from "next/navigation";
+import { prefetchNav } from "@/lib/nav-prefetch";
 import { WORKSPACES, workspaceSections } from "@/lib/workspaces";
 import { fmt$, fmtInt, fmtDelta, fmtAgo, MONTHS_IT } from "@/lib/format";
 import { useStyle } from "@/lib/theme-client";
 import { PageHead, HeroMetric, Metric, SectionTitle, ActionRow, card } from "@/components/ds";
 import { useIsPhone } from "@/lib/use-phone";
 import { isEarlyMonth } from "@/lib/use-smart-period";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { MonthArea, Donut, usd } from "@/components/VetroCharts";
 
 // Tollera 4xx/5xx: ritorna null invece di throware (le metriche mostrano "—")
 const fetcher = async (url) => {
@@ -55,6 +59,7 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Per creator: venduto e costo degli operatori, anche sul mese in corso", icon: Wallet },
       { href: "/admin/retention",         title: "Retention fan",       desc: "Per pagina dello split: dipendenza dai fan più grossi, fan di valore in pausa, nuovi che tornano", icon: Repeat },
+      { href: "/admin/publisher-x",       title: "Publisher X",         desc: "Quanto pagare chi porta sub da X: fan per fan, sui loro primi 30 giorni", icon: UserPlus },
       { href: "/admin/comp-calendar",     title: "Calendario compensi", desc: "Quanto costa ogni giorno di turni e perché, con simulatore", icon: Calendar },
       { href: "/admin/profiles-compare",  title: "Scaglioni a confronto", desc: "Standardizzazione dei profili di pagamento", icon: Scale },
     ],
@@ -71,6 +76,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/creator-split",         title: "Creator dello split", desc: "Aggiungi o togli una creator: HOC Pro collega da solo pagine OnlyFans, paese e turni, e la creator compare in Revenue e chat, Analisi vendite e S4S", icon: Users },
       { href: "/admin/fan-da-recuperare",     title: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano bene e si sono fermati, con il perché e una bozza di ripresa personale scritta dall'AI dalle loro ultime chat. Segni a chi hai scritto e vedi chi ha ricomprato", icon: HeartHandshake },
       { href: "/admin/analisi-vendite",       title: "Analisi vendite", desc: "Le tue creator in un posto solo: tutte a confronto sugli stessi numeri (lordo, abbonati, reach, click, fan paganti) con una riga di lettura, come vanno e perché (prima chi perde di più, con il perché letto nelle chat), e la scheda di ogni creator", icon: BarChart3 },
+      { href: "/admin/benvenuto",             title: "Benvenuto a pagamento", desc: "Quanto sblocca il benvenuto di ogni pagina, prima e dopo ogni cambio di prezzo. Il prezzo si legge dalle chat; se il benvenuto parte da un altro strumento lo inserisci a mano con la data da cui vale", icon: MailOpen },
       { href: "/admin/looker",                title: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics 3.0 e KPI Sales) con gli stessi nomi, la stessa disposizione e le stesse formule, verificate contro Looker. Solo le tue creator, export CSV", icon: LayoutDashboard },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
       { href: "/admin/conversation-intelligence", title: "Presidio chat", desc: "Latenza risposta, % entro 5 min e response rate per creator (dai transcript, solo metadati)", icon: Activity },
@@ -124,8 +130,11 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
-      { href: "/admin/studio-social", title: "Studio social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
+      { href: "/admin/creator-ai", title: "Creator AI", desc: "Studi su Fanvue e mappa delle creator AI italiane con i loro profili. Sezione privata.", icon: Bot },
+      { href: "/admin/studio-social", title: "Regia social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
+      { href: "/admin/warmup", title: "Clipping", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
+      { href: "/admin/piani", title: "Piani", desc: "I piani di lavoro a fasi (come gli sprint): chi fa cosa e per quando, le voci che si spuntano da sole dai dati, le decisioni con le loro condizioni", icon: ListChecks },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
     ],
   },
@@ -135,7 +144,9 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
       { href: "/admin/hr",                title: "Persone · Area Partner", desc: "CRM persone (HOC Pro è il master): anagrafica, rapporto, contratto, documenti e storico, sincronizzato con la lista HR di ClickUp; link di compilazione per la persona", icon: BookUser },
+      { href: "/admin/presenze-discord",  title: "Presenze Discord", desc: "Chi è stato nelle stanze vocali del server Discord, quanto e con chi, giornata dalle 5 alle 5; storico per persona e per mansione. Visibile solo a chi ha l'accesso", icon: Headphones },
       { href: "/admin/hr/contratti",      title: "Controllo contratti", desc: "Contratti da Dropbox Sign confrontati con le schede: chi ce l'ha, chi no, chi ha cambiato mansione e serve un contratto nuovo; PDF firmati allegati su ClickUp", icon: FileSignature },
+      { href: "/admin/referral",          title: "Porta un amico", desc: "Programma referral: chi ha portato chi, a che punto è ogni persona (colloquio, formazione, primo turno, 3 mesi), premi e percentuali sul venduto Infloww, cosa va pagato", icon: Gift },
       { href: "/admin/hr/sync",           title: "Sincronizzazione ClickUp", desc: "Lista configurata, webhook, ultimo import, conflitti: import completo e registrazione webhook", icon: RefreshCw },
       { href: "/admin/candidate-assessments", title: "Assessment candidati", desc: "Simulatore Academy come test pre-assunzione: crea link, leggi il report (segnale per HR, non gate), registra l'esito", icon: UserCheck },
       { href: "/admin/priority-queue",    title: "Fan da seguire ora", desc: "Quale fan seguire ora per creator: whale in attesa o in raffreddamento, ordinati per valore", icon: Inbox },
@@ -183,6 +194,7 @@ const TOOL_BY_HREF = new Map(SHORTCUT_GROUPS_RAW.flatMap((g) => g.items.map((i) 
 const PHONE_QUICK = ["/admin/scouting", "/admin/le-mie-creator", "/admin/analisi-vendite", "/admin/alerts", "/admin/pnl-live", "/admin/hr"];
 
 export default function AdminHub() {
+  const router = useRouter();
   const { user } = useUser();
   const [q, setQ] = useState("");
   const now = useMemo(() => new Date(), []);
@@ -257,6 +269,10 @@ export default function AdminHub() {
     .sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
 
   const [st] = useStyle();
+  // Stile vetro in prova su questa pagina (VetroScope), spegnibile dall'intestazione
+  const [vetro, setVetro] = useVetro();
+  // numeri che salgono (VetroNum); nello stile Casa li fa già NumText, che vuole una stringa
+  const num = (v) => (st === "v3" ? v : <VetroNum value={v} />);
   // Telefono (10/10/2026, Nicholas: "sembra un libro"): verdetto corto, 3 alert, decisioni in una riga,
   // scorciatoie al posto dell'elenco degli strumenti. Il computer resta com'è.
   const phone = useIsPhone();
@@ -281,8 +297,10 @@ export default function AdminHub() {
   const loopNote = (x, fallback) => x?.reason === "no_history" ? "servono 2 mesi di dati" : x?.reason ? fallback : null;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <VetroScope on={vetro}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
+        actions={<VetroSwitch on={vetro} set={setVetro} />}
         title={`${greeting}${userName ? `, ${userName}` : ""}.`}
         line2={isHr ? null : phone && dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete ? `${fmtPct(dSales)} su ${prevName}, stessi giorni.` : paceLine}
         subtitle={isHr ? "Persone, accessi e contestazioni: da qui parti per il lavoro di oggi."
@@ -290,7 +308,7 @@ export default function AdminHub() {
       />
 
       {noCreators && !isHr && (
-        <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
           <SectionTitle>Non hai ancora creator assegnate</SectionTitle>
           <div style={{ fontSize: 14, color: CP.textSecondary, lineHeight: 1.55 }}>
             Le pagine di vendita mostrano solo le creator che segui. Finché un admin non te le assegna (Membri e ruoli → la tua scheda → Creator visibili), qui e nelle classifiche non vedrai numeri.
@@ -298,9 +316,9 @@ export default function AdminHub() {
         </section>
       )}
 
-      {!isHr && !noCreators && <HeroMetric
+      {!isHr && !noCreators && <div className="vt-hero" data-tone={dSales != null && cmp?.until_day >= FEW_DAYS && !agency?.incomplete && dSales > 3 ? "good" : "ink"}><HeroMetric
         label={`${partial ? `Venduto delle tue ${me.creators.count} creator` : "Venduto agenzia"} · ${monthName} finora`}
-        value={fmt$(agency?.current?.sales)}
+        value={num(fmt$(agency?.current?.sales))}
         compare={phone && cmp?.until_day ? `${fmt$(cmp.prev.sales)} a ${prevName} negli stessi giorni` : compareLine}
         hint={<>
           {agency?.incomplete && (
@@ -314,15 +332,27 @@ export default function AdminHub() {
         </>}
       >
         <div className="hub-metrics" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-          <Metric label="Operatori attivi" value={fmtInt(base?.operators)} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
-          <Metric label="Creator" value={fmtInt(base?.creators)} />
-          <Metric label="Turni" value={fmtInt(base?.shifts)} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
-          <Metric label="Venduto per turno" value={fmt$(perShift(base))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
+          <Metric label="Operatori attivi" value={num(fmtInt(base?.operators))} delta={fmtDelta(base?.operators, basePrev?.operators)} deltaLabel={dl} />
+          <Metric label="Creator" value={num(fmtInt(base?.creators))} />
+          <Metric label="Turni" value={num(fmtInt(base?.shifts))} delta={fmtDelta(base?.shifts, basePrev?.shifts)} deltaLabel={dl} />
+          <Metric label="Venduto per turno" value={num(fmt$(perShift(base)))} delta={fmtDelta(perShift(base), perShift(basePrev))} deltaLabel={dl} />
         </div>
-      </HeroMetric>}
+      </HeroMetric></div>}
+
+      {!isHr && !noCreators && <HubCharts agency={agency} periodId={periodId} curName={monthName} prevName={prevName} partial={partial}
+        todo={[
+          alertsData && { key: "crit", n: open.filter((a) => a.severity === "critical").length, label: "alert critici", zero: "nessun alert critico", lvl: 2, href: "/admin/alerts",
+            detail: open.find((a) => a.severity === "critical")?.title },
+          alertsData && { key: "open", n: open.filter((a) => a.severity !== "critical").length, label: "altri controlli aperti", zero: "nessun altro controllo aperto", lvl: "ink", href: "/admin/alerts",
+            detail: open.find((a) => a.severity !== "critical")?.title },
+          s4s?.access && { key: "s4s", n: s4s.count || 0, label: "S4S da fare", zero: "nessuno S4S da fare", lvl: "ink", href: "/admin/s4s#oggi",
+            detail: s4s.requests?.[0] ? `${s4s.requests[0].partner} propone a ${s4s.requests[0].page}` : s4s.todayTodo?.length ? `${s4s.todayTodo.length} di oggi da programmare` : null },
+          wantDecisions && { key: "dec", n: decisions.length, label: decisions.length === 1 ? "decisione aspetta" : "decisioni aspettano", zero: "nessuna decisione in attesa", lvl: "ink", href: "/admin/roadmap",
+            detail: decisions[0] ? `la più vecchia da ${daysAgo(decisions[0].added_at) ?? "?"} giorni` : null },
+        ].filter(Boolean)} />}
 
       {s4s?.access && (s4s.count > 0 || s4s.missingKit?.length > 0 || s4s.proposals > 0) && (
-        <section style={{ ...card, marginBottom: 14 }}>
+        <section className="vt-glass" style={{ ...card, marginBottom: 14, "--vt-i": 1 }}>
           <div style={{ padding: "14px 16px 10px" }}>
             <SectionTitle aside={s4s.count ? `${s4s.count} da fare` : null}>S4S</SectionTitle>
           </div>
@@ -366,7 +396,7 @@ export default function AdminHub() {
       )}
 
       {phone && wantDecisions && decisions.length > 0 && (
-        <Link href="/admin/roadmap" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
+        <Link href="/admin/roadmap" className="vt-glass" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 14, textDecoration: "none", color: CP.textPrimary }}>
           <span><span style={{ fontSize: 15 }}>{decisions.length} {decisions.length === 1 ? "decisione ti aspetta" : "decisioni ti aspettano"}</span>
             <span style={{ display: "block", fontSize: 12.5, color: CP.textMuted, marginTop: 2 }}>la più vecchia da {daysAgo(decisions[0].added_at) ?? "?"} giorni</span></span>
           <span style={{ color: CP.accentSoftText }}>→</span>
@@ -396,11 +426,11 @@ export default function AdminHub() {
         <section className="ds-open" style={{ ...card, padding: "14px 16px", marginBottom: 24 }}>
           <SectionTitle aside={loopPeriod === prevId ? `${prevName}: il mese appena chiuso, come la Classifica` : "coaching e sostituzioni del mese scorso, misurati su questo"}>Le decisioni sulle persone funzionano?</SectionTitle>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-            <Metric label="Migliorati dopo il coaching" value={loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—"}
+            <Metric label="Migliorati dopo il coaching" value={num(loop.coaching?.rate != null ? `${loop.coaching.rate}%` : "—")}
               note={loop.coaching?.total ? `${loop.coaching.improved} su ${loop.coaching.total}, almeno +5 punti` : loopNote(loop.coaching, "nessun coaching completato")} />
-            <Metric label="Sostituzioni riuscite" value={loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—"}
+            <Metric label="Sostituzioni riuscite" value={num(loop.swaps?.rate != null ? `${loop.swaps.rate}%` : "—")}
               note={loop.swaps?.total ? `${loop.swaps.success} su ${loop.swaps.total}, sostituto con score ≥ 50` : loopNote(loop.swaps, "nessuna sostituzione")} />
-            <Metric label="Score medio agenzia" value={trend?.current != null ? String(trend.current).replace(".", ",") : "—"}
+            <Metric label="Score medio agenzia" value={num(trend?.current != null ? String(trend.current).replace(".", ",") : "—")}
               note={trend?.delta != null ? `${trend.delta > 0 ? "+" : trend.delta < 0 ? "−" : ""}${String(Math.abs(trend.delta)).replace(".", ",")} punti sul mese prima` : loopNote(trend, "")} />
           </div>
         </section>
@@ -412,9 +442,9 @@ export default function AdminHub() {
           <section style={{ marginBottom: 18 }}>
             <h2 className="ds-sect" style={{ fontSize: 16, fontWeight: 500, margin: "6px 0 10px", color: CP.textPrimary }}>Vai a</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-              {quick.map((it) => { const Icon = it.icon || LayoutDashboard; return (
-                <Link key={it.href} href={it.href} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
-                  <Icon size={18} color={CP.textMuted} strokeWidth={1.8} />
+              {quick.map((it, qi) => { const Icon = it.icon || LayoutDashboard; return (
+                <Link key={it.href} href={it.href} onPointerEnter={() => prefetchNav(router, it.href)} onTouchStart={() => prefetchNav(router, it.href)} className="hub-tool" style={{ ...card, display: "flex", flexDirection: "column", gap: 10, padding: "14px 14px 12px", textDecoration: "none", color: CP.textPrimary, minHeight: 86 }}>
+                  <span className="vt-ico" data-tone={qi % 6} style={{ display: "inline-flex" }}><Icon size={18} color={CP.textMuted} strokeWidth={1.8} /></span>
                   <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.25 }}>{it.title}</span>
                 </Link>
               ); })}
@@ -438,7 +468,7 @@ export default function AdminHub() {
         <section style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>I tuoi strumenti · {WORKSPACES[ws]?.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {mine.map((it) => <ToolCard key={it.href} it={it} />)}
+            {mine.map((it, i) => <ToolCard key={it.href} it={it} tone={i % 6} />)}
           </div>
         </section>
       )}
@@ -448,11 +478,11 @@ export default function AdminHub() {
           {showAll ? "Nascondi gli altri strumenti" : `Tutti gli strumenti (${others.reduce((n, g) => n + g.items.length, 0)})`}
         </button>
       )}
-      {othersOpen && others.map((g) => (
+      {othersOpen && others.map((g, gi) => (
         <section key={g.label} style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>{g.label}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
-            {g.items.map((it) => <ToolCard key={it.href} it={it} />)}
+            {g.items.map((it) => <ToolCard key={it.href} it={it} tone={gi % 6} />)}
           </div>
         </section>
       ))}
@@ -460,19 +490,72 @@ export default function AdminHub() {
       <style>{`.hub-tool:hover{background:${CP.surfaceAlt} !important}
 @media (max-width:699px){.hub-metrics{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px !important}.ds-arow > div{flex:1 1 0 !important}.ds-arow .ds-arow-go{margin-left:20px}}`}</style>
     </div>
+    </VetroScope>
   );
 }
 
-function ToolCard({ it }) {
+// tone: colore del gruppo, usato solo dallo stile vetro (VetroScope) per la tessera dell'icona
+function ToolCard({ it, tone = 0 }) {
+  const router = useRouter();
   const Icon = it.icon;
   return (
-    <Link href={it.href} className="hub-tool"
+    <Link href={it.href} onPointerEnter={() => prefetchNav(router, it.href)} onTouchStart={() => prefetchNav(router, it.href)} className="hub-tool"
       style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", ...card, textDecoration: "none", color: CP.textPrimary }}>
-      <Icon size={16} color={CP.textMuted} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
+      <span className="vt-ico" data-tone={tone} style={{ display: "inline-flex", flexShrink: 0, marginTop: 2 }}><Icon size={16} color={CP.textMuted} strokeWidth={1.8} /></span>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500 }}>{it.title}</div>
         {it.desc && <div style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.45, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.desc}</div>}
       </div>
     </Link>
+  );
+}
+
+// Il mese che sale e chi porta il venduto (solo stile vetro, 26/10/2026, come la copertina del reel 1):
+// gli stessi turni CreatorsPro del numero qui sopra, giorno per giorno e per creator (agency-sales).
+const capIt = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const daysOfMonth = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+// 26/10/2026 («per ogni pagina capiscine l'utilità»): Casa risponde a «come va e cosa devo fare oggi» → accanto
+// al mese, al posto della ciambella per creator (che ripeteva la pagina Creator), le cose da fare come
+// schede piene di colore (le «Hot deals» del reel rapport): rosso = critico, inchiostro = da fare,
+// vetro = niente in sospeso. Gli elenchi completi restano sotto. Senza nulla da mostrare torna la ciambella.
+function HubCharts({ agency, periodId, curName, prevName, partial, todo = [] }) {
+  const inVetro = useInVetro();
+  const cur = agency?.current;
+  if (!inVetro || !cur?.byDay || !cur.lastDay) return null;
+  const prevId = agency.prev_period_id || periodId;
+  const shares = (cur.byCreator || []).map((x) => ({ label: x.alias, value: x.sales }));
+  return (
+    <div className="vt-row21" style={{ marginBottom: 14 }}>
+      <section className="vt-glass" style={{ "--vt-i": 1, borderRadius: 22, padding: 18, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>{partial ? "Il mese delle tue creator" : "Il mese dell'agenzia"}</div>
+          <div style={{ fontSize: 12.5, color: CP.textMuted }}>venduto sommato giorno per giorno, turni CreatorsPro</div>
+        </div>
+        <MonthArea cur={cur.byDay} prev={agency.prev_full?.byDay || []} days={daysOfMonth(periodId)} prevDays={daysOfMonth(prevId)}
+          upto={cur.lastDay} curLabel={capIt(curName)} prevLabel={capIt(prevName)} />
+      </section>
+      {todo.length > 0 ? (
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0, display: "grid", gap: 12, alignContent: "start" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Da fare oggi</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>{todo.reduce((a, t) => a + t.n, 0) ? "tocca una scheda per aprirla" : "tutto a posto"}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+            {todo.map((t, i) => (
+              <Link key={t.key} href={t.href} className={t.n ? "vt-hot" : "vt-hot vt-glass"} data-lvl={t.n ? t.lvl : undefined} style={{ "--vt-i": 3 + i }}>
+                <span style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>{t.n}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 500, color: CP.textPrimary }}>{t.n ? t.label : t.zero}</span>
+                {t.n > 0 && t.detail && <span style={{ fontSize: 12, color: CP.textSecondary, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{t.detail}</span>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : shares.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 2, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Chi porta il venduto</div>
+          <Donut items={shares} center={usd(cur.sales)} centerSub={`a ${curName}`} />
+        </section>
+      )}
+    </div>
   );
 }
