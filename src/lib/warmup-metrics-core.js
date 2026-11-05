@@ -1,8 +1,11 @@
 // Warm-up — numeri PUBBLICI dei profili letti in automatico (fase 1, 22/10/2026). Logica pura.
 //
 // Fonte: Apify, solo quello che vede chiunque apra il profilo (nessun accesso agli account):
-//   Instagram  apify/instagram-profile-scraper   follower, post totali, ultimi ~12 post con
-//                                                 visualizzazioni dei reel, like, commenti
+//   Instagram  apify/instagram-profile-scraper   follower, post totali, ultimi ~12 post (like,
+//                                                 commenti; dal 3/11/2026 NON porta più le view)
+//              apify/instagram-reel-scraper      TUTTI i reel degli ultimi REEL_DAYS giorni con le
+//                                                 visualizzazioni aggiornate (5/11/2026, come fa
+//                                                 CreatorsPro: un reel si segue finché cresce)
 //   X          danek/twitter-profile-ppr          follower, post totali, Premium, sito in bio
 //              apidojo/twitter-profile-scraper    ultimi 40 post con visualizzazioni e interazioni
 // Restano a mano i numeri privati (visite al profilo, tocchi sul link): li dà solo l'app.
@@ -11,14 +14,20 @@
 // post) e i post visti con l'ultimo conteggio. Da qui si ricava la settimana:
 //   follower a fine settimana e differenza con la settimana prima;
 //   reel/post PUBBLICATI nella settimana e le loro visualizzazioni (all'ultima lettura).
-// Le visualizzazioni di un reel crescono nei giorni dopo: il numero di una settimana si
-// assesta qualche giorno dopo la sua fine. Lo si dice a schermo.
+// Le visualizzazioni di un reel crescono nei giorni dopo: ogni notte si rilegge ogni reel degli
+// ultimi REEL_DAYS giorni, quindi il numero di una settimana cresce finché i suoi reel crescono.
+// Prima (fino al 5/11) un reel si leggeva solo finché era tra gli ultimi 12 post: con 4-5 post al
+// giorno il suo numero si fermava dopo 1-2 giorni (settimana 26/10 di @about.julii_: 27.831
+// letti contro 69.172 veri). Un reel vecchio che riparte lo segnala `wakeups`.
 import { weekKey } from "@/lib/warmup-plan";
 import { normalizeLinkUrl } from "@/lib/s4s-core";
 
 export const METRICS_VERSION = "wu-pub-1";
 export const KEEP_POST_DAYS = 120;
 export const KEEP_DAY_ROWS = 200;
+export const REEL_DAYS = 45;      // finestra dei reel riletti ogni notte
+export const REEL_LIMIT = 150;    // tetto di reel per profilo a giro
+export const VIEW_HIST = 8;       // letture tenute per reel (giorno, visualizzazioni)
 
 /** Giorno di Roma (YYYY-MM-DD) di un istante. */
 export function romeDay(ts) {
@@ -82,6 +91,32 @@ export function parseX(profile, tweets = [], at = Date.now()) {
   };
 }
 
+/** Righe di apify/instagram-reel-scraper (tutti i profili insieme) → reel per nome utente. */
+export function parseReels(rows) {
+  const out = new Map();
+  for (const r of rows || []) {
+    if (!r || r.error || !r.shortCode || !r.timestamp) continue;
+    const ts = Date.parse(r.timestamp);
+    if (isNaN(ts)) continue;
+    const h = String(r.ownerUsername || r.inputUrl?.split("/").filter(Boolean).pop() || "").toLowerCase();
+    if (!h) continue;
+    if (!out.has(h)) out.set(h, []);
+    out.get(h).push({ id: String(r.shortCode), ts, kind: "reel", views: num(r.videoPlayCount ?? r.videoViewCount), likes: num(r.likesCount), comments: num(r.commentsCount), pinned: Boolean(r.isPinned) });
+  }
+  return out;
+}
+
+/** Unisce ai post della lettura del profilo i reel letti a parte: per i reel vince il lettore dei reel. */
+export function withReels(reading, reels) {
+  if (!reading || reading.notFound || reading.error || !reels?.length) return reading;
+  const by = new Map((reading.items || []).map((p) => [p.id, p]));
+  for (const r of reels) {
+    const p = by.get(r.id);
+    by.set(r.id, p ? { ...p, ...r, views: r.views ?? p.views, likes: r.likes ?? p.likes, comments: r.comments ?? p.comments } : r);
+  }
+  return { ...reading, items: [...by.values()], reels: reels.length };
+}
+
 /** Aggiunge una lettura allo storico del profilo (riga del giorno + post visti), potando il vecchio. */
 export function mergeReading(store, reading) {
   const s = store && store.v === METRICS_VERSION ? { ...store, days: { ...store.days }, posts: { ...store.posts } } : { v: METRICS_VERSION, days: {}, posts: {} };
@@ -97,7 +132,11 @@ export function mergeReading(store, reading) {
     // Serve a confrontare reel di età uguale (un reel di 10 giorni ha sempre più view di uno di ieri).
     const age = reading.at - p.ts;
     const early = prev.early ?? (p.views != null && age >= 18 * 3600000 && age <= 48 * 3600000 ? p.views : undefined);
-    s.posts[p.id] = { ...prev, ...p, ...(early != null ? { early } : {}), firstAt: prev.firstAt || reading.at, lastAt: reading.at };
+    // un numero già letto non si cancella con un vuoto (il 3/11 il lettore ha smesso di darle)
+    const views = p.views ?? prev.views ?? null;
+    const seed = prev.vh || (prev.views != null && prev.lastAt ? [[prev.lastAt, prev.views]] : []);
+    const vh = views != null && views !== prev.views ? [...seed, [reading.at, views]].slice(-VIEW_HIST) : prev.vh;
+    s.posts[p.id] = { ...prev, ...p, views, likes: p.likes ?? prev.likes ?? null, comments: p.comments ?? prev.comments ?? null, ...(vh ? { vh } : {}), ...(early != null ? { early } : {}), firstAt: prev.firstAt || reading.at, lastAt: reading.at };
   }
   const oldPost = reading.at - KEEP_POST_DAYS * 86400000;
   for (const [k, p] of Object.entries(s.posts)) if (p.ts < oldPost) delete s.posts[k];
@@ -277,6 +316,37 @@ export function reachCheck(store, platform, now = Date.now()) {
   return out;
 }
 
+/**
+ * Reel che RIPARTONO (5/11/2026): un reel di almeno WAKE.minAgeDays giorni che nell'ultimo tratto
+ * letto ha preso, al giorno, almeno quanto fa un reel tipico del profilo in tutta la sua vita
+ * (mediana dei reel degli ultimi 30 giorni, minimo WAKE.minGain). Esempio vero: @about.julii_,
+ * reel del 18/10 a 38k il 29/10 e a 73k il 5/11 = ~5k al giorno contro una mediana di ~2k.
+ * Si guarda solo l'ultimo tratto (le due letture più recenti, max WAKE.maxGapDays di distanza):
+ * è un avviso di adesso, non uno storico.
+ */
+export const WAKE = { minAgeDays: 4, minGain: 1000, maxGapDays: 3, medianDays: 30, top: 5 };
+export function wakeups(store, now = Date.now()) {
+  const D = 86400000;
+  const reels = Object.values(store?.posts || {}).filter((p) => p.kind === "reel" && p.views != null);
+  const base = reels.filter((p) => now - p.ts <= WAKE.medianDays * D).map((p) => p.views);
+  if (base.length < 5) return { median: null, list: [] };
+  const typical = median(base);
+  const bar = Math.max(WAKE.minGain, typical);
+  const list = [];
+  for (const p of reels) {
+    const ageDays = (now - p.ts) / D;
+    const h = p.vh || [];
+    if (ageDays < WAKE.minAgeDays || h.length < 2) continue;
+    const [a, b] = [h[h.length - 2], h[h.length - 1]];
+    const gap = (b[0] - a[0]) / D;
+    if (gap <= 0 || gap > WAKE.maxGapDays || now - b[0] > 2 * D) continue;
+    const perDay = Math.round((b[1] - a[1]) / gap);
+    if (perDay >= bar) list.push({ id: p.id, ts: p.ts, ageDays: Math.floor(ageDays), views: p.views, perDay, url: `https://www.instagram.com/p/${p.id}/` });
+  }
+  list.sort((x, y) => y.perDay - x.perDay);
+  return { median: typical, bar, list: list.slice(0, WAKE.top) };
+}
+
 /** I numeri automatici con cui precompilare la scheda «Dati della settimana» (solo campi vuoti). */
 export function prefillFor(platform, w) {
   const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null));
@@ -285,7 +355,9 @@ export function prefillFor(platform, w) {
 }
 function prefillRaw(platform, w) {
   if (platform === "x") return { followers: w.followersDelta, views: w.avgViews, eng: w.engagementPct, clicks: w.linkClicks, subs: w.linkSubs, spent: w.linkRevenue };
-  return { followers: w.followers, views: w.views };
+  // le «Visualizzazioni» del modulo sono quelle dell'app (tutto l'account, anche reel vecchi e storie):
+  // non si precompilano con la somma dei reel della settimana, che è un altro numero (5/11/2026)
+  return { followers: w.followers };
 }
 
 /** Avvisi per «Da non dimenticare» dalla lettura pubblica più recente. */
@@ -301,12 +373,21 @@ export function publicAlerts(a, pub, now = Date.now()) {
     const cosa = a.platform === "x" ? "post" : "reel";
     out.push({ lev: "warn", t: `Visualizzazioni crollate su ${a.username}`, d: `I ${cosa} di questi giorni fanno ${r.recentMedian} visualizzazioni a un giorno, contro le ${r.baseMedian} di prima (${Math.round(r.ratio * 100)}%). Con lo Stato dell'account verde è il segno tipico dello shadowban: controllalo dal telefono e, se confermato, apri la segnalazione.` });
   }
+  const w = pub.wakes?.list?.[0];
+  if (w && a.platform !== "x") {
+    const altri = pub.wakes.list.length - 1;
+    out.push({ lev: "ok", t: `Un reel di ${w.ageDays} giorni fa è ripartito su ${a.username}`, d: `Sta facendo ${w.perDay.toLocaleString("it-IT")} visualizzazioni al giorno (un reel tipico del profilo ne fa ${pub.wakes.median.toLocaleString("it-IT")} in tutto) ed è a ${w.views.toLocaleString("it-IT")}.${altri > 0 ? ` Altri ${altri} reel vecchi stanno ripartendo.` : ""} Guarda cosa ha di diverso e rifanne una versione: lo trovi in Dati.` });
+  }
   if (a.platform === "x" && !last.notFound && last.premium === false) out.push({ lev: "warn", t: `Premium non attivo su ${a.username}`, d: "Letto dal profilo pubblico: senza Premium un post fa in media meno di 100 visualizzazioni." });
   return out;
 }
 
 /** Costo stimato di un giro (per il tetto sul run). */
-export const PRICE = { ig: 0.003, xProfile: 0.0003, xPosts: 0.017 };
+export const PRICE = { ig: 0.003, igReel: 0.0014, xProfile: 0.0003, xPosts: 0.017 };
 export function runBudget(nIg, nX) {
   return Math.ceil((nIg * PRICE.ig + nX * (PRICE.xProfile + PRICE.xPosts)) * 1.5 * 100 + 5) / 100;
+}
+/** Tetto del giro dei reel: al massimo REEL_LIMIT reel per profilo. */
+export function reelBudget(nIg) {
+  return Math.ceil(nIg * REEL_LIMIT * PRICE.igReel * 1.2 * 100 + 5) / 100;
 }

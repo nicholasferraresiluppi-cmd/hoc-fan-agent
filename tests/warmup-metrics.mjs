@@ -70,7 +70,7 @@ t("storico e settimana: follower, post della settimana, visualizzazioni", () => 
   assert.equal(w[wk].published, 5); // a + 4 di igRow
   assert.equal(w[wk].reels, 4);
   assert.equal(w[wk].views, 40 + 120 + 74 + 62); // l'ultima lettura di un reel vince (78 → 120)
-  assert.equal(M.prefillFor("ig", w[wk]).views, 296);
+  assert.equal(M.prefillFor("ig", w[wk]).views, undefined); // le view del modulo sono quelle dell'app, non si precompilano
   assert.equal(M.prefillFor("ig", w[wk]).followers, 2);
 });
 
@@ -153,6 +153,66 @@ t("tracking link OnlyFans: quale si usa, righe del magazzino, settimana", () => 
   assert.deepEqual(M.prefillFor("x", wk[w2]), { clicks: 11, subs: 3, spent: 40 });
   const miss = M.mergeLinkRows(null, "onlyfans.com/nessuno/c1", rows, "profilo");
   assert.equal(miss.link.missing, true);
+});
+
+// 5/11/2026: il lettore dei profili non dà più le view; quello dei reel sì (forma vera, @about.julii_)
+t("Reel: lettore dei reel unito al profilo, vince sulle view", () => {
+  const rows = [
+    { shortCode: "De-fY51sdfC", ownerUsername: "about.julii_", timestamp: "2026-10-26T23:44:23.000Z", videoPlayCount: 26523, videoViewCount: null, likesCount: 247, commentsCount: 2, productType: "clips", type: "Video" },
+    { shortCode: "DepBta6MnLI", ownerUsername: "about.julii_", timestamp: "2026-10-18T15:42:03.000Z", videoPlayCount: 73421, likesCount: 2173, commentsCount: 5 },
+    { error: "no_items" },
+  ];
+  const by = M.parseReels(rows);
+  assert.equal(by.get("about.julii_").length, 2);
+  assert.equal(by.get("about.julii_")[0].views, 26523);
+  const prof = M.parseInstagram({ username: "about.julii_", followersCount: 65, postsCount: 70, latestPosts: [
+    { shortCode: "De-fY51sdfC", type: "Video", productType: "clips", timestamp: "2026-10-26T23:44:23.000Z", likesCount: 240, commentsCount: 2 },
+    { shortCode: "Car0usel", type: "Sidecar", timestamp: "2026-10-27T09:06:00.000Z", likesCount: 1, commentsCount: 0 },
+  ] }, Date.parse("2026-11-05T03:00:00Z"));
+  assert.equal(prof.items[0].views, null); // il profilo non porta più le view
+  const r = M.withReels(prof, by.get("about.julii_"));
+  assert.equal(r.items.length, 3); // il carosello resta, il reel vecchio fuori dagli ultimi 12 si aggiunge
+  assert.equal(r.items.find((p) => p.id === "De-fY51sdfC").views, 26523);
+  assert.equal(r.items.find((p) => p.id === "De-fY51sdfC").likes, 247);
+  assert.equal(M.withReels(prof, undefined), prof);
+});
+
+t("Reel: un vuoto non cancella un numero già letto", () => {
+  const ts = Date.parse("2026-11-01T00:07:00Z");
+  let s = M.mergeReading(null, { at: ts + 27 * 3600e3, followers: 1, posts: 1, items: [{ id: "r", ts, kind: "reel", views: 1235 }] });
+  s = M.mergeReading(s, { at: ts + 75 * 3600e3, followers: 1, posts: 1, items: [{ id: "r", ts, kind: "reel", views: null, likes: null }] });
+  assert.equal(s.posts.r.views, 1235);
+  assert.equal(s.posts.r.early, 1235);
+});
+
+t("Reel che riparte: segnalato, quello che cresce piano no", () => {
+  const D = 86400e3, now = Date.parse("2026-11-05T04:00:00Z");
+  let s = null;
+  const reels = (day, extra) => {
+    const items = Array.from({ length: 8 }, (_, i) => ({ id: "n" + i, ts: now - (2 + i) * D, kind: "reel", views: 2000 + i * 10 }));
+    return [...items, { id: "viral", ts: now - 18 * D, kind: "reel", views: extra.viral }, { id: "slow", ts: now - 10 * D, kind: "reel", views: extra.slow }];
+  };
+  s = M.mergeReading(s, { at: now - D, followers: 60, posts: 70, items: reels(1, { viral: 68000, slow: 1500 }) });
+  assert.equal(M.wakeups(s, now).list.length, 0); // una lettura sola: niente tratto da misurare
+  s = M.mergeReading(s, { at: now, followers: 65, posts: 70, items: reels(2, { viral: 73421, slow: 1900 }) });
+  const w = M.wakeups(s, now);
+  assert.equal(w.median, 2035);
+  assert.equal(w.list.length, 1);
+  assert.equal(w.list[0].id, "viral");
+  assert.equal(w.list[0].perDay, 5421);
+  assert.equal(w.list[0].ageDays, 18);
+  const al = M.publicAlerts({ platform: "ig", username: "@about.julii_" }, { last: s.last, lastAt: now, wakes: w }, now);
+  assert.equal(al.length, 1);
+  assert.equal(al[0].lev, "ok");
+  assert.match(al[0].t, /18 giorni fa è ripartito/);
+  // il reel appena uscito che cresce tanto NON è un risveglio (è giovane)
+  let y = M.mergeReading(null, { at: now - D, followers: 1, posts: 1, items: [...reels(1, { viral: 0, slow: 0 }).slice(0, 8), { id: "nuovo", ts: now - 2 * D, kind: "reel", views: 100 }] });
+  y = M.mergeReading(y, { at: now, followers: 1, posts: 1, items: [...reels(2, { viral: 0, slow: 0 }).slice(0, 8), { id: "nuovo", ts: now - 2 * D, kind: "reel", views: 9000 }] });
+  assert.equal(M.wakeups(y, now).list.length, 0);
+});
+
+t("Reel: tetto del giro dei reel", () => {
+  assert.equal(M.reelBudget(2), Math.ceil(2 * 150 * 0.0014 * 1.2 * 100 + 5) / 100);
 });
 
 console.log(`warmup-metrics: ${n} gruppi di asserzioni ok`);
