@@ -55,7 +55,9 @@ t("giorno passato: si legge a fine giornata, le vendite dopo non contano", () =>
   const c = b.creators[0];
   assert.equal(b.live, false); assert.equal(b.closedDays, 10); assert.equal(b.daysLeft, 21);
   near(c.mtd, 20000); near(c.day, 2000); near(c.projection, 62000);
-  assert.equal(b.days[9].selected, true); assert.equal(b.days[10].total, null); assert.equal(b.days[9].partial, false);
+  assert.equal(b.days[9].selected, true); assert.equal(b.days[9].partial, false);
+  // l'andamento non si ferma al giorno scelto: mostra il mese fino a oggi
+  near(b.days[10].total, 9999); assert.equal(b.days[15].partial, true); assert.equal(b.days[16].total, null);
 });
 
 t("mese passato: si legge il mese chiuso, l'ultimo giorno vale per intero", () => {

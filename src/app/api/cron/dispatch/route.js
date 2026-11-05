@@ -20,8 +20,11 @@
  *   - sempre:            run alert operativi (watchdog catena incluso)
  *   - sempre:            copia di sicurezza del warehouse (warehouse-backup)
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
- *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo)
+ *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo;
+ *                        scouting-webcheck: OnlyFans cercato su Google, catena propria)
  *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
+ *   - sempre:            Warm-up: numeri pubblici dei profili IG e X (warmup-metrics, una volta al giorno)
+ *   - sempre:            Trend modelle: reel esplosi dal warehouse + descrizione AI (trend-modelle)
  *   - lunedì:            + digest email (dopo il run: legge i suoi findings)
  *   - giorno 1 del mese: snapshot leghe (chiusura stagione)
  *   - sempre, in fondo:  Centro HR: riconciliazione con ClickUp (solo con HR_CLICKUP_LIST_ID)
@@ -93,6 +96,8 @@ export async function POST(request) {
   // coaching vendite (split / operatori / test): gira nella SUA route (budget
   // proprio), ricalcola solo se la cache ha più di 20h
   out.sales_coaching = await kickEndpoint(request, "/api/cron/sales-coaching");
+  // la scaletta (funnel del sexting per pagina): route propria, ricalcolo SETTIMANALE (> 6 giorni)
+  out.scaletta = await kickEndpoint(request, "/api/cron/scaletta");
 
   // sales manager AI: la notte degli uffici sui turni di ieri (catena propria,
   // aspetta i batch AI; tetto di spesa giornaliero in KV smai:config)
@@ -110,12 +115,19 @@ export async function POST(request) {
   // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
   // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
+  // Warm-up (22/10/2026): numeri pubblici dei profili IG e X letti con Apify, una volta al giorno
+  out.warmup_metrics = await kickEndpoint(request, "/api/cron/warmup-metrics");
+  // Trend modelle (03/11/2026): reel esplosi dal warehouse (trendfinder + i nostri) e descrizione AI
+  out.trend_modelle = await kickEndpoint(request, "/api/cron/trend-modelle");
   // rilettura delle prime evidenze del Radar (16/10/2026): si porta avanti da sola, qui la si
   // riaccende se la catena si è interrotta (la route non fa niente se il giro non è in corso)
   out.scouting_hlreread = await kickEndpoint(request, "/api/cron/scouting-hlreread");
   // apertura dei link del Radar che da soli non dicono niente (17/10/2026, caso Elisa Esposito):
   // gratis, si concatena da sola finché ci sono link da aprire
   out.scouting_probe = await kickEndpoint(request, "/api/cron/scouting-probe");
+  // OnlyFans cercato su Google (05/11/2026, caso @soryu_geggy_cosplay): primo giro su tutto il
+  // radar, poi una volta a settimana sugli account nuovi; tetto 15 $ a giro
+  out.scouting_webcheck = await kickEndpoint(request, "/api/cron/scouting-webcheck");
   // canali Telegram delle creator (14/10/2026): iscritti del giorno di ogni canale dal bot HOC
   out.telegram_channels = await kickEndpoint(request, "/api/cron/telegram-channels");
 

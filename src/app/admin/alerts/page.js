@@ -17,7 +17,10 @@ import { useUser } from "@clerk/nextjs";
 import { CheckCircle2, RefreshCw, Loader2, ArrowUpRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtAgo, fmtInt } from "@/lib/format";
-import { PageHead, HeroMetric, Metric, FilterChip, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, FilterChip, FilterBar, SectionTitle, Notice, DataTable, card, BTN_PRIMARY } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
+import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
+import { alertDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -29,7 +32,7 @@ const fetcher = async (url) => {
 };
 
 const btn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: CP.textPrimary, fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, whiteSpace: "nowrap" };
-const btnPrimary = { ...btn, padding: "8px 14px", background: CP.accent, border: `1px solid ${CP.accent}`, color: CP.accentInk, fontWeight: 500 };
+const btnPrimary = BTN_PRIMARY;
 const inp = { padding: "8px 12px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, boxSizing: "border-box" };
 
 function sevColor(a) {
@@ -60,6 +63,7 @@ export default function OpsAlertsPage() {
   const [filter, setFilter] = useState("open");
   const [running, setRunning] = useState(false);
   const [ackBusy, setAckBusy] = useState(null);
+  const inVetro = useInVetro();
 
   const alerts = data?.alerts || [];
   const lastRun = data?.last_run;
@@ -67,9 +71,15 @@ export default function OpsAlertsPage() {
   const critOpen = openAlerts.filter((a) => a.severity === "critical");
   const warnOpen = openAlerts.filter((a) => a.severity !== "critical");
   const unowned = openAlerts.filter((a) => a.status === "open");
+  const critUnowned = critOpen.filter((a) => a.status === "open");
+  const weekAgo = Date.now() - 7 * 86400000;
+  const closedWeek = alerts.filter((a) => a.status === "resolved" && (a.resolvedAt || 0) >= weekAgo);
+  // i tre aperti da più tempo: un problema vecchio è quello che rischia di diventare normale
+  const oldest = [...openAlerts].sort((a, b) => (a.firstSeen || 0) - (b.firstSeen || 0)).slice(0, 3);
 
   const visible = filter === "all" ? alerts
     : filter === "crit" ? alerts.filter((a) => a.severity === "critical" && a.status !== "resolved")
+    : filter === "nobody" ? unowned
     : openAlerts;
 
   async function runNow() {
@@ -78,7 +88,7 @@ export default function OpsAlertsPage() {
       const r = await fetch("/api/admin/ops-alerts/run", { method: "POST" });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
-        alert(d?.error || `Errore run (${r.status})`);
+        alertDialog(d?.error || `Errore run (${r.status})`);
       }
       await mutate();
     } finally {
@@ -96,7 +106,7 @@ export default function OpsAlertsPage() {
       });
       if (!r.ok) {
         const d = await r.json().catch(() => null);
-        alert(d?.error || `Errore (${r.status})`);
+        alertDialog(d?.error || `Errore (${r.status})`);
       }
       await mutate();
     } finally {
@@ -154,7 +164,7 @@ export default function OpsAlertsPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Alert operativi" }]}
         title="Alert operativi"
@@ -176,7 +186,49 @@ export default function OpsAlertsPage() {
       )}
 
       {data && !error && (<>
-        <HeroMetric
+        {inVetro && (
+          <div className="vt-row21" style={{ marginBottom: 18 }}>
+            <Panel i={0} title={openAlerts.length ? `${fmtInt(openAlerts.length)} alert aperti` : "Nessun alert aperto"} aside={`ultimo controllo ${lastRunText}`}>
+              {openAlerts.length > 0 ? (<>
+                <MixBar format={fmtInt} items={[
+                  { label: "Critici da prendere", value: critUnowned.length, color: CP.accentRed },
+                  { label: "Critici in carico", value: critOpen.length - critUnowned.length, color: "var(--vt-c0)" },
+                  { label: "Avvisi da prendere", value: unowned.length - critUnowned.length, color: "var(--vt-c1)" },
+                  { label: "Avvisi in carico", value: warnOpen.length - (unowned.length - critUnowned.length), color: "var(--vt-c2)" },
+                ]} />
+                <div style={{ marginTop: 16, fontSize: 12.5, color: CP.textMuted, marginBottom: 6 }}>Aperti da più tempo</div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {oldest.map((a) => (
+                    <div key={a.fingerprint} style={{ display: "grid", gridTemplateColumns: "8px minmax(0,1fr) auto", gap: 10, alignItems: "center", fontSize: 13 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 999, background: sevColor(a) }} />
+                      {a.cta?.href
+                        ? <Link href={a.cta.href} style={{ color: CP.textPrimary, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</Link>
+                        : <span style={{ color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</span>}
+                      <span style={{ color: CP.textMuted, whiteSpace: "nowrap" }}>{fmtAgo(a.firstSeen)}{a.status === "ack" ? ` · ${a.ackBy || "in carico"}` : ""}</span>
+                    </div>
+                  ))}
+                </div>
+              </>) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 14 }}>
+                  <CheckCircle2 size={18} color={CP.accentGreen} /> I controlli non hanno trovato problemi.
+                </div>
+              )}
+            </Panel>
+            <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
+              <HotTile i={1} lvl={critOpen.length ? "2" : "0"} label="Critici aperti" value={fmtInt(critOpen.length)}
+                sub={critOpen.length ? "bloccano numeri che usate per decidere" : "nessun problema grave"}
+                active={filter === "crit"} onClick={critOpen.length ? () => setFilter("crit") : undefined} />
+              <HotTile i={2} lvl={unowned.length ? "ink" : "0"} label="Senza nessuno che se ne occupa" value={fmtInt(unowned.length)}
+                sub={unowned.length ? "prendili in carico dalla tabella" : "tutti hanno qualcuno"}
+                active={filter === "nobody"} onClick={unowned.length ? () => setFilter("nobody") : undefined} />
+              <HotTile i={3} label="Chiusi da soli in 7 giorni" value={fmtInt(closedWeek.length)}
+                sub="il problema è rientrato e il controllo l'ha visto"
+                active={filter === "all"} onClick={closedWeek.length ? () => setFilter("all") : undefined} />
+            </div>
+          </div>
+        )}
+
+        {!inVetro && <HeroMetric
           label="Critici aperti"
           value={fmtInt(critOpen.length)}
           compare={critOpen.length === 0 ? "Nessun problema grave in questo momento." : "Da guardare per primi: bloccano numeri che usate per decidere."}
@@ -186,19 +238,21 @@ export default function OpsAlertsPage() {
             <Metric label="Avvisi aperti" value={fmtInt(warnOpen.length)} />
             <Metric label="Senza nessuno che se ne occupa" value={fmtInt(unowned.length)} />
           </div>
-        </HeroMetric>
+        </HeroMetric>}
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <FilterBar onReset={filter !== "open" ? () => setFilter("open") : undefined} style={{ margin: "0 0 14px" }}>
           <FilterChip label={`Aperti · ${openAlerts.length}`} active={filter === "open"} onClick={() => setFilter("open")} />
           <FilterChip label={`Solo critici · ${critOpen.length}`} active={filter === "crit"} onClick={() => setFilter("crit")} />
+          <FilterChip label={`Senza nessuno · ${unowned.length}`} active={filter === "nobody"} onClick={() => setFilter("nobody")} />
           <FilterChip label={`Tutti, anche risolti · ${alerts.length}`} active={filter === "all"} onClick={() => setFilter("all")} />
-        </div>
+        </FilterBar>
 
         {visible.length === 0 ? (
           <div style={{ ...card, padding: "24px 20px", display: "flex", alignItems: "center", gap: 10, color: CP.textSecondary, fontSize: 14, marginBottom: 14 }}>
             <CheckCircle2 size={18} color={CP.accentGreen} />
             {filter === "all"
               ? "Nessun alert registrato finora. Premi «Aggiorna ora» per il primo controllo."
+              : filter === "nobody" ? "Ogni alert aperto ha qualcuno che se ne occupa."
               : "Nessun alert aperto: i controlli non hanno trovato problemi."}
           </div>
         ) : (

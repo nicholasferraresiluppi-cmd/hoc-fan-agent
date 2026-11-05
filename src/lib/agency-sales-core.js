@@ -38,11 +38,13 @@ export function shiftSalesByAlias(s) {
  * @param {object} o
  * @param {number|null} o.untilDay  conta solo i turni iniziati nei giorni 1..untilDay del mese (null = tutto)
  * @param {(alias:string)=>boolean} o.allow  filtro creator (perimetro di chi guarda); default tutte
- * @returns {{ sales, shifts, operators, creators, lastDay }}  lastDay = ultimo giorno (1-31) con venduto > 0
+ * @returns {{ sales, shifts, operators, creators, lastDay, byDay, byCreator }}  lastDay = ultimo giorno (1-31) con venduto > 0;
+ *   byDay[i] = venduto dei turni iniziati il giorno i+1 (26/10/2026, per il grafico di Casa); byCreator = alias → venduto, i più alti per primi
  */
 export function agencySales(wages, { periodId, untilDay = null, allow = () => true } = {}) {
   let sales = 0, shifts = 0, lastDay = 0;
   const ops = new Set(), creators = new Set();
+  const byDay = new Array(31).fill(0), byAlias = new Map();
   for (const w of wages || []) {
     for (const s of w?.shifts || []) {
       const day = romeDay(s.started_at);
@@ -54,15 +56,18 @@ export function agencySales(wages, { periodId, untilDay = null, allow = () => tr
         if (!allow(alias)) continue;
         shiftSales += v;
         if (v > 0) creators.add(alias);
+        if (v > 0) byAlias.set(alias, (byAlias.get(alias) || 0) + v);
       }
       if (shiftSales <= 0) continue;
       sales += shiftSales;
       shifts += 1;
       ops.add(w.member_id ?? w.member_name ?? w.id);
       if (dnum != null && dnum > lastDay) lastDay = dnum;
+      if (dnum != null) byDay[dnum - 1] += shiftSales;
     }
   }
-  return { sales: Math.round(sales), shifts, operators: ops.size, creators: creators.size, lastDay };
+  const byCreator = [...byAlias].sort((a, b) => b[1] - a[1]).map(([alias, v]) => ({ alias, sales: Math.round(v) }));
+  return { sales: Math.round(sales), shifts, operators: ops.size, creators: creators.size, lastDay, byDay: byDay.map(Math.round), byCreator };
 }
 
 /**

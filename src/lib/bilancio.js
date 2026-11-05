@@ -42,12 +42,17 @@ async function computeSales(ids, month, today) {
       AND DATE(created_at) <= DATE '${end}'
     GROUP BY 1, 2`, { maxBytesBilled: 5 * 1024 ** 3, timeoutMs: 40_000 });
   const daily = [], prevTotals = {};
+  // mese prima anche giorno per giorno (26/10/2026, grafico dello stile vetro): righe già lette, niente query in più
+  const prevDaily = new Array(31).fill(0);
   for (const r of rows) {
     const id = Number(r.creator_id), net = Number(r.net) || 0;
     if (r.date.startsWith(month)) daily.push({ creator_id: id, date: r.date, net });
-    else if (r.date.startsWith(prevMonth)) prevTotals[id] = (prevTotals[id] || 0) + net;
+    else if (r.date.startsWith(prevMonth)) {
+      prevTotals[id] = (prevTotals[id] || 0) + net;
+      prevDaily[Number(r.date.slice(8, 10)) - 1] += net;
+    }
   }
-  return { daily, prevTotals, today, month, bytes: totalBytesProcessed, updated_at: new Date().toISOString() };
+  return { daily, prevTotals, prevDaily: prevDaily.map((v) => Math.round(v)), today, month, bytes: totalBytesProcessed, updated_at: new Date().toISOString() };
 }
 
 async function getSales(ids, month, { force = false } = {}) {
@@ -129,5 +134,6 @@ export async function getBilancio({ date, force = false } = {}) {
     creators, daily: sales.daily, prevTotals: sales.prevTotals,
     goals: Object.fromEntries(goalsList), people, groups, today, asOf,
   });
-  return { ...out, updated_at: sales.updated_at, refreshing: Boolean(sales.refreshing), groupsDef: groups, allCreators: creators.map((c) => ({ slug: c.slug, name: c.name })) };
+  // prevDaily manca nelle cache scritte prima del 26/10: il grafico allora mostra solo il mese in corso
+  return { ...out, prevDaily: sales.prevDaily || null, updated_at: sales.updated_at, refreshing: Boolean(sales.refreshing), groupsDef: groups, allCreators: creators.map((c) => ({ slug: c.slug, name: c.name })) };
 }

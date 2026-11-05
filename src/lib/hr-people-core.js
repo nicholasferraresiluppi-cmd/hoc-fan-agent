@@ -12,7 +12,7 @@
  */
 import { normalizeSkillMap, normalizeLearnList, normalizePastRoles, skillName, pastRoleText } from "./hr-skills.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, findChoice, SOURCE_REFERRAL, isLangNo, canonicalSource } from "./hr-fields.js";
+import { FIELDS, FIELD_BY_KEY, EDITABLE_KEYS, validateCodiceFiscale, validatePartitaIva, findChoice, SOURCE_REFERRAL, isLangNo, canonicalSource } from "./hr-fields.js";
 
 // Schema e codice fiscale vivono in hr-fields.js (senza dipendenze Node: li
 // importano anche le pagine client). Qui si riesportano per comodità.
@@ -158,6 +158,12 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
     switch (f.type) {
       case "text": case "longtext": {
         const v = s(raw).slice(0, f.max || (f.type === "longtext" ? 4000 : 300));
+        if (v && f.validate === "piva") {
+          const r = validatePartitaIva(v);
+          if (!r.ok) { errors.push(`${f.label}: ${r.error}`); break; }
+          values[key] = r.value;
+          break;
+        }
         values[key] = v || null;
         break;
       }
@@ -272,6 +278,8 @@ export function normalizePersonInput(input = {}, allowed = EDITABLE_KEYS) {
   // "Segnalato da" ha senso solo per chi è arrivato da una reference: se nello stesso
   // invio la provenienza è un'altra, il nome si scarta (resta il dato coerente).
   if ("source" in values && values.source !== SOURCE_REFERRAL && "referredBy" in values) values.referredBy = null;
+  // Il numero di partita IVA ha senso solo per chi ha risposto «sì»: con «no» nello stesso invio si scarta.
+  if (values.partitaIva === false) values.partitaIvaNumero = null;
   return { values, cf, errors };
 }
 

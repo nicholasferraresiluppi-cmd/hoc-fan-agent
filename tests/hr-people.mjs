@@ -10,7 +10,7 @@ import {
   valueHash, dropUnchangedSinceBase, matchPendingAssignment,
 } from "../src/lib/hr-people-core.js";
 import {
-  decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup,
+  decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup, clickupDrift,
   createTaskPayload, statusForCollaboration, parseHocBlock, withHocBlock, stripHocBlock, HOC_BLOCK_START,
   encodeFieldValue, incomingTimestamps,
 } from "../src/lib/hr-clickup-map.js";
@@ -173,6 +173,16 @@ const meta = task.custom_fields.map(({ value, ...f }) => f);
   const meta2 = [...meta, { id: "f-cf", name: "Codice fiscale", type: "short_text" }];
   const plan2 = personToClickup(person, meta2, { cfPlain: "RSSMRA85T10A562S" });
   eq(plan2.fieldOps.find((o) => o.key === "codiceFiscale").body, { value: "RSSMRA85T10A562S" }, "CF sul campo dedicato");
+  // indirizzo (04/11/2026): campo «Indirizzo» sulla lista → testo lì, niente riga nel blocco
+  const meta3 = [...meta, { id: "f-ind", name: "Indirizzo", type: "short_text" }];
+  const planInd = personToClickup(person, meta3, {});
+  eq(planInd.fieldOps.find((o) => o.key === "location").body, { value: "Roma" }, "indirizzo come testo nel campo «Indirizzo»");
+  ok(!planInd.description.includes("Dove vive (testo)"), "con il campo «Indirizzo» niente riga nel blocco");
+  const back = taskToPerson({ id: "t1", name: "Anna Bianchi", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text", value: "Via Garibaldi 5" }] });
+  eq(back.fields.location, { address: "Via Garibaldi 5", lat: null, lng: null }, "indirizzo corretto su ClickUp torna in app");
+  const empty = taskToPerson({ id: "t1", name: "Anna", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text" }] });
+  eq(empty.fields.location, null, "«Indirizzo» vuoto su ClickUp = indirizzo vuoto");
+  eq(clickupDrift(person, { id: "t1", name: "Anna Bianchi", custom_fields: [{ id: "f-ind", name: "Indirizzo", type: "short_text" }] }, meta3).includes("location"), true, "indirizzo mancante su ClickUp = differenza da riparare");
   ok(!plan2.description.includes("Codice fiscale"), "con campo dedicato il CF non va nel blocco");
   const plan3 = personToClickup(person, meta2, { cfPlain: undefined });
   ok(plan3.skipped.some((x) => x.key === "codiceFiscale"), "senza chiave il CF non si spinge (e non si cancella)");
@@ -1049,6 +1059,20 @@ console.log(`hr-people: ${n} asserzioni OK`);
   t(recNew.parityChecked >= 1 && recNew.drift.length === 0 && cu.tasks.get(taskId).values["f-prov"] === "o-alt", "parità: il campo nuovo su ClickUp viene riempito dall'app");
   FIELDS_META.pop();
 
+  // 2c) incidente 04/11: campo specchio nuovo («Indirizzo») vuoto su ClickUp con una base
+  //     ereditata dal campo vecchio («Location»): l'app non si svuota e la parità lo riempie
+  await H.savePerson({ id: sara.id, input: { location: "Via Roma 1" }, actor: "admin", source: "app" });
+  const sLoc = await H.getPerson(sara.id);
+  await fake.set(`hr:person:${sara.id}`, { ...sLoc, cuBase: { ...(sLoc.cuBase || {}), location: valueHash(null) }, fieldUpdatedAt: { ...(sLoc.fieldUpdatedAt || {}), location: 1 } });
+  FIELDS_META.push({ id: "f-ind", name: "Indirizzo", type: "short_text" });
+  const recInd = await H.importFromClickup({ mode: "reconcile", by: "test" });
+  t((await H.getPerson(sara.id)).fields.location?.address === "Via Roma 1", "«Indirizzo» nuovo e vuoto con base vecchia: l'indirizzo dell'app resta");
+  t(recInd.drift.length === 0 && cu.tasks.get(taskId).values["f-ind"] === "Via Roma 1", "parità: «Indirizzo» riempito dall'app");
+  editOnClickup(taskId, "Indirizzo", null);
+  await webhook(taskId, ["Indirizzo"]);
+  t((await H.getPerson(sara.id)).fields.location == null, "chi cancella l'indirizzo su ClickUp lo cancella anche in app");
+  FIELDS_META.pop();
+
   // 3) modifica vera su ClickUp → l'app si aggiorna (anche le etichette Skills seguono)
   editOnClickup(taskId, "Luogo di nascita", "milano, mi");
   editOnClickup(taskId, "Competenze e livello", "OnlyFans: Chat e vendita (Esperto)\nSocial organico: Instagram (Autonomo)");
@@ -1554,4 +1578,36 @@ console.log(`totale: ${n} asserzioni`);
   const ours = keepNewerFields({ fields: { idDocument: { title: "nuovo.jpg" } }, fieldUpdatedAt: { idDocument: 300 } }, snap, cur);
   t(ours.fields.idDocument.title === "nuovo.jpg", "se il campo l'abbiamo cambiato noi, vince il nostro");
   n += m; console.log(`scritture concorrenti: ${m} asserzioni OK`);
+}
+
+// ── numero di partita IVA (28/10/2026): chiesto solo a chi risponde «sì» ──
+{
+  const { validatePartitaIva, FORM_KEYS } = await import("../src/lib/hr-fields.js");
+  const { requiredKeysFor, fieldErrors } = await import("../src/lib/hr-form-experience.js");
+  const { personToClickup: toCu } = await import("../src/lib/hr-clickup-map.js");
+  let m = 0; const t = (c, msg) => { assert.ok(c, msg); m++; };
+  t(validatePartitaIva("01114601006").ok, "P.IVA italiana valida");
+  t(validatePartitaIva("IT 0111 4601 006").value === "01114601006", "prefisso IT e spazi tolti");
+  t(!validatePartitaIva("01114601007").ok, "cifra di controllo sbagliata");
+  t(!validatePartitaIva("0111460100").ok, "10 cifre: italiana incompleta");
+  t(!validatePartitaIva("IT123").ok, "IT + poche cifre");
+  t(validatePartitaIva("ESB12345678").foreign, "partita IVA estera");
+  t(validatePartitaIva("123-456-789-000").foreign, "numero fiscale estero con trattini");
+  t(!validatePartitaIva("ciao").ok, "testo a caso");
+  t(FORM_KEYS.includes("partitaIvaNumero"), "nel modulo");
+  t(requiredKeysFor({ partitaIva: true }).includes("partitaIvaNumero"), "obbligatorio con sì");
+  t(!requiredKeysFor({ partitaIva: false }).includes("partitaIvaNumero"), "non richiesto con no");
+  const e = fieldErrors({ partitaIva: true, partitaIvaNumero: "123" }, ["partitaIva", "partitaIvaNumero"]);
+  t(Boolean(e.partitaIvaNumero), "errore sotto il campo");
+  t(!fieldErrors({ partitaIva: true, partitaIvaNumero: "01114601006" }, ["partitaIva", "partitaIvaNumero"]).partitaIvaNumero, "valida: nessun errore");
+  const ok = normalizePersonInput({ partitaIva: true, partitaIvaNumero: "IT01114601006" });
+  t(ok.values.partitaIvaNumero === "01114601006" && !ok.errors.length, "server normalizza");
+  t(normalizePersonInput({ partitaIva: true, partitaIvaNumero: "999" }).errors.length === 1, "server rifiuta");
+  t(normalizePersonInput({ partitaIva: false, partitaIvaNumero: "01114601006" }).values.partitaIvaNumero === null, "con no il numero si scarta");
+  const meta = [{ id: "f-piva", name: "Partita IVA", type: "drop_down", type_config: { options: [{ id: "si", name: "Sì", orderindex: 0 }, { id: "no", name: "No", orderindex: 1 }] } }, { id: "f-num", name: "Numero partita IVA", type: "short_text", type_config: {} }];
+  const cu = toCu({ id: "p_x", fields: { firstName: "A", partitaIva: true, partitaIvaNumero: "01114601006" } }, meta);
+  t(JSON.stringify(cu).includes("01114601006"), "va nel campo ClickUp «Numero partita IVA»");
+  const back = taskToPerson({ name: "A", custom_fields: [{ ...meta[1], value: "01114601006" }] });
+  t(back.fields.partitaIvaNumero === "01114601006", "e torna da ClickUp");
+  n += m; console.log(`numero partita IVA: ${m} asserzioni OK`);
 }

@@ -1,6 +1,7 @@
 // Registra l'apertura di una pagina (chiamata da AppShell a ogni cambio pagina).
 // Solo utenti loggati; nessun contenuto, solo (persona, pagina, giorno).
 import { auth } from "@clerk/nextjs/server";
+import { after } from "next/server";
 import { recordView, recordEvents } from "@/lib/usage";
 
 export async function POST(request) {
@@ -9,7 +10,10 @@ export async function POST(request) {
   let body = null;
   try { body = JSON.parse(await request.text()); } catch {}
   const path = typeof body?.path === "string" ? body.path.slice(0, 300) : null;
-  if (path) await recordView(userId, path).catch(() => {});
-  if (Array.isArray(body?.events)) await recordEvents(body.events).catch(() => {});
+  // si risponde subito: la scrittura avviene dopo la risposta (il browser non aspetta)
+  after(async () => {
+    if (path) await recordView(userId, path).catch(() => {});
+    if (Array.isArray(body?.events)) await recordEvents(body.events).catch(() => {});
+  });
   return new Response(null, { status: 204 });
 }

@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Download, Loader2, FlaskConical } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, Metric, SectionTitle, FilterChip, DataTable, Notice, card, NUM } from "@/components/ds";
+import { PageHead, Metric, SectionTitle, FilterChip, DataTable, Notice, card, NUM, BTN_PRIMARY_OFF } from "@/components/ds";
 import { fmt$, fmtPct, fmtPts, fmtInt } from "@/lib/format";
 import CompNav from "@/components/CompNav";
 
@@ -95,7 +95,7 @@ export default function ShiftResearchPage() {
   const pb = data?.phase_b;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Comp & Ben" }, { label: "Shift Research" }]}
         title="Shift Research: turni e profili di pagamento"
@@ -229,12 +229,4 @@ export default function ShiftResearchPage() {
 
 const lbl = { display: "flex", flexDirection: "column", gap: 5, fontSize: 12, color: CP.textMuted };
 const input = { width: "100%", padding: "10px 14px", background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 13, fontFamily: FONTS.body, outline: "none", boxSizing: "border-box" };
-const primaryBtn = (disabled) => ({
-  display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "10px 18px",
-  background: disabled ? CP.surfaceAlt : CP.accent,
-  color: disabled ? CP.textMuted : CP.accentInk,
-  border: "none", borderRadius: 8,
-  fontSize: 13, fontWeight: 500, fontFamily: FONTS.body,
-  cursor: disabled ? "not-allowed" : "pointer",
-});
+const primaryBtn = BTN_PRIMARY_OFF;

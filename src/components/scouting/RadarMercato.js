@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { marketByGroup, agencies } from "@/lib/scouting-core";
 import { NICHE_INDEX, REEL_RULES, REEL_TYPES, COMPETITOR, MARKET_ASOF, CAPTION_STUDY } from "@/lib/scouting-market";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
 import { SERIF, NUM, fmtFull, H2, igProfile, useIsPhone } from "./radar-ui";
 
 const W = 720, H = 360, X0 = 40, X1 = 700, Y0 = 20, Y1 = 330;
@@ -22,6 +23,18 @@ export default function RadarMercato({ creators }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 52 }}>
+      <HeroHead
+        eyebrow="Radar creator · mercato"
+        title="Il mercato di"
+        accent={`${fmtFull(total)} creator`}
+        sub="Dove c'è spazio, le regole dei reel, i tipi di reel che esplodono e chi lo fa già."
+        numbers={<>
+          <HeroNum label="Nicchie" value={groups.length} />
+          <HeroNum label="Con profilo a pagamento" value={groups.reduce((s, g) => s + g.paid, 0)} strong />
+          <HeroNum label="Agenzie viste" value={ags.length} />
+        </>}
+        style={{ marginBottom: -28 }}
+      />
       <section aria-labelledby="rm-spazio" style={{ display: "flex", flexWrap: "wrap", gap: "32px 52px", alignItems: "flex-start" }}>
         <div style={{ flex: "999 1 560px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           <H2 id="rm-spazio" sub={phone ? "Dalla nicchia che rende di più a parità di follower. Sopra ×1 = sopra la media del mercato." : "Più a sinistra: meno concorrenti. Più in alto: più view a parità di follower. Il cerchio è grande quante OnlyFanser ha la nicchia."}>Dove c&apos;è spazio</H2>

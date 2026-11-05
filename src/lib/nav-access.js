@@ -20,13 +20,13 @@ export const NAV_ACCESS = {
   "/me/turno": any("copilot.pilot"),
   // 27/09/2026: pagine di squadra aperte a chi guida una squadra (scope team), dati filtrati per creator assegnate
   "/leaderboard/sales-cp": team("scores.view"), "/leaderboard/creators": team("scores.view"), "/leaderboard/creators/heatmap": allC("scores.view"),
-  "/admin/conversation-intelligence": team("scores.view"), "/admin/shift-quality": allC("scores.view"), "/admin/sales-coaching": allC("scores.view"), "/admin/s4s": team("scores.view"), "/admin/telegram": team("scores.view"), "/admin/sales-ai": allC("scores.view"), "/admin/manuale-vendite": allC("scores.view"), "/admin/prova-fedelta": team("scores.view"), "/me/allenatore": any("copilot.pilot"),
+  "/admin/conversation-intelligence": team("scores.view"), "/admin/shift-quality": allC("scores.view"), "/admin/sales-coaching": allC("scores.view"), "/admin/scaletta": team("scores.view"), "/admin/s4s": team("scores.view"), "/admin/rete-amici": allC("scores.view"), "/admin/telegram": team("scores.view"), "/admin/sales-ai": allC("scores.view"), "/admin/manuale-vendite": allC("scores.view"), "/admin/prova-fedelta": team("scores.view"), "/me/allenatore": any("copilot.pilot"),
   "/admin/payout-tree": allC("scores.view"), "/admin/bilancio": team("scores.view"), "/admin/le-mie-creator": team("scores.view"), "/admin/revenue-pacing": team("scores.view"), "/admin/chat-monitor": team("scores.view"), "/admin/qa-reviews": allC("scores.view"), "/admin/loop": allC("scores.view"),
   "/admin/priority-queue": allC("scores.view"), "/admin/disputes": allC("scores.view"),
   "/admin/pnl-live": SEED, "/admin/retention": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
-  "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/transfer": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/sede": SEED, "/admin/qualita": SEED, "/admin/hr/contratti": any("people.manage"), "/admin/citta/ufficio": SEED, "/admin/citta/persone": SEED, "/admin/ads": SEED, "/admin/scouting": any("scouting.use"), "/admin/supervisor": any("social.manage"), "/admin/studio-social": any("social.manage"), "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
-  "/admin/infloww-ingest": SEED, "/admin/creator-split": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/hr": any("people.manage"), "/admin/hr/sync": any("people.manage"), "/admin/action-center": team("scores.view"), "/admin/settimana": team("scores.view"),
+  "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/transfer": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/sede": SEED, "/admin/qualita": SEED, "/admin/hr/contratti": any("people.manage"), "/admin/citta/ufficio": SEED, "/admin/citta/persone": SEED, "/admin/ads": SEED, "/admin/scouting": any("scouting.use"), "/admin/supervisor": any("social.manage"), "/admin/warmup": any("social.manage"), "/admin/piani": any("social.manage"), "/admin/editoriale": any("social.manage"), "/admin/studio-social": any("social.manage"), "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
+  "/admin/infloww-ingest": SEED, "/admin/creator-split": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/hr": any("people.manage"), "/admin/hr/sync": any("people.manage"), "/admin/referral": any("referral.manage"), "/admin/publisher-x": any("people.manage"), "/admin/action-center": team("scores.view"), "/admin/settimana": team("scores.view"),
   "/admin/coaching-center": team("scores.view"), "/admin/employee-profiles": SEED, "/admin/creatorspro-sync": SEED, "/admin/wage-audit": SEED,
   "/admin/creatorspro-sync-history": SEED, "/admin/infloww-agency": SEED, "/admin/infloww-revenue": SEED, "/admin/infloww-reconcile": SEED,
   "/admin/debug-mapping": SEED, "/admin/user-mapping": SEED, "/admin/leaderboard-exclusions": SEED, "/admin/group-languages": SEED,
@@ -40,10 +40,14 @@ export const NAV_ACCESS = {
   "/admin/utilizzo": { type: "admin" },
   // Contabilità (15/10/2026): accesso a parte, NON passa dall'admin (lib/compensi-access)
   "/contabilita": { type: "accounting" },
+  // Creator AI (01/11/2026): solo il titolare, più stretto della Contabilità (lib/creator-ai-access)
+  "/admin/creator-ai": { type: "owner" },
+  // Presenze Discord (03/11/2026): titolare + persone in env HOC_PRESENZE_VIEWER_IDS (lib/presenze-access)
+  "/admin/presenze-discord": { type: "presenze" },
   // report Looker aziendale: serve un account Google HOC con accesso al report (non gli operatori)
   "/admin/reports": all("scores.view"),
   // Analisi vendite, HOC Analytics, Fan da recuperare: authorizeScoped(ANALYTICS_VIEW) + creator assegnate
-  "/admin/analisi-vendite": team("analytics.view"), "/admin/looker": team("analytics.view"), "/admin/fan-da-recuperare": team("analytics.view"),
+  "/admin/analisi-vendite": team("analytics.view"), "/admin/benvenuto": team("analytics.view"), "/admin/looker": team("analytics.view"), "/admin/fan-da-recuperare": team("analytics.view"),
 };
 
 /** La voce `href` funziona per chi ha queste capability? */
@@ -51,6 +55,8 @@ export function canSee(href, caps, isAdmin) {
   const req = NAV_ACCESS[href];
   if (!req || req.type === "any") return true;
   if (req.type === "accounting") return Boolean(caps?.["accounting.private"]); // prima dell'admin: l'admin qui non basta
+  if (req.type === "owner") return Boolean(caps?.["owner.private"]);
+  if (req.type === "presenze") return Boolean(caps?.["presenze.private"]);
   if (isAdmin) return true;
   if (req.type === "admin") return false;
   const scope = caps?.[req.cap];
@@ -61,4 +67,4 @@ export function canSee(href, caps, isAdmin) {
 }
 
 /** Voci da NON mostrare nemmeno mentre i permessi si caricano (contabilità): finché non si sa chi sei, non ci sono. */
-export const isPrivateHref = (href) => NAV_ACCESS[href]?.type === "accounting";
+export const isPrivateHref = (href) => ["accounting", "owner", "presenze"].includes(NAV_ACCESS[href]?.type);

@@ -15,6 +15,7 @@ import { ScanLine, Send, RefreshCw, Save, ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Notice, card } from "@/components/ds";
 import { lbl, input, btnPrimary, btnGhost, fetcher, postJson, fmtDate, fmtDateTime } from "@/components/hr-ui";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const Step = ({ n, title, done, children, aside }) => (
   <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
@@ -75,7 +76,7 @@ export default function ContractFunnelPage() {
   const readId = () => run("read", () => postJson(`/api/admin/hr/people/${id}/contract`, { action: "read-id" }), (j) => `Documento letto (${(j?.readFiles || []).map((f) => f.title).join(", ")}). Controlla i dati qui sotto.`);
   const saveId = () => run("saveid", () => postJson(`/api/admin/hr/people/${id}/contract`, { action: "save-id", idDoc: doc }), "Dati del documento salvati.");
   const send = async () => {
-    if (!confirm(`Invio il contratto in firma a ${terms?.email}${testMode ? " come PROVA (non vincolante)" : ""}?`)) return;
+    if (!(await confirmDialog(`Invio il contratto in firma a ${terms?.email}${testMode ? " come PROVA (non vincolante)" : ""}?`))) return;
     await run("send", () => postJson(`/api/admin/hr/people/${id}/contract`, { action: "send", confirmMismatch, testMode }), (j) => j.testMode
       ? `Inviato come PROVA${j.forcedTest ? " (il piano Dropbox Sign non ha invii API reali disponibili)" : ""}: arriva con la filigrana e non vale come contratto.`
       : "Contratto inviato in firma. Stato del contratto: «Firma richiesta». Quando firma, il CRM se ne accorge da solo.");

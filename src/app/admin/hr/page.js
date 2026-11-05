@@ -17,12 +17,14 @@
  * Vista "Archiviate" = rete di sicurezza per i task cancellati su ClickUp: fuori
  * da elenco, doppioni e numeri; si ripristinano, non si cancellano mai.
  */
+import { prefetchData } from "@/lib/nav-prefetch";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Plus, Link2, RefreshCw, Power, SlidersHorizontal, FileSignature } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
+import { confirmDialog } from "@/components/AppDialogs";
 import { PageHead, Notice, DataTable, card } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
 import { PHASE_LABELS, PHASE_EXITED, CONTRACT_LABELS } from "@/lib/hr-fields";
@@ -31,6 +33,8 @@ import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, 
 import { RestoreButton } from "@/components/hr-archive";
 import { ContractPill } from "@/components/hr-contracts-ui";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
+import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
+import { Donut } from "@/components/VetroCharts";
 
 const NONE = "__none__";
 
@@ -66,6 +70,7 @@ export default function HrPeoplePage() {
   const [newOpen, setNewOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [archNotice, setArchNotice] = useState(null);
+  const [vetro, setVetro] = useVetro();
   // ?vista=archiviate (link diretto alla vista)
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vista") === "archiviate") setTab("archiviate");
@@ -200,13 +205,15 @@ export default function HrPeoplePage() {
   );
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1240, margin: "0 auto", fontFamily: FONTS.body }}>
+    <VetroScope on={vetro}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "People" }, { label: "Persone" }]}
         title="Persone"
         subtitle="Chi lavora con noi. Si aggiorna da sola con ClickUp."
         actions={!error && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <VetroSwitch on={vetro} set={setVetro} />
             <Link href="/admin/hr/contratti" style={btnGhost}><FileSignature size={15} /> Contratti</Link>
             <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={15} /> Link del modulo</button>
             <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>
@@ -244,6 +251,8 @@ export default function HrPeoplePage() {
           <p style={{ margin: 0, fontSize: 14, color: CP.textSecondary, lineHeight: 1.6 }}>Manda il <button type="button" onClick={() => setLinkOpen(true)} style={{ background: "none", border: 0, padding: 0, color: CP.accentSoftText, cursor: "pointer", fontSize: 14 }}>link del modulo</button> a chi entra, oppure crea una scheda con «Nuova persona».</p>
         </section>
       )}
+
+      {data && items.length > 0 && <VetroOverview items={items} ready={ready} cflag={cflag} hasContracts={Boolean(data.contracts)} tabCounts={tabCounts} onTab={setTab} />}
 
       {data && (items.length > 0 || archivedItems.length > 0) && (
         <>
@@ -302,7 +311,7 @@ export default function HrPeoplePage() {
                 </section>
               )}
 
-              <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} minWidth={860} maxHeight={680}
+              <DataTable columns={columns} rows={rows} defaultSort={{ key: "name", dir: 1 }} onRowClick={(p) => router.push(`/admin/hr/${p.id}`)} onRowHover={(p) => { try { router.prefetch(`/admin/hr/${p.id}`); } catch {} prefetchData([`/api/admin/hr/people/${p.id}`]); }} minWidth={860} maxHeight={680}
                 empty={<span>Nessuna persona qui{activeFilters || q ? " con questi filtri" : ""}.{(activeFilters || q) ? <> <button type="button" onClick={() => { resetFilters(); setQ(""); }} style={{ background: "none", border: "none", padding: 0, color: CP.accentSoftText, cursor: "pointer" }}>Togli i filtri</button></> : null}</span>} />
 
               {tab === "ripulire" && data.cleanup && (
@@ -334,6 +343,119 @@ export default function HrPeoplePage() {
       </Modal>
       <NewPersonModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={(p) => { setNewOpen(false); mutate(); router.push(`/admin/hr/${p.id}`); }} />
     </div>
+    </VetroScope>
+  );
+}
+
+// Colpo d'occhio delle persone (solo col vetro, 26/10/2026): quattro riquadri sulle domande di tutti i
+// giorni (con noi, attive, in ingresso, contratti da sistemare), chi lavora su quale progetto (barre) e
+// per mansione (ciambella). Contano solo le persone con noi (fase diversa da Uscita), come la scheda
+// «Con noi». Un clic sul titolo di un riquadro apre la scheda corrispondente sotto.
+function VetroOverview({ items, ready, cflag, hasContracts, tabCounts, onTab }) {
+  const inVetro = useInVetro();
+  if (!inVetro) return null;
+  const live = items.filter((p) => (p.fields?.collaborationStatus || "") !== PHASE_EXITED);
+  const toFix = hasContracts ? live.filter((p) => ["cambiata", "mancante", "risolto"].includes(cflag(p))).length : null;
+  const NO = "Senza indicazione";
+  const count = (get) => {
+    const m = new Map();
+    for (const p of live) {
+      const vals = [].concat(get(p) ?? []).filter(Boolean);
+      for (const v of vals.length ? vals : [NO]) m.set(v, (m.get(v) || 0) + 1);
+    }
+    return [...m.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  };
+  // «Senza indicazione» in fondo e in grigio: è un buco da riempire, non una mansione
+  const byMans = count((p) => p.fields?.mansioni).sort((a, b) => (a.label === NO) - (b.label === NO)).map((x) => (x.label === NO ? { ...x, color: "var(--vt-cx)" } : x));
+  const byProj = count((p) => p.fields?.progetto).sort((a, b) => (a.label === NO) - (b.label === NO)).slice(0, 8);
+  const maxP = Math.max(1, ...byProj.map((x) => x.value));
+  // 26/10/2026 («per ogni pagina capiscine l'utilità»): Persone HR serve a «chi c'è, chi sta entrando, cosa
+  // c'è da sistemare» → il percorso delle fasi in fila (come la pipeline del reel rapport: ogni fase una
+  // colonna con il suo numero, un clic apre la scheda), accanto la scheda rossa di quello che va sistemato;
+  // sotto chi sta entrando con le iniziali (i «Members» del reel 2), un clic apre la sua scheda.
+  const flow = [
+    { label: "In ingresso", n: tabCounts.ingresso || 0, tab: "ingresso", sub: "stanno iniziando" },
+    { label: "Attive", n: tabCounts.attive || 0, tab: "attive", sub: "al lavoro" },
+    { label: "In riassegnazione", n: live.filter((p) => p.fields?.collaborationStatus === "In riassegnazione").length, tab: "cambio", sub: "cambiano progetto" },
+    { label: "In uscita", n: live.filter((p) => p.fields?.collaborationStatus === "In uscita").length, tab: "cambio", sub: "stanno lasciando" },
+  ];
+  const fix = [
+    (tabCounts["senza-contratto"] || 0) > 0 && { n: tabCounts["senza-contratto"], label: "senza contratto", tab: "senza-contratto" },
+    (tabCounts["mansione-cambiata"] || 0) > 0 && { n: tabCounts["mansione-cambiata"], label: "con la mansione cambiata", tab: "mansione-cambiata" },
+    (tabCounts["da-completare"] || 0) > 0 && { n: tabCounts["da-completare"], label: "schede da completare", tab: "da-completare" },
+  ].filter(Boolean);
+  const entering = live.filter((p) => p.fields?.collaborationStatus === "In ingresso")
+    .sort((x, y) => (Number(y.createdAt) || 0) - (Number(x.createdAt) || 0)).slice(0, 12);
+  const tab = (key) => ({ role: "button", tabIndex: 0, onClick: () => onTab(key), onKeyDown: (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onTab(key)) });
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+        {flow.map((f, i) => (
+          <div key={f.label} {...tab(f.tab)} className="vt-glass" aria-label={`${f.label}: ${f.n}, apri la scheda`}
+            style={{ "--vt-i": i, borderRadius: 20, padding: "14px 16px", display: "grid", gap: 4, cursor: "pointer", minWidth: 0, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: CP.textSecondary }}>
+              <span style={{ width: 9, height: 9, borderRadius: 9, background: ["var(--vt-c1)", "var(--vt-c0)", "var(--vt-c3)", "var(--vt-c2)"][i] }} />{f.label}
+              {i < flow.length - 1 && <span aria-hidden="true" style={{ marginLeft: "auto", color: CP.textMuted }}>→</span>}
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}><VetroNum value={String(f.n)} /></div>
+            <div style={{ fontSize: 12, color: CP.textMuted }}>{f.sub}</div>
+          </div>
+        ))}
+        <div {...(fix[0] ? tab(fix[0].tab) : {})} className={fix.length ? "vt-hot" : "vt-hot vt-glass"} data-lvl={fix.length ? 2 : undefined}
+          style={{ "--vt-i": 4, cursor: fix.length ? "pointer" : "default", gap: 4 }}>
+          <span style={{ fontSize: 12.5, color: CP.textSecondary }}>Da sistemare</span>
+          {fix.length ? fix.map((x) => (
+            <button key={x.tab} type="button" onClick={(e) => { e.stopPropagation(); onTab(x.tab); }}
+              style={{ all: "unset", cursor: "pointer", display: "flex", alignItems: "baseline", gap: 8, color: CP.textPrimary }}>
+              <span style={{ fontSize: x === fix[0] ? 30 : 17, fontWeight: 600, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{x.n}</span>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{x.label}</span>
+            </button>
+          )) : <span style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary }}>{toFix == null ? "controllo contratti non disponibile" : "niente da sistemare"}</span>}
+        </div>
+      </div>
+      {entering.length > 0 && (
+        <section className="vt-glass" style={{ "--vt-i": 5, borderRadius: 22, padding: 18, minWidth: 0, marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Stanno entrando</div>
+            <button type="button" onClick={() => onTab("ingresso")} style={{ all: "unset", cursor: "pointer", fontSize: 12.5, color: CP.accentSoftText || CP.accent }}>
+              {(tabCounts.ingresso || 0) > entering.length ? `tutte le ${tabCounts.ingresso} →` : "apri la scheda →"}
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 12 }}>
+            {entering.map((p) => (
+              <Link key={p.id} href={`/admin/hr/${p.id}`} style={{ display: "grid", justifyItems: "center", gap: 6, textAlign: "center", textDecoration: "none", color: CP.textPrimary, minWidth: 0 }}>
+                <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, fontWeight: 600, background: avatarColor(p.id), color: "#fff" }}>{initials(p.name)}</span>
+                <span style={{ fontSize: 12.5, lineHeight: 1.3, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name || "Senza nome"}</span>
+                {[].concat(p.fields?.progetto || []).length > 0 && <span style={{ fontSize: 11.5, color: CP.textMuted, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[].concat(p.fields.progetto)[0]}</span>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+      <div className="vt-row21" style={{ marginBottom: 14 }}>
+        <section className="vt-glass" style={{ "--vt-i": 6, borderRadius: 22, padding: 18, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary }}>Su quale progetto</div>
+            <div style={{ fontSize: 12.5, color: CP.textMuted }}>persone con noi; chi segue più progetti conta in ognuno</div>
+          </div>
+          {byProj.map((x) => (
+            <div key={x.label} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr) 36px", gap: 10, alignItems: "center", fontSize: 13, color: CP.textPrimary, padding: "3px 0" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: x.label === NO ? CP.textMuted : CP.textPrimary }}>{x.label}</span>
+              <span style={{ height: 8, borderRadius: 99, background: CP.track, overflow: "hidden" }}>
+                <span style={{ display: "block", height: "100%", width: `${(x.value / maxP) * 100}%`, borderRadius: 99, background: x.label === NO ? "var(--vt-cx)" : "var(--vt-c0)" }} />
+              </span>
+              <span style={{ textAlign: "right", color: CP.textSecondary, fontVariantNumeric: "tabular-nums" }}>{x.value}</span>
+            </div>
+          ))}
+        </section>
+        {byMans.length > 0 && (
+          <section className="vt-glass" style={{ "--vt-i": 7, borderRadius: 22, padding: 18, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: CP.textPrimary, marginBottom: 12 }}>Per mansione</div>
+            <Donut items={byMans} center={String(live.length)} centerSub="con noi" format={(v) => String(v)} />
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -390,8 +512,8 @@ function SharedLinkBox({ onChanged }) {
   const [err, setErr] = useState(null);
   const link = data?.link || null;
   const act = async (action) => {
-    if (action === "regenerate" && link && !confirm("Rigenero il link? Quello di adesso smette subito di funzionare: chi lo ha ricevuto e non ha ancora compilato dovrà avere quello nuovo.")) return;
-    if (action === "disable" && !confirm("Disattivo il link? Nessuno potrà più compilare il modulo finché non ne crei uno nuovo.")) return;
+    if (action === "regenerate" && link && !(await confirmDialog({ title: "Rigenero il link?", message: "Quello di adesso smette subito di funzionare: chi lo ha ricevuto e non ha ancora compilato dovrà avere quello nuovo.", ok: "Rigenera", danger: true }))) return;
+    if (action === "disable" && !(await confirmDialog({ title: "Disattivo il link?", message: "Nessuno potrà più compilare il modulo finché non ne crei uno nuovo.", ok: "Disattiva", danger: true }))) return;
     setBusy(true); setErr(null);
     try {
       const j = await postJson("/api/admin/hr/form-links/shared", { action });

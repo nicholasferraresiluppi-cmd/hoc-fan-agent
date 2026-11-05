@@ -6,6 +6,7 @@
 import { Info } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { NUM, card } from "@/components/ds";
+import { useInVetro } from "@/components/VetroScope";
 
 export const COUNTRIES = [
   { id: "IT", label: "Italia" },
@@ -86,8 +87,9 @@ export function Kpi({ label, value, sub, status, tip, onClick, active, badge }) 
 }
 
 export function Section({ title, tip, aside, badge, children, style }) {
+  const inVetro = useInVetro();
   return (
-    <section style={{ ...card, borderRadius: 20, padding: "16px 18px", marginBottom: 12, ...style }}>
+    <section className={inVetro ? "vt-glass" : undefined} style={{ ...card, borderRadius: 20, padding: "16px 18px", marginBottom: 12, ...style }}>
       {title && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0, color: CP.textPrimary }}>{title}</h2>

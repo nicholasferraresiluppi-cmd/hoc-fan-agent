@@ -3,15 +3,20 @@
 // scouting) e filtri. Una riga = una persona (più account collegati contano una volta).
 import { useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { hookLine, attentionScore, agencies } from "@/lib/scouting-core";
+import { hookLine, attentionScore, agencies, RANGE_FILTERS, passRanges, activeRanges, QUEUE_SORTS } from "@/lib/scouting-core";
 import { DataTable, FilterChip } from "@/components/ds";
-import { NUM, SERIF, fmtFull, fmtN, input, btn, igProfile, LinkChip, Growth, Spark, Initials, STAGE_LABEL, useIsPhone } from "./radar-ui";
+import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
+import { NUM, SERIF, fmtFull, fmtN, fmtEr, input, btn, igProfile, LinkChip, Growth, Spark, Initials, STAGE_LABEL, RatingTag, useIsPhone } from "./radar-ui";
 
 const views = (newCut) => [
   { id: "paid", label: "Con profilo a pagamento", test: (c) => c.sig === "forte" },
+  // voto «Assolutamente» (21/10/2026): la lista di chi contattare per prima
+  { id: "top", label: "Assolutamente", test: (c) => c.rating === 4 },
   { id: "talent", label: "Talenti da formare", test: (c) => c.sig === "nessuno" && c.fmt && c.fmt !== "nessuno" },
   { id: "new", label: "Nuove questa settimana", test: (c) => c.firstSeen && c.firstSeen >= newCut },
   { id: "check", label: "Indizi da verificare", test: (c) => c.sig === "debole" },
+  // OnlyFans trovato cercando su Google (5/11/2026): chi tiene Instagram e OnlyFans separati
+  { id: "web", label: "Trovate su Google", test: (c) => c.link?.where === "web" },
   { id: "todo", label: "Da classificare", test: (c) => c.g === "Da classificare" },
   // catena dei seguiti: OnlyFanser di cui non abbiamo ancora letto chi segue (le prossime della matrioska)
   { id: "folq", label: "Seguiti da leggere", test: (c) => c.sig === "forte" && !c.folAt && !c.ours },
@@ -28,6 +33,8 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
   const [fmtOnly, setFmtOnly] = useState(false);
   const [itaSure, setItaSure] = useState(false);
   const [ag, setAg] = useState("all");
+  const [ranges, setRanges] = useState({});
+  const [sortBy, setSortBy] = useState("auto");
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
   const phone = useIsPhone();
@@ -49,10 +56,11 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
       if (itaSure && r.ita === "forse") return false;
       if (ag === "none" && r.agency && r.agency !== "Indipendente") return false;
       if (ag !== "all" && ag !== "none" && (r.agency || "").toLowerCase() !== ag) return false;
+      if (!passRanges(r, ranges)) return false;
       if (s && !`${r.name} ${r.handles.join(" ")} ${r.nic} ${r.fmts.join(" ")} ${r.g} ${r.agency || ""}`.toLowerCase().includes(s)) return false;
       return true;
-    }).sort((a, b) => (b.g4 ?? -999) - (a.g4 ?? -999) || (b.medv || 0) - (a.medv || 0));
-  }, [base, grp, growing, fmtOnly, itaSure, ag, q]);
+    }).sort((a, b) => (sortBy !== "auto" ? (b[sortBy] ?? -Infinity) - (a[sortBy] ?? -Infinity) : 0) || (b.g4 ?? -999) - (a.g4 ?? -999) || (b.medv || 0) - (a.medv || 0));
+  }, [base, grp, growing, fmtOnly, itaSure, ag, q, ranges, sortBy]);
   const agList = useMemo(() => agencies(creators), [creators]);
 
   const columns = [
@@ -67,8 +75,10 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
     { key: "fmt", label: "Format", muted: true, render: (r) => (r.fmt === "nessuno" ? "—" : r.fmt) },
     { key: "fol", label: "Follower", align: "right", render: (r) => fmtFull(r.fol) },
     { key: "medv", label: "View per reel", align: "right", render: (r) => fmtFull(r.medv) },
+    { key: "er", label: "Engagement", align: "right", render: (r) => fmtEr(r.er) },
     { key: "g4", label: "4 settimane", align: "right", render: (r) => (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>{r.n === 1 && <Spark hist={profilesBy[r.handles[0]]?.hist} w={64} h={20} />}<Growth v={r.g4} /></span>) },
+    { key: "rating", label: "Voto", render: (r) => (r.rating ? <RatingTag v={r.rating} /> : "—") },
     { key: "stage", label: "Fase", sort: (r) => Object.keys(STAGE_LABEL).indexOf(r.stage), render: (r) => <span style={{ color: r.stage === "interessante" ? CP.gold : r.stage === "scartata" ? CP.textMuted : CP.textSecondary }}>{STAGE_LABEL[r.stage]}</span> },
   ];
 
@@ -77,13 +87,38 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
     const xs = creators.filter((c) => c.stage === "da_valutare" && !c.ours).map((c) => attentionScore(c, newCut)).sort((a, b) => b - a);
     return xs.length ? xs[Math.floor(xs.length * 0.1)] : Infinity;
   }, [creators, newCut]);
-  const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure + (ag !== "all");
+  const activeFilters = (grp !== "all") + growing + fmtOnly + itaSure + (ag !== "all") + activeRanges(ranges);
+  // filtri a intervallo (follower, view per reel, engagement), come in Valuta
+  const rangeSelects = (fs) => Object.entries(RANGE_FILTERS).map(([k, def]) => (
+    <select key={k} aria-label={def.label} value={ranges[k] || "all"} onChange={(e) => { setRanges((x) => ({ ...x, [k]: e.target.value })); setShown(PAGE); }} style={{ ...input, ...fs }}>
+      {def.opts.map((o) => <option key={o.id} value={o.id}>{`${def.label}: ${o.label.toLowerCase()}`}</option>)}
+    </select>
+  ));
   const more = rows.length > shown && (
     <button onClick={() => setShown((x) => x + PAGE)} style={{ ...btn, alignSelf: "center" }}>Mostra altre {fmtFull(Math.min(PAGE, rows.length - shown))}</button>
   );
 
+  // intestazione «stile reel» (30/10/2026): quante ne mostra la vista scelta + le viste che contano
+  const viewLabel = VIEWS.find((v) => v.id === view).label;
+  const hero = (
+    <HeroHead
+      eyebrow="Radar creator · esplora"
+      title={view === "all" ? "Tutte le" : "Ci sono"}
+      accent={`${fmtFull(rows.length)} creator`}
+      sub={view === "all" ? "Le creator italiane del radar: una riga per persona." : `Vista «${viewLabel}»${activeFilters ? ", con i filtri scelti" : ""}.`}
+      numbers={phone ? null : <>
+        <HeroNum label="Con profilo a pagamento" value={viewCounts.paid} strong />
+        <HeroNum label="Assolutamente" value={viewCounts.top} />
+        <HeroNum label="Nuove questa settimana" value={viewCounts.new} />
+        <HeroNum label="Talenti da formare" value={viewCounts.talent} />
+      </>}
+      style={{ marginBottom: 6 }}
+    />
+  );
+
   if (phone) return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {hero}
       <label htmlFor="rx-q" style={{ position: "absolute", left: -9999 }}>Cerca</label>
       <input id="rx-q" type="search" value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="Cerca nome, @ o nicchia" style={{ ...input, width: "100%", fontSize: 16 }} />
       <div role="tablist" aria-label="Viste" className="rx-strip">
@@ -109,6 +144,10 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
             <option value="all">Agenzia: tutte</option>
             <option value="none">Senza agenzia nota</option>
             {agList.map((a) => <option key={a.name} value={a.name.toLowerCase()}>{a.name} · {a.n}</option>)}
+          </select>
+          {rangeSelects({ fontSize: 16 })}
+          <select aria-label="Ordina per" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ ...input, fontSize: 16 }}>
+            {QUEUE_SORTS.map((o) => <option key={o.id} value={o.id}>Ordina per: {o.id === "auto" ? "crescita e view" : o.label.toLowerCase()}</option>)}
           </select>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <FilterChip label="In crescita" active={growing} onClick={() => setGrowing((x) => !x)} />
@@ -142,7 +181,9 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
                   <span style={{ display: "flex", gap: "4px 10px", alignItems: "center", flexWrap: "wrap", fontSize: 12.5, color: CP.textMuted }}>
                     <LinkChip link={r.link} sig={r.sig} />
                     {best ? <span style={NUM}>reel top {fmtN(best)}</span> : reach && reach >= 0.3 ? <span style={NUM}>view ×{reach.toFixed(1).replace(".", ",")} i follower</span> : null}
+                    {r.er != null && <span style={NUM}>ER {fmtEr(r.er)}</span>}
                     {r.g4 != null && <span><Growth v={r.g4} /></span>}
+                    <RatingTag v={r.rating} />
                     {r.agency && <span style={{ color: CP.textSecondary }}>{r.agency === "Indipendente" ? "indipendente" : `con ${r.agency}`}</span>}
                     {r.stage !== "da_valutare" && <span style={{ color: r.stage === "interessante" ? CP.gold : CP.textMuted }}>{STAGE_LABEL[r.stage]}</span>}
                   </span>
@@ -163,6 +204,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {hero}
       <div role="tablist" aria-label="Viste" style={{ display: "flex", flexWrap: "wrap", gap: "6px 26px", borderBottom: `1px solid ${CP.border}` }}>
         {VIEWS.map((v) => (
           <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => { setView(v.id); setGrp("all"); setShown(PAGE); }}
@@ -182,6 +224,7 @@ export default function RadarEsplora({ creators, profilesBy, onOpen, newCut }) {
             <option value="none">Senza agenzia nota</option>
             {agList.map((a) => <option key={a.name} value={a.name.toLowerCase()}>{a.name} · {a.n}</option>)}
           </select>
+        {rangeSelects({ padding: "8px 10px" })}
         <FilterChip label="In crescita (+5% in 4 settimane)" active={growing} onClick={() => setGrowing((x) => !x)} />
         <FilterChip label="Ha un format" active={fmtOnly} onClick={() => setFmtOnly((x) => !x)} />
         <FilterChip label={`Solo italiane sicure (senza ${base.filter((r) => r.ita === "forse").length} «forse»)`} active={itaSure} onClick={() => setItaSure((x) => !x)} />

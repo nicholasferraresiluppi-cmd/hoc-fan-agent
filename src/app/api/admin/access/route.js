@@ -1,3 +1,4 @@
+import { forgetAuthz } from "@/lib/authz-cache";
 import { kv } from "@vercel/kv";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { listAdmins } from "@/lib/admin";
@@ -42,6 +43,7 @@ export async function POST(request) {
 
     if (action === "add") {
       await kv.sadd("admins:set", targetId);
+      forgetAuthz(targetId);
       await auditAccess(a.userId, "admin_add", { target: targetId });
       return Response.json({ ok: true, action, userId: targetId });
     }
@@ -56,6 +58,7 @@ export async function POST(request) {
       // Rimuovi dal set KV
       if (targetId === a.userId) return Response.json({ error: "Non puoi rimuovere te stesso dagli admin: chiedilo a un altro admin." }, { status: 400 });
       await kv.srem("admins:set", targetId);
+      forgetAuthz(targetId);
       await auditAccess(a.userId, "admin_remove", { target: targetId });
       // Revoca COMPLETA (27/09/2026, Nicholas): l'admin può venire anche dai metadata Clerk
       // (role / roles) e dai ruoli in KV. Prima si toglieva solo dal set KV e restava admin via Clerk.
