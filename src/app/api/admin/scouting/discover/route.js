@@ -21,6 +21,9 @@ const KINDS = {
   // pagine di link (Linktree, Beacons, link.me…): profili social e link in uscita. Letta da un attore dello Store
   // (memo23/biolink-scraper, 0,3 cent a pagina, nessun permesso speciale): dal nostro indirizzo Linktree blocca.
   pages: { actor: "memo23~biolink-scraper", unit: 0.004, input: (urls) => ({ profileUrls: urls, maxItems: urls.length }) },
+  // ricerche Google (17/10/2026, test Elisa): notorietà di una creator ("nome" OnlyFans) e fonte
+  // "Stampa" (articoli italiani su chi apre OnlyFans). `handles` = le ricerche, una per riga.
+  google: { actor: "apify~google-search-scraper", unit: 0.0025, input: (q) => ({ queries: q.join("\n"), countryCode: "it", languageCode: "it", maxPagesPerQuery: 1, resultsPerPage: 10, mobileResults: false, includeUnfilteredResults: false }) },
   highlights: { actor: "afanasenko~instagram-stories-highlights-scraper", unit: 0.022, input: (h) => ({ operationMode: "highlightsByUsername", usernames: h, maxAccounts: h.length, includeHighlightItems: true, maxHighlightsPerAccount: 1, analyzeFrames: false, skipPrivate: true }) },
 };
 
@@ -31,7 +34,9 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const k = KINDS[body.kind];
   if (!k) return Response.json({ error: "tipo di ricerca non valido" }, { status: 400 });
-  const handles = body.kind === "pages"
+  const handles = body.kind === "google"
+    ? [...new Set((body.handles || []).map((q) => String(q).replace(/\s+/g, " ").trim()).filter((q) => q.length >= 3 && q.length <= 160))].slice(0, 3000)
+    : body.kind === "pages"
     ? [...new Set((body.handles || []).map(String).filter((u) => /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}\/[^\s]{1,80}$/i.test(u)))].slice(0, 3000)
     : [...new Set((body.handles || []).map(normHandle).filter(Boolean))].slice(0, 3000);
   if (!handles.length) return Response.json({ error: "nessun account" }, { status: 400 });

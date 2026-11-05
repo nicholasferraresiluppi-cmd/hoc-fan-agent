@@ -7,22 +7,27 @@ import { getCreatorScope } from "@/lib/creator-scope";
 import { resolveWorkspace } from "@/lib/workspace-store";
 import { defaultWorkspace } from "@/lib/workspaces";
 import { restrictionFor } from "@/lib/restricted-roles";
-import { hasAccountingAccess } from "@/lib/compensi-access";
+import { hasAccountingAccess, isAccountingOwner } from "@/lib/compensi-access";
+import { hasPresenzeAccess } from "@/lib/presenze-access";
+import { serverTiming } from "@/lib/server-timing";
 
 export async function GET() {
+  const st = serverTiming();
   try {
     const { userId } = await auth();
+    st.mark("auth");
     if (!userId) return Response.json({ userId: null, authenticated: false });
-    const user = await currentUser();
-    const admin = await isUserIdAdmin(userId);
-    const role = await getUserRole(userId); // primario (retrocompat)
-    const roles = await getUserRoles(userId); // multi
-    const team = await getUserTeam(userId);
-    const capabilities = { ...(await getEffectiveCapabilities(userId)) }; // unione
+    // in parallelo: prima erano sei letture una dopo l'altra
+    const [user, admin, role, roles, team, caps] = await Promise.all([
+      currentUser(), isUserIdAdmin(userId), getUserRole(userId), getUserRoles(userId), getUserTeam(userId), getEffectiveCapabilities(userId),
+    ]);
+    st.mark("perms");
+    const capabilities = { ...caps }; // unione
     // visibilità per creator (27/09/2026): per il MENU, "vede tutte le creator" come pseudo-permesso
     const cs = await getCreatorScope(userId).catch(() => null);
     if (cs?.all) capabilities["creators.all"] = "all";
     const creators = cs ? { all: cs.all, count: cs.creators?.size || 0, source: cs.source } : null;
+    st.mark("creators");
     const adminRaw = admin || (await isUserIdAdminRaw(userId));
     // mansione (03/10/2026): menu e hub per il lavoro della persona; in "Vedi come" quella del membro/ruolo guardato
     const va = adminRaw ? await viewAsFor(userId).catch(() => null) : null;
@@ -33,8 +38,12 @@ export async function GET() {
     // dato solo dal titolare (lib/compensi-access). Pseudo-permesso solo per mostrare la voce di menu;
     // le API si difendono da sole. In "Vedi come" mai.
     if (!va && (await hasAccountingAccess(userId).catch(() => false))) capabilities["accounting.private"] = "all";
+    if (!va && isAccountingOwner(userId)) capabilities["owner.private"] = "all";
+    // Presenze Discord (03/11/2026): accesso a parte come la Contabilità (lib/presenze-access)
+    if (!va && hasPresenzeAccess(userId)) capabilities["presenze.private"] = "all";
     // appena attivata la 2FA la cache del controllo si aggiorna subito
     if (adminRaw && user?.twoFactorEnabled) await kv.set(`mfa:ok:${userId}`, 1, { ex: 600 }).catch(() => {});
+    st.mark("rest");
     const security = adminRaw
       ? { admin_raw: true, mfa_enabled: !!user?.twoFactorEnabled, mfa_required: await adminMfaRequired() }
       : { admin_raw: false };
@@ -50,11 +59,11 @@ export async function GET() {
       security,
       workspace,
       // ruolo ristretto (lib/restricted-roles): app ridotta alle sue pagine
-      restricted: restrictionFor({ admin, roles }),
+      restricted: restrictionFor({ admin, roles, capabilities }),
       view_as: va ? { label: va.label, roles: va.roles, exp: va.exp, employee: va.employee || null } : null,
       email: user?.emailAddresses?.[0]?.emailAddress,
       name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || null,
-    });
+    }, { headers: { "Server-Timing": st.header() } });
   } catch (e) {
     return Response.json({ error: e?.message || "Errore" }, { status: 500 });
   }

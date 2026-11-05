@@ -15,7 +15,7 @@
 // Account non letti per errore: in coda per UN secondo tentativo alla fine; privati e
 // spariti contati a parte, mai riprovati.
 import { kv } from "@vercel/kv";
-import { getProfiles, saveProfiles, getCrm, getForgotten } from "@/lib/scouting-store";
+import { getProfiles, commitProfiles, getCrm, getForgotten } from "@/lib/scouting-store";
 import { parseHighlightRows, applyHighlightRead, hlRereadCandidates, normHandle } from "@/lib/scouting-core";
 import { apify, apifyConfigured } from "@/lib/scouting-refresh";
 
@@ -101,7 +101,7 @@ async function applyBatch(st, hl, via) {
     if (q.sig === "forte" && p.sig !== "forte") forte++;
     return q;
   });
-  await saveProfiles(next);
+  await commitProfiles(profiles, next);
   return { ...st, found: { link: st.found.link + link, tag: st.found.tag + tag, forte: st.found.forte + forte } };
 }
 

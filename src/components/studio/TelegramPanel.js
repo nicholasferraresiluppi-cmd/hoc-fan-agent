@@ -10,10 +10,12 @@
  */
 import { useState } from "react";
 import useSWR from "swr";
-import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink, Star } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
+import { TG_ROLES } from "@/lib/studio-editorial-core";
 import { TG_REVIEWERS, TG_STATUSES, TG_MAX_PHOTOS, TG_TEXT_MAX_PHOTO, canApproveTg, msToRomeLocal, romeLocalToMs } from "@/lib/studio-telegram-core";
 
 const fetcher = async (url) => {
@@ -70,9 +72,9 @@ export function FunnelTiles({ data }) {
   );
 }
 
-function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
+export function PostModal({ post, photos, cfg, pid, onClose, onDone, arcs = [] }) {
   const [f, setF] = useState(() => ({
-    text: "", photoIds: [], buttonLabel: cfg?.ofLinkUrl ? "Vieni a trovarmi" : "", buttonUrl: cfg?.ofLinkUrl || "",
+    text: "", photoIds: [], poll: null, pin: false, role: null, slot: null, arcId: null, buttonLabel: cfg?.ofLinkUrl ? "Vieni a trovarmi" : "", buttonUrl: cfg?.ofLinkUrl || "",
     sendAtLocal: msToRomeLocal(Date.now() + 3600e3).slice(0, 14) + "00", ai: false, reviews: {},
     ...post, ...(post?.sendAt ? { sendAtLocal: msToRomeLocal(post.sendAt) } : {}),
   }));
@@ -89,6 +91,8 @@ function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
     setBusy(true); setErr(null);
     try {
       const { sendAt: _drop, ...rest } = f; // eslint-disable-line no-unused-vars
+      if (rest.poll) rest.poll = { question: rest.poll.question, options: (rest.poll.options || []).map((o) => o.trim()).filter(Boolean) };
+      if (rest.poll && !rest.poll.question && !rest.poll.options.length) rest.poll = null;
       const res = await call({ action: "post", post: rest });
       if (approve) await call({ action: "approve", postId: res.post.id });
       await onDone();
@@ -142,6 +146,32 @@ function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
       <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textPrimary, marginBottom: 12 }}>
         <input type="checkbox" checked={!!f.ai} disabled={sent} onChange={(e) => setF({ ...f, ai: e.target.checked })} /> Foto con parti generate con l'AI (scrivilo nel testo)
       </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12 }}>
+        <L label="Ruolo nel racconto">
+          <select style={field} value={f.role || ""} disabled={sent} onChange={(e) => setF({ ...f, role: e.target.value || null })}>
+            <option value="">—</option>
+            {TG_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </L>
+        <L label="Esce solo se" hint="Es. «Se vince Sì»: le versioni alternative restano in bozza">
+          <input style={field} value={f.condition || ""} disabled={sent} onChange={(e) => setF({ ...f, condition: e.target.value })} placeholder="Sempre" />
+        </L>
+        <L label="Storia della settimana">
+          <select style={field} value={f.arcId || ""} disabled={sent} onChange={(e) => setF({ ...f, arcId: e.target.value || null })}>
+            <option value="">Nessuna</option>
+            {arcs.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </L>
+      </div>
+      <details open={!!f.poll} style={{ marginBottom: 12 }}>
+        <summary style={{ fontSize: 13, color: CP.textSecondary, cursor: "pointer", marginBottom: 8 }}>Sondaggio (nel canale è l'unico modo per far rispondere chi legge)</summary>
+        <L label="Domanda"><input style={field} disabled={sent} value={f.poll?.question || ""} onChange={(e) => setF({ ...f, poll: { options: f.poll?.options || [], question: e.target.value } })} placeholder="Gli rispondo stavolta?" /></L>
+        <L label="Risposte" hint="Una per riga, da 2 a 10"><textarea style={{ ...field, minHeight: 70 }} disabled={sent} value={(f.poll?.options || []).join("\n")} onChange={(e) => setF({ ...f, poll: { question: f.poll?.question || "", options: e.target.value.split("\n") } })} /></L>
+        {f.poll && <button type="button" style={{ ...btn(false), padding: "3px 8px" }} disabled={sent} onClick={() => setF({ ...f, poll: null })}>Togli il sondaggio</button>}
+      </details>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: CP.textPrimary, marginBottom: 12 }}>
+        <input type="checkbox" checked={!!f.pin} disabled={sent} onChange={(e) => setF({ ...f, pin: e.target.checked })} /> Fissalo in alto nel canale (il messaggio di benvenuto)
+      </label>
       <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 8px" }}>Revisori</div>
       {TG_REVIEWERS.map((r) => {
         const rv = f.reviews?.[r.key] || {};
@@ -164,7 +194,7 @@ function PostModal({ post, photos, cfg, pid, onClose, onDone }) {
           <button style={btn(false)} disabled={busy} onClick={() => save(false)}>{busy ? "Salvataggio…" : "Salva in bozza"}</button>
           {approvable.ok && <button style={btn(true)} disabled={busy} onClick={() => save(true)}><Check size={14} aria-hidden="true" /> Approva e programma</button>}
           {post?.id && post.status !== "annullato" && <button style={btn(false)} disabled={busy} onClick={() => act({ action: "status", postId: post.id, status: "annullato" })}>Annulla</button>}
-          {post?.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={() => confirm("Eliminare il post?") && act({ action: "deletePost", postId: post.id })}><Trash2 size={14} aria-hidden="true" /> Elimina</button>}
+          {post?.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={async () => { if (await confirmDialog({ title: "Eliminare il post?", ok: "Elimina", danger: true })) act({ action: "deletePost", postId: post.id }); }}><Trash2 size={14} aria-hidden="true" /> Elimina</button>}
         </div>
       )}
     </Modal>
@@ -237,7 +267,7 @@ function SetupModal({ data, pid, onClose, onDone }) {
   );
 }
 
-export default function TelegramPanel({ pid }) {
+export default function TelegramPanel({ pid, arcs = [] }) {
   const url = `/api/admin/studio-social/${encodeURIComponent(pid)}/telegram`;
   const { data, error, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const [editing, setEditing] = useState(null);
@@ -272,10 +302,19 @@ export default function TelegramPanel({ pid }) {
     await mutate();
   };
   const removePhoto = async (id) => {
-    if (!confirm("Togliere la foto?")) return;
+    if (!(await confirmDialog({ title: "Togliere la foto?", ok: "Togli", danger: true }))) return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deletePhoto", photoId: id }) });
     const j = await r.json().catch(() => null);
     setMsg(r.ok ? { text: "Foto tolta" } : { danger: true, text: j?.error || "Non riuscito" });
+    await mutate();
+  };
+  const refs = cfg.referencePhotoIds || [];
+  const toggleRef = async (id) => {
+    const next = refs.includes(id) ? refs.filter((x) => x !== id) : [...refs, id];
+    if (next.length > 4) { setMsg({ danger: true, text: "Al massimo 4 foto di riferimento" }); return; }
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "config", referencePhotoIds: next }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) setMsg({ danger: true, text: j?.error || "Non riuscito" });
     await mutate();
   };
   const duplicate = (p) => setEditing({ text: p.text, photoIds: p.photoIds, buttonLabel: p.buttonLabel, buttonUrl: p.buttonUrl, ai: p.ai, reviews: {}, sendAt: Number.isFinite(p.sendAt) ? p.sendAt + 86400e3 : null });
@@ -284,7 +323,7 @@ export default function TelegramPanel({ pid }) {
     <button onClick={() => setEditing(p)} style={{ display: "grid", gridTemplateColumns: "minmax(0, 150px) minmax(0, 1fr) auto", gap: 10, alignItems: "center", width: "100%", textAlign: "left", background: "none", border: "none", borderTop: `1px solid ${CP.borderSoft}`, padding: "9px 0", cursor: "pointer", fontFamily: FONTS.body }}>
       <span style={{ fontSize: 13, color: CP.textSecondary, ...NUM }}>{fmtWhen(p.sentAt || p.sendAt)}</span>
       <span style={{ fontSize: 13, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {p.photoIds?.length ? `${p.photoIds.length} foto · ` : ""}{p.text || "(solo foto)"}
+        {p.condition ? `${p.condition} · ` : ""}{p.photoIds?.length ? `${p.photoIds.length} foto · ` : ""}{p.poll ? `Sondaggio: ${p.poll.question}` : p.text || "(solo foto)"}
       </span>
       <span style={{ fontSize: 12, color: STATUS_COLOR[p.status] || CP.textSecondary, border: `1px solid ${alpha(STATUS_COLOR[p.status] || CP.textSecondary, "55")}`, borderRadius: 6, padding: "1px 6px" }}>
         {TG_STATUSES.find((s) => s.key === p.status)?.label || p.status}
@@ -320,7 +359,7 @@ export default function TelegramPanel({ pid }) {
 
         <div style={{ ...card, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: CP.textMuted }}>Foto ({data.photos.length})</div>
+            <div style={{ fontSize: 12, color: CP.textMuted }}>Foto ({data.photos.length}) · stella = riferimento del volto ({refs.length} di 4)</div>
             <label style={{ ...btn(false), padding: "4px 10px", opacity: data.blobReady ? 1 : 0.5 }}>
               <Upload size={13} aria-hidden="true" /> Carica
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden disabled={!data.blobReady} onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
@@ -332,6 +371,8 @@ export default function TelegramPanel({ pid }) {
               <div key={p.id} style={{ position: "relative", aspectRatio: "3 / 4", borderRadius: 8, overflow: "hidden", background: CP.bgSunken }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/api/admin/studio-social/${encodeURIComponent(pid)}/photo?p=${p.id}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <button onClick={() => toggleRef(p.id)} aria-pressed={refs.includes(p.id)} aria-label={refs.includes(p.id) ? "Togli dai riferimenti del volto" : "Usa come riferimento del volto"} title="Riferimento del volto per il controllo qualità"
+                  style={{ position: "absolute", top: 3, left: 3, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 6, padding: 2, cursor: "pointer", display: "flex", color: refs.includes(p.id) ? CP.accent : CP.textMuted }}><Star size={12} fill={refs.includes(p.id) ? "currentColor" : "none"} /></button>
                 <button onClick={() => removePhoto(p.id)} aria-label="Togli la foto" style={{ position: "absolute", top: 3, right: 3, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 6, padding: 2, cursor: "pointer", display: "flex", color: CP.textSecondary }}><Trash2 size={12} /></button>
               </div>
             ))}
@@ -357,7 +398,7 @@ export default function TelegramPanel({ pid }) {
         )}
       </div>
 
-      {editing && <PostModal post={editing} photos={data.photos} cfg={cfg} pid={pid} onClose={() => setEditing(null)} onDone={async () => { setEditing(null); await mutate(); }} />}
+      {editing && <PostModal post={editing} photos={data.photos} cfg={cfg} pid={pid} arcs={arcs} onClose={() => setEditing(null)} onDone={async () => { setEditing(null); await mutate(); }} />}
       {setup && <SetupModal data={data} pid={pid} onClose={() => setSetup(false)} onDone={async () => { setSetup(false); await mutate(); }} />}
     </div>
   );

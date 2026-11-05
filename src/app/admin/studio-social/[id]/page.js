@@ -4,7 +4,7 @@
  * /admin/studio-social/[id] — un profilo social della redazione.
  *
  * Dall'alto: fase e numeri, cosa fare oggi a mano, la settimana (calendario fisso + contenuti del
- * giorno), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
+ * giorno), il banco dei video montati (BancoMontaggi), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
  * da cui tutto deve discendere, poi Telegram e landing (TelegramPanel). Un contenuto va in
  * "Programmati" solo col video montato, i quattro revisori, la qualità «ok» con tutte le voci e
  * nessun blocco: la regola la applica il server.
@@ -18,9 +18,14 @@ import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
 import {
   PLATFORM_LABEL, PHASES, STATUSES, KINDS, REVIEWERS, qualityChecksFor, WEEKDAYS, WEEKDAY_LABEL,
-  phaseLine, canSchedule, weekdayOf,
+  phaseLine, phaseDay, canSchedule, weekdayOf,
 } from "@/lib/studio-social-core";
-import TelegramPanel, { FunnelTiles } from "@/components/studio/TelegramPanel";
+import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/TelegramPanel";
+import EditorialSection from "@/components/studio/EditorialSection";
+import { IG_ROLES } from "@/lib/studio-editorial-core";
+import QualityAgent from "@/components/studio/QualityAgent";
+import BancoMontaggi from "@/components/studio/BancoMontaggi";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
   const r = await fetch(url);
@@ -75,7 +80,50 @@ function ReviewChips({ item }) {
   );
 }
 
-function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
+const fmtWhen = (ms) => (Number.isFinite(ms) ? new Date(ms).toLocaleString("it-IT", { timeZone: "Europe/Rome", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
+
+/** Instagram via Postiz: ora di uscita, stato del post, riprova. Il video è quello del controllo AI. */
+function InstagramBlock({ pid, f, setF, postizOn, rodaggio, onRefresh }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const pz = f.postiz;
+  const publish = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(`/api/admin/studio-social/${encodeURIComponent(pid)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publishIg", itemId: f.id, publishAtLocal: f.publishAtLocal }) });
+      const j = await r.json().catch(() => null);
+      if (j?.item) setF((x) => ({ ...x, postiz: j.item.postiz, publishAtLocal: j.item.publishAtLocal }));
+      if (!r.ok) throw new Error(j?.error || `Errore ${r.status}`);
+      setMsg("Programmato su Instagram");
+      onRefresh?.();
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ border: `1px solid ${CP.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, marginBottom: 6 }}>Instagram</div>
+      {!postizOn && <div style={{ fontSize: 12, color: CP.textMuted }}>Postiz non è collegato in questo ambiente.</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 10, alignItems: "end" }}>
+        <L label="Esce su Instagram" hint="Ora di Roma">
+          <input type="datetime-local" style={field} value={f.publishAtLocal || (f.day ? `${f.day}T18:30` : "")} disabled={!!pz?.postId && pz.state !== "ERROR"} onChange={(e) => setF({ ...f, publishAtLocal: e.target.value })} />
+        </L>
+        <div style={{ fontSize: 13, color: CP.textSecondary, paddingBottom: 12, lineHeight: 1.45 }}>
+          {f.video?.path ? <>Video: {f.video.name || "salvato"}</> : <span style={{ color: CP.textMuted }}>Il video si salva facendo il controllo AI qui sopra</span>}
+        </div>
+      </div>
+      {pz?.state === "QUEUE" && <div style={{ fontSize: 13, color: CP.accentGreen }}>In coda su Instagram per {fmtWhen(pz.scheduledFor)}. Se lo riporti indietro nella coda, il post si toglie da solo.</div>}
+      {pz?.state === "PUBLISHED" && <div style={{ fontSize: 13, color: CP.accentGreen }}>Pubblicato{pz.releaseURL ? <> · <a href={pz.releaseURL} target="_blank" rel="noreferrer" style={{ color: CP.accent }}>apri su Instagram</a></> : null}</div>}
+      {pz?.state === "ERROR" && <div style={{ fontSize: 13, color: CP.accentRed }}>Non partito: {pz.error || "errore di Postiz"}</div>}
+      {f.status === "programmato" && postizOn && (!pz?.postId || pz.state === "ERROR") && (
+        <button style={{ ...btn(true), marginTop: 8 }} disabled={busy || !f.video?.path} onClick={publish}>{busy ? "Invio a Postiz…" : pz?.state === "ERROR" ? "Riprova su Instagram" : "Programma su Instagram"}</button>
+      )}
+      {f.status !== "programmato" && f.status !== "pubblicato" && <div style={{ fontSize: 12, color: CP.textMuted }}>Con «Approva e programma» va in coda su Instagram all'ora scelta.</div>}
+      {rodaggio && <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 6 }}>Il profilo è in rodaggio: consigliato pubblicare a mano dal telefono fino all'8º giorno.</div>}
+      {msg && <div style={{ fontSize: 13, color: CP.textSecondary, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
+}
+
+function ItemModal({ item, onClose, onSave, onDelete, saving, err, pid, refs, onRefresh, arcs = [], onApprove, postizOn, rodaggio }) {
   const [f, setF] = useState(() => ({ kind: "reel", status: "idea", ...item, reviews: { ...(item?.reviews || {}) } }));
   const setReview = (key, patch) => setF((x) => {
     const cur = x.reviews?.[key] || {};
@@ -99,6 +147,20 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
         <L label="Giorno di uscita"><input type="date" style={field} value={f.day || ""} onChange={(e) => setF({ ...f, day: e.target.value })} /></L>
         <L label="Format"><input style={field} value={f.format || ""} onChange={(e) => setF({ ...f, format: e.target.value })} placeholder="Beccato" /></L>
       </div>
+      <div style={grid}>
+        <L label="Storia della settimana">
+          <select style={field} value={f.arcId || ""} onChange={(e) => setF({ ...f, arcId: e.target.value || null })}>
+            <option value="">Nessuna</option>
+            {arcs.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </L>
+        <L label="Ruolo nella storia">
+          <select style={field} value={f.arcRole || ""} onChange={(e) => setF({ ...f, arcRole: e.target.value || null })}>
+            <option value="">—</option>
+            {IG_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </L>
+      </div>
       <L label="Gancio a schermo" hint="Massimo 6 parole, si legge in un secondo senza audio"><input style={field} value={f.hook || ""} onChange={(e) => setF({ ...f, hook: e.target.value })} /></L>
       <L label="Script"><textarea style={{ ...field, minHeight: 180, fontFamily: FONTS.mono || FONTS.body, fontSize: 13, lineHeight: 1.5 }} value={f.script || ""} onChange={(e) => setF({ ...f, script: e.target.value })} /></L>
       <div style={grid}>
@@ -112,6 +174,7 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
         Ha parti generate con l'AI (va pubblicato con l'etichetta AI)
       </label>
 
+      <QualityAgent pid={pid} item={f} refs={refs} onResult={(it) => { setF((x) => ({ ...x, reviews: it.reviews, aiReview: it.aiReview })); onRefresh?.(); }} />
       <div style={{ fontSize: 14, fontWeight: 500, color: CP.textPrimary, margin: "6px 0 8px" }}>Revisori</div>
       {REVIEWERS.map((r) => {
         const rv = f.reviews?.[r.key] || {};
@@ -140,12 +203,13 @@ function ItemModal({ item, onClose, onSave, onDelete, saving, err }) {
           </div>
         );
       })}
+      {f.id && <InstagramBlock pid={pid} f={f} setF={setF} postizOn={postizOn} rodaggio={rodaggio} onRefresh={onRefresh} />}
       {!gate.ok && <div style={{ fontSize: 12, color: CP.textMuted, marginBottom: 10 }}>Per programmarlo: {gate.reason.toLowerCase()}.</div>}
       {err && <div style={{ color: CP.accentRed, fontSize: 13, marginBottom: 10 }}>{err}</div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button style={btn(true)} disabled={saving} onClick={() => onSave(f)}>{saving ? "Salvataggio…" : "Salva"}</button>
         {f.status === "da_approvare" && gate.ok && (
-          <button style={btn(false)} disabled={saving} onClick={() => onSave({ ...f, status: "programmato" })}><Check size={14} aria-hidden="true" /> Approva e programma</button>
+          <button style={btn(false)} disabled={saving} onClick={() => onApprove({ ...f, status: "programmato", publishAtLocal: f.publishAtLocal || (f.day ? `${f.day}T18:30` : null) })}><Check size={14} aria-hidden="true" /> Approva e programma</button>
         )}
         {f.id && (
           <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} onClick={() => onDelete(f)}><Trash2 size={14} aria-hidden="true" /> Elimina</button>
@@ -195,9 +259,10 @@ export default function StudioProfilePage() {
   const { id } = useParams();
   const url = `/api/admin/studio-social/${encodeURIComponent(id)}`;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
-  const { data: tg } = useSWR(`${url}/telegram`, fetcher, { revalidateOnFocus: false }); // stessa chiave del pannello: una sola richiesta
+  const { data: tg, mutate: mutateTg } = useSWR(`${url}/telegram`, fetcher, { revalidateOnFocus: false }); // stessa chiave del pannello: una sola richiesta
   const [editing, setEditing] = useState(null); // contenuto aperto
   const [editId, setEditId] = useState(false);  // identità aperta
+  const [postEditing, setPostEditing] = useState(null); // messaggio Telegram aperto dall'Editoriale
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -215,8 +280,21 @@ export default function StudioProfilePage() {
     setSaving(true); setErr(null);
     try { await post({ action: "item", item }); await mutate(); setEditing(null); } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
+  // approvazione: il contenuto va in «Programmati» e, se c'è il video controllato, parte la coda su Instagram
+  const approveItem = async (item) => {
+    setSaving(true); setErr(null);
+    try {
+      const saved = await post({ action: "item", item });
+      if (data?.postiz && saved.item?.video?.path) {
+        const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publishIg", itemId: saved.item.id, publishAtLocal: item.publishAtLocal }) });
+        const j = await r.json().catch(() => null);
+        if (!r.ok) { await mutate(); setEditing(j?.item || saved.item); setErr(`Approvato, ma Instagram non è partito: ${j?.error || r.status}`); return; }
+      }
+      await mutate(); setEditing(null);
+    } catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
   const deleteItem = async (item) => {
-    if (!confirm(`Eliminare "${item.title}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare "${item.title}"?`, ok: "Elimina", danger: true }))) return;
     try { await post({ action: "deleteItem", itemId: item.id }); await mutate(); setEditing(null); } catch (e) { setErr(e.message); }
   };
   const moveItem = async (item, status) => {
@@ -237,6 +315,19 @@ export default function StudioProfilePage() {
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
 
+  // Archivia/riattiva (31/10/2026): si manda il profilo intero col flag, mai cancellato.
+  const toggleArchived = async () => {
+    setErr(null);
+    try {
+      const r = await fetch("/api/admin/studio-social", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data.profile, archived: !data.profile.archived }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      await mutate();
+    } catch (e) { setErr(e.message); }
+  };
+  const saveArc = async (arc) => { await post({ action: "arc", arc }); await mutate(); };
+  const deleteArc = async (arc) => { await post({ action: "deleteArc", arcId: arc.id }); await mutate(); };
+
   if (isLoading) return <div style={{ padding: 28, color: CP.textMuted, fontFamily: FONTS.body }}>Caricamento profilo…</div>;
   if (error) {
     return (
@@ -255,13 +346,19 @@ export default function StudioProfilePage() {
   const idn = profile.identity || {};
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Studio social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Regia social", href: "/admin/studio-social" }, { label: `@${profile.handle}` }]}
         title={`@${profile.handle}`}
         subtitle={[profile.creator, PLATFORM_LABEL[profile.platform], profile.format && `format ${profile.format}`].filter(Boolean).join(" · ")}
-        actions={<button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+        actions={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={btn(false)} onClick={toggleArchived}>{profile.archived ? "Riattiva profilo" : "Archivia profilo"}</button>
+            {!profile.archived && <button style={btn(true)} onClick={() => setEditing({ day: today, format: profile.format || "" })}><Plus size={14} aria-hidden="true" /> Nuovo contenuto</button>}
+          </div>
+        }
       />
+      {profile.archived && <Notice>Profilo archiviato: non compare nell'elenco della Regia social. I contenuti restano qui, niente è stato cancellato.</Notice>}
       {err && !editing && !editId && <Notice danger>{err}</Notice>}
 
       {/* Fase e numeri */}
@@ -287,27 +384,20 @@ export default function StudioProfilePage() {
             </label>
           ))}
         </div>
-        <div style={{ ...card, padding: 16 }}>
-          <SectionTitle>La settimana</SectionTitle>
-          {week.map((d) => {
-            const wd = weekdayOf(d);
-            const dayItems = items.filter((it) => it.day === d && it.status !== "scartato");
-            return (
-              <div key={d} style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr)", gap: 10, padding: "7px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-                <div style={{ fontSize: 13, color: d === today ? CP.textPrimary : CP.textSecondary, fontWeight: d === today ? 500 : 400 }}>{d === today ? "Oggi" : fmtDay(d)}</div>
-                <div style={{ minWidth: 0 }}>
-                  {dayItems.length === 0 && <div style={{ fontSize: 13, color: CP.textMuted }}>{profile.calendar?.[wd] ? `Previsto: ${profile.calendar[wd]}` : "Niente in programma"}</div>}
-                  {dayItems.map((it) => (
-                    <button key={it.id} onClick={() => setEditing(it)} style={{ display: "block", background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", fontSize: 13, color: CP.textPrimary, fontFamily: FONTS.body }}>
-                      {it.title} <span style={{ color: CP.textMuted }}>· {STATUSES.find((s) => s.key === it.status)?.label.toLowerCase()}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
+
+      {/* Editoriale: la settimana come una storia, Instagram e Telegram insieme */}
+      <EditorialSection
+        today={today} items={items} posts={tg?.posts || []} arcs={data.arcs || []}
+        onOpenItem={(it) => setEditing(it)}
+        onNewItem={(prefill) => setEditing({ format: profile.format || "", ...prefill })}
+        onOpenPost={(p) => setPostEditing(p)}
+        onNewPost={(prefill) => setPostEditing(prefill)}
+        onSaveArc={saveArc} onDeleteArc={deleteArc}
+      />
+
+      {/* Banco montaggi: i video della cartella Drive, da guardare e scegliere */}
+      <BancoMontaggi pid={id} />
 
       {/* Coda */}
       <SectionTitle>Coda dei contenuti</SectionTitle>
@@ -352,7 +442,7 @@ export default function StudioProfilePage() {
       )}
 
       {/* Telegram e landing */}
-      <TelegramPanel pid={id} />
+      <TelegramPanel pid={id} arcs={data.arcs || []} />
 
       {/* Identità */}
       <SectionTitle aside={<button style={btn(false)} onClick={() => setEditId(true)}><Pencil size={13} aria-hidden="true" /> Modifica</button>}>Identità</SectionTitle>
@@ -383,7 +473,8 @@ export default function StudioProfilePage() {
         </div>
       </div>
 
-      {editing && <ItemModal item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} />}
+      {editing && <ItemModal key={`${editing.id || "nuovo"}-${editing.updatedAt || ""}`} item={editing} onClose={() => { setEditing(null); setErr(null); }} onSave={saveItem} onDelete={deleteItem} saving={saving} err={err} pid={id} refs={tg?.config?.referencePhotoIds || []} onRefresh={mutate} arcs={data.arcs || []} onApprove={approveItem} postizOn={!!data.postiz} rodaggio={profile.phase === "rodaggio" && (phaseDay(profile, today) || 99) <= 7} />}
+      {postEditing && tg && <PostModal post={postEditing} photos={tg.photos || []} cfg={tg.config || {}} pid={id} arcs={data.arcs || []} onClose={() => setPostEditing(null)} onDone={async () => { setPostEditing(null); await mutateTg(); }} />}
       {editId && <IdentityModal profile={profile} onClose={() => { setEditId(false); setErr(null); }} onSave={saveProfile} saving={saving} err={err} />}
     </div>
   );

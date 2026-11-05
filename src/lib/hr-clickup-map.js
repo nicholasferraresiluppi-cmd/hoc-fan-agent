@@ -20,7 +20,13 @@ import { FIELDS, FIELD_BY_KEY, isEmptyValue, maskCf, findChoice, choiceLabel, ph
 import { mirrorText, parseMirror, mirrorPrint } from "./hr-mirror.js";
 
 export const HOC_BLOCK_START = "— Dati HOC Pro —";
-const HOC_BLOCK_NOTE = "(blocco scritto da HOC Pro: qui si leggono solo Mansione attuale e Partita IVA; il resto si modifica in app)";
+// 18/10/2026: le note scritte SOPRA il blocco arrivano in app (campo «Note», a due vie); il blocco lo riscrive HOC Pro
+export const HOC_BLOCK_NOTE = "(sezione aggiornata da HOC Pro: queste righe si correggono in app. Le note scritte SOPRA «— Dati HOC Pro —» arrivano anche in HOC Pro.)";
+/** Note = descrizione senza il blocco, a capo normalizzati. "" → null. */
+export function notesFromDescription(desc) {
+  const t = stripHocBlock(String(desc || "").replace(/\r\n?/g, "\n")).trim();
+  return t || null;
+}
 
 const s = (v) => (v == null ? "" : String(v)).trim();
 const lc = (v) => s(v).toLowerCase();
@@ -111,6 +117,29 @@ export function decodeCustomField(cf, appType) {
 }
 
 // ── Blocco "— Dati HOC Pro —" in fondo alla descrizione ──────────────────────
+/** 18/10/2026: la descrizione senza la vecchia riga «Prepara il contratto: …» (null se non c'era). */
+export function withoutContractLink(desc) {
+  const d = String(desc ?? "");
+  const next = d.replace(/^[ \t]*Prepara il contratto:[^\n]*\n?/m, "");
+  return next === d ? null : next;
+}
+
+/**
+ * 19/10/2026: nel blocco già scritto, la nota in fondo e le righe dei campi ritirati restavano quelle
+ * vecchie («qui si leggono solo Mansione attuale e Partita IVA»). Riporta la nota a quella attuale e
+ * toglie la riga «Mansione attuale: …». Solo dentro il blocco; null se non c'è niente da cambiare.
+ */
+export function refreshBlockBoilerplate(desc) {
+  const d = String(desc ?? "");
+  const i = d.indexOf(HOC_BLOCK_START);
+  if (i < 0) return null;
+  const head = d.slice(0, i);
+  const lines = d.slice(i).split("\n");
+  const out = lines.filter((l) => !/^\s*Mansione attuale:/.test(l)).map((l) => (/^\s*\((blocco scritto|sezione aggiornata) da HOC Pro\b.*\)\s*$/.test(l) ? HOC_BLOCK_NOTE : l));
+  const next = head + out.join("\n");
+  return next === d ? null : next;
+}
+
 /** Toglie il blocco (dal marcatore alla fine) e ritorna la descrizione pulita. */
 export function stripHocBlock(desc) {
   const d = String(desc || "");
@@ -159,10 +188,10 @@ const fmtItDate = (ms) => {
 export function hocBlockLines(person, byName, { cfPlain } = {}) {
   const f = person.fields || {};
   const lines = [`ID HOC Pro: ${person.id}`];
-  // 10/10/2026: il "pulsante" su ClickUp per preparare e inviare il contratto (apre il percorso in HOC Pro)
-  lines.push(`Prepara il contratto: https://houseofcreators.app/admin/hr/${person.id}/contratto`);
-  if (!byName.has(lc("Mansione attuale"))) lines.push(`Mansione attuale: ${oneLine(f.currentJob, 300) || "—"}`);
+  // 18/10/2026: tolta la riga «Prepara il contratto» (link all'invio da HOC Pro): i contratti si fanno a mano
+  // 18/10/2026: tolta anche la riga «Mansione attuale» (campo del vecchio CRM ritirato: la mansione sta in «Mansione»)
   if (!byName.has(lc("Partita IVA"))) lines.push(`Partita IVA: ${f.partitaIva === true ? "sì" : f.partitaIva === false ? "no" : "—"}`);
+  if (s(f.partitaIvaNumero) && !byName.has(lc("Numero partita IVA"))) lines.push(`Numero partita IVA: ${oneLine(f.partitaIvaNumero, 40)}`);
   if (!byName.has(lc("Codice fiscale")) && (cfPlain || person.cfEnc)) lines.push(`Codice fiscale: ${cfPlain ? maskCf(cfPlain) : "presente"} (completo in HOC Pro)`);
   if (f.idDocument?.at) lines.push(`Documento d'identità: allegato il ${fmtItDate(f.idDocument.at)} (${s(f.idDocument.title)})`);
   // campi solo-app (02/10): luogo di nascita, comune/CAP di residenza, competenze con livello
@@ -189,9 +218,9 @@ export function hocBlockLines(person, byName, { cfPlain } = {}) {
   if (s(f.otherSkills) && !has("Altro che sa fare")) lines.push(`Altro che sa fare: ${oneLine(f.otherSkills, 500)}`);
   const learn = normalizeLearnList(f.learnWish);
   if (learn.length && !has("Vorrebbe imparare")) lines.push(`Vorrebbe imparare: ${learn.map(skillName).join(", ")}`);
-  // Location senza coordinate: ClickUp la rifiuta, il testo va nel blocco
+  // indirizzo: nel campo «Indirizzo» se la lista ce l'ha, altrimenti riga nel blocco
   const loc = f.location;
-  if (loc?.address && (loc.lat == null || loc.lng == null)) lines.push(`Dove vive (testo): ${s(loc.address)}`);
+  if (loc?.address && !has("Indirizzo")) lines.push(`Dove vive (testo): ${s(loc.address)}`);
   return lines;
 }
 
@@ -251,9 +280,11 @@ export function taskToPerson(task, { comuni = null } = {}) {
     fields.firstName = taskName || null;
   }
   // Campi nuovi dal blocco in descrizione (solo se la lista non ha il campo omonimo)
-  const block = parseHocBlock(task?.description ?? task?.text_content);
+  const desc = task?.description ?? task?.text_content;
+  const block = parseHocBlock(desc);
+  // note: solo se il task porta la descrizione (assente ≠ vuota: non si cancellano le note per un task letto a metà)
+  if (task && ("description" in task || "text_content" in task)) fields.notes = notesFromDescription(desc);
   if (block) {
-    if (!byName.has(lc("Mansione attuale")) && "currentJob" in block) fields.currentJob = block.currentJob;
     if (!byName.has(lc("Partita IVA")) && "partitaIva" in block) fields.partitaIva = block.partitaIva;
   }
   return {
@@ -344,7 +375,7 @@ export function statusForCollaboration(statuses = [], phase) {
  * deve vedere anche su ClickUp, non devo accorgermene io"). Confronta la scheda dell'app col
  * task, campo per campo, e restituisce le chiavi che su ClickUp NON sono come in app.
  * Solo i campi che la lista ha davvero; esclusi: sola lettura, file, codice fiscale (cifrato
- * in app), indirizzo su mappa (ClickUp vuole lat/lng: il testo va nel blocco).
+ * in app). L'indirizzo è un campo specchio («Indirizzo», testo) dal 04/11/2026.
  * Telefoni ed email confrontati normalizzati; campi specchio sull'impronta del testo.
  */
 export function clickupDrift(person, task, fieldsMeta = null) {
@@ -373,12 +404,25 @@ export function clickupDrift(person, task, fieldsMeta = null) {
   return out;
 }
 
-/** Nome del task: il nome; "Nome Cognome" se il task lo aveva già così. */
+/**
+ * Iniziali maiuscole per i nomi scritti tutti minuscoli o tutti maiuscoli («eleonora» → «Eleonora»,
+ * «DI DOMENICO» → «Di Domenico», «d'anna» → «D'Anna»). Se la persona ha già usato maiuscole e
+ * minuscole («McCarthy», «De Luca») si lascia com'è.
+ */
+export function niceName(v) {
+  const t = s(v).replace(/\s+/g, " ");
+  if (!t) return "";
+  if (t !== t.toLowerCase() && t !== t.toUpperCase()) return t;
+  return t.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+}
+
+/**
+ * Nome del task: sempre «Nome Cognome» (19/10/2026, Nicholas: nella lista e nei link si vedeva solo
+ * «eleonora», «Nicholas»… e non si capiva chi fosse). Il cognome resta anche nel campo «Surname».
+ */
 export function taskNameFor(person) {
   const f = person.fields || {};
-  const first = s(f.firstName);
-  if (person.clickup?.nameIncludesSurname && s(f.surname)) return `${first} ${s(f.surname)}`.trim();
-  return first || s(f.surname) || "Senza nome";
+  return [niceName(f.firstName), niceName(f.surname)].filter(Boolean).join(" ") || "Senza nome";
 }
 
 /**
@@ -432,10 +476,15 @@ export function personToClickup(person, fieldsMeta, { keys, cfPlain, statuses, c
     const print = mirrorPrint(text);
     fieldOps.push(text ? { key: f.key, fieldId: meta.id, body: { value: text }, effective, print } : { key: f.key, fieldId: meta.id, remove: true, effective, print });
   }
-  const description = withHocBlock(currentDescription || "", hocBlockLines(person, byName, { cfPlain }));
+  // note (18/10/2026): si scrivono alla creazione o quando sono tra i campi da spingere; in ogni
+  // altro push si tiene il testo che c'è su ClickUp (una modifica appena fatta lì non va schiacciata)
+  const writeNotes = Boolean(want && want.has("notes")) || (!currentTask && !stripHocBlock(currentDescription || ""));
+  const notesText = writeNotes ? s(person.fields?.notes) : stripHocBlock(currentDescription || "");
+  const description = withHocBlock(notesText, hocBlockLines(person, byName, { cfPlain }));
   const status = statusForCollaboration(statuses, person.fields?.collaborationStatus);
   // campi nuovi rappresentati nel blocco in descrizione (letti indietro da parseHocBlock)
-  const blockKeys = ["currentJob", "partitaIva"].filter((k) => !byName.has(lc(FIELD_BY_KEY[k].cu)));
+  const blockKeys = ["partitaIva"].filter((k) => !byName.has(lc(FIELD_BY_KEY[k].cu)));
+  if (writeNotes) blockKeys.push("notes");
   return { name: taskNameFor(person), description, status, fieldOps, skipped, blockKeys };
 }
 
@@ -481,7 +530,7 @@ export function incomingTimestamps(historyItems = [], fieldsMeta = [], fallback 
     let key = historyItemKey(it, fieldsMeta);
     if (!key) continue;
     const at = Number(it.date) || fallback;
-    const keys = key === "_description" ? ["currentJob", "partitaIva"] : [key];
+    const keys = key === "_description" ? ["partitaIva", "notes"] : [key];
     for (const k of keys) out[k] = Math.max(Number(out[k] || 0), at);
   }
   return out;

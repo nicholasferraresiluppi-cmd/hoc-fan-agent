@@ -84,7 +84,7 @@ export default function CreatorDrilldownPage({ params, searchParams }) {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Creator", href: `/leaderboard/creators?period_id=${periodId}` }, { label: alias }]}
         title={alias}

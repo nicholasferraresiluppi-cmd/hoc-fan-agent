@@ -432,7 +432,7 @@ export default function OperatorSignalsPage() {
   const inputStyle = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 999, color: CP.textPrimary, fontSize: 13, padding: "7px 12px", outline: "none", fontFamily: FONTS.body };
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1280, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Training" }, { label: "Profilo operatore" }]}
         title="Profilo operatore"

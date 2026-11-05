@@ -41,12 +41,13 @@ export const WORKSPACES = {
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
       ] },
       { title: "Persone e decisioni", items: [
-        { href: "/admin/hr", label: "Persone HR" },
+        { href: "/admin/hr", label: "Persone" },
         { href: "/contabilita", label: "Contabilità" },
         { href: "/admin/sede", label: "La Sede" },
         { href: "/admin/qualita", label: "Controllo qualità" },
         { href: "/admin/citta", label: "La città" },
         { href: "/admin/roadmap", label: "Roadmap" },
+        { href: "/admin/piani", label: "Piani" },
       ] },
       { title: "Dati completi", items: [
         { href: "/admin/looker", label: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics), con le stesse formule" },
@@ -98,8 +99,9 @@ export const WORKSPACES = {
     home: "/admin/hr",
     sections: [
       { title: "Persone", items: [
-        { href: "/admin/hr", label: "Persone HR" },
+        { href: "/admin/hr", label: "Persone" },
         { href: "/admin/hr/sync", label: "Sincronizzazione ClickUp" },
+        { href: "/admin/referral", label: "Porta un amico" },
         { href: "/admin/candidate-assessments", label: "Assessment candidati" },
       ] },
       { title: "Accessi e richieste", items: [

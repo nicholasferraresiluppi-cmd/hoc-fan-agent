@@ -103,7 +103,7 @@ export default function PeriodPicker({ value, onChange, max, maxDays = 400, comp
           {narrow && <div onClick={close} style={{ position: "fixed", inset: 0, background: CP.scrim, zIndex: 60 }} />}
           <div role="dialog" aria-label="Scegli il periodo"
             style={narrow
-              ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 61, background: CP.panel, borderTop: `1px solid ${CP.border}`, borderRadius: "16px 16px 0 0", padding: "16px 16px 20px", maxHeight: "88vh", overflowY: "auto", display: "grid", gap: 14 }
+              ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 61, background: CP.panel, borderTop: `1px solid ${CP.border}`, borderRadius: "16px 16px 0 0", padding: "16px 16px calc(20px + env(safe-area-inset-bottom))", maxHeight: "88vh", overflowY: "auto", display: "grid", gap: 14 }
               : { position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 60, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.35)", display: "grid", gridTemplateColumns: "170px auto", overflow: "hidden" }}>
 
             <div style={narrow

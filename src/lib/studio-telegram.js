@@ -2,7 +2,7 @@
 // Logica pura in studio-telegram-core.js.
 //
 // Chiavi (namespace studio:*):
-//   studio:tgcfg:{pid}     { channelId (canale di /admin/telegram), ofLinkUrl, landing{…}, updatedAt, updatedBy }
+//   studio:tgcfg:{pid}     { channelId (canale di /admin/telegram), ofLinkUrl, landing{…}, referencePhotoIds[] (volto, per l'agente qualità), updatedAt, updatedBy }
 //   studio:tg:{pid}        { [postId]: post }                         post Telegram programmati
 //   studio:media:{pid}     { [photoId]: { id, path, type, size, at, by } }   foto (Blob PRIVATO studio/{pid}/…)
 //   studio:land:{slug}     → pid                                       indirizzo della landing
@@ -50,6 +50,11 @@ export async function saveTgConfig(pid, input, by) {
     if (u && !/^https:\/\/onlyfans\.com\/\S+$/i.test(u)) errors.push("Il link OnlyFans deve iniziare con https://onlyfans.com/");
     next.ofLinkUrl = u;
   }
+  if ("referencePhotoIds" in (input || {})) {
+    // foto di riferimento del volto per l'agente qualità (max 4, solo foto del profilo)
+    const media = (await kv.get(MEDIA(pid))) || {};
+    next.referencePhotoIds = [...new Set((Array.isArray(input.referencePhotoIds) ? input.referencePhotoIds : []).map(String))].filter((id) => media[id]).slice(0, 4);
+  }
   if (input?.landing) {
     const { ok, errors: le, landing } = normalizeLanding(input.landing);
     if (!ok) errors.push(...le);
@@ -64,6 +69,19 @@ export async function saveTgConfig(pid, input, by) {
     }
   }
   if (errors.length) return { ok: false, errors };
+  // link OF nuovo o cambiato: va sui messaggi «richiamo» ancora in bozza che non hanno un pulsante
+  // (l'Editoriale li prepara prima che il link esista). I programmati non si toccano: sono approvati così.
+  if (next.ofLinkUrl && next.ofLinkUrl !== prev.ofLinkUrl) {
+    const all = (await kv.get(POSTS(pid))) || {};
+    let changed = 0;
+    for (const p of Object.values(all)) {
+      if (p.status === "bozza" && p.role === "richiamo" && (!p.buttonUrl || p.buttonUrl === prev.ofLinkUrl)) {
+        all[p.id] = { ...p, buttonUrl: next.ofLinkUrl, buttonLabel: p.buttonLabel || "Vieni di là" };
+        changed++;
+      }
+    }
+    if (changed) await kv.set(POSTS(pid), all);
+  }
   next.updatedAt = Date.now();
   next.updatedBy = by || null;
   await kv.set(CFG(pid), next);
@@ -100,6 +118,7 @@ export async function removePhoto(pid, id) {
   if (posts.some((x) => x.status === "programmato" && (x.photoIds || []).includes(id))) return { ok: false, error: "È in un post programmato: toglila prima dal post" };
   const cfg = await getTgConfig(pid);
   if (cfg.landing?.photoId === id) return { ok: false, error: "È la foto della landing: cambiala prima" };
+  if ((cfg.referencePhotoIds || []).includes(id)) await kv.set(CFG(pid), { ...cfg, referencePhotoIds: cfg.referencePhotoIds.filter((x) => x !== id) });
   delete all[id];
   await kv.set(MEDIA(pid), all);
   if (blobReady()) { const { del } = await sdk(); await del(p.path).catch(() => {}); }
@@ -222,8 +241,13 @@ async function sendPost(pid, chatId, post) {
       }
       const res = await tgCall("sendMediaGroup", { chat_id: String(chatId), media }, files);
       ids.push(...res.map((m) => m.message_id));
+    } else if (step.method === "sendPoll") {
+      const res = await tgCall("sendPoll", { chat_id: chatId, question: step.question, options: step.options.map((text) => ({ text })), is_anonymous: true });
+      ids.push(res.message_id);
     }
   }
+  // il benvenuto si fissa in alto (senza notifica: è un messaggio di casa, non una novità)
+  if (post.pin && ids.length) await tgCall("pinChatMessage", { chat_id: chatId, message_id: ids[0], disable_notification: true });
   return ids;
 }
 

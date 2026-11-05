@@ -322,19 +322,6 @@ export function notificheListSql(refs, ids, range) {
     ORDER BY n.created_at DESC`;
 }
 
-/**
- * Welcome e mass unlock — Looker "Welcome mass unlocks", tabella onlyfans.welcome_unlocks: per creator e prezzo,
- * abbonati, sblocchi, revenue = prezzo × sblocchi, CR = sblocchi / abbonati.
- * Verificato (25/9-8/10): Stormy IT $5,88 · 505 · 19 · $111,72 · 3,76%; Fishball IT $4,89 · 1.712 · 95 · $464,55 · 5,55%.
- */
-export function welcomeSql(refs, ids, range) {
-  return `
-    SELECT creator_id, amount, ANY_VALUE(type) AS type, SUM(subs_count) AS subs, SUM(unlocks_count) AS unlocks
-    FROM \`${refs.welcomeUnlocks}\`
-    WHERE creator_id IN (${idList(ids)}) AND calendar_date BETWEEN ${d(range.from)} AND ${d(range.to)}
-    GROUP BY creator_id, amount`;
-}
-
 /** Termine di ricerca ammesso: username o id OnlyFans (lettere, cifre, . _ -), 3-40 caratteri. */
 export function cleanSearch(term) {
   const t = String(term || "").trim().replace(/^@/, "").toLowerCase();

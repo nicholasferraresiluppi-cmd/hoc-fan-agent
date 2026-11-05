@@ -17,6 +17,7 @@ import { fmtInt } from "@/lib/format";
 import { PageHead, Notice, DataTable, SectionTitle, Disclosure, Metric, card } from "@/components/ds";
 import { FIELD_BY_KEY, PHASE_LABELS, taskStatusNamesFor } from "@/lib/hr-fields";
 import { btnPrimary, btnGhost, SYNC_LABEL, fmtDateTime, fetcher, postJson } from "@/components/hr-ui";
+import { confirmDialog } from "@/components/AppDialogs";
 
 function Row({ ok, label, children }) {
   return (
@@ -80,7 +81,7 @@ export default function HrSyncPage() {
   const [fieldsOpen, setFieldsOpen] = useState(false);
 
   const run = async (action) => {
-    if (action === "register_webhook" && !confirm(`Registro il webhook verso ${data?.webhookEndpoint}? Se ce n'era già uno viene sostituito.`)) return;
+    if (action === "register_webhook" && !(await confirmDialog({ title: `Registro il webhook verso ${data?.webhookEndpoint}?`, message: "Se ce n'era già uno viene sostituito.", ok: "Registra" }))) return;
     setBusy(action); setMsg(null);
     try {
       const j = await postJson("/api/admin/hr/sync", { action });
@@ -100,9 +101,9 @@ export default function HrSyncPage() {
   const conflictRows = (data?.conflicts || []).map((x, i) => ({ ...x, id: `${x.at}-${i}` }));
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
-        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone HR", href: "/admin/hr" }, { label: "Sincronizzazione ClickUp" }]}
+        crumbs={[{ label: "Hub", href: "/admin" }, { label: "Persone", href: "/admin/hr" }, { label: "Sincronizzazione ClickUp" }]}
         title="Sincronizzazione ClickUp"
         subtitle="HOC Pro è la fonte principale; la lista HR su ClickUp ne è lo specchio. Qui vedi se il collegamento funziona e lo fai ripartire."
         actions={c?.enabled && (
@@ -113,7 +114,7 @@ export default function HrSyncPage() {
         )}
       />
 
-      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata agli admin." : `Non riesco a leggere lo stato: ${error.message}`}</Notice>}
+      {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : `Non riesco a leggere lo stato: ${error.message}`}</Notice>}
       {msg && <Notice danger={!msg.ok}>{msg.text}</Notice>}
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
@@ -125,6 +126,9 @@ export default function HrSyncPage() {
             </Notice>
           )}
           {c.isRealList && <Notice danger>La lista configurata è il <b>CRM vecchio</b> (901212383318), non «✅ New CRM»: dal 03/10/2026 il CRM attivo è New CRM e il vecchio resta solo come archivio. Ogni salvataggio e ogni import toccherebbero i task del vecchio.</Notice>}
+
+          {c.enabled && <MilestonesCard status={data.milestones} onDone={mutate} />}
+          {c.enabled && <ViewsCard last={data.views} onDone={mutate} />}
 
           <section style={{ ...card, padding: "6px 16px 8px", marginBottom: 14 }}>
             <Row ok={Boolean(c.listId)} label="Lista ClickUp">
@@ -189,5 +193,93 @@ export default function HrSyncPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Viste del CRM su ClickUp (18/10/2026): ereditate dal CRM vecchio, leggevano Role/Project (vuoti
+ * nel New CRM). Anteprima → applica (l'ordine via API non funziona: ClickUp ignora orderindex, provato 18/10/2026). Lo scrivere su ClickUp è solo degli admin (l'API lo dice).
+ */
+function ViewsCard({ last, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState(null);
+  const report = res || last;
+  const go = async (action, apply = false) => {
+    if (apply && !(await confirmDialog("Applico le modifiche alle viste del New CRM su ClickUp?"))) return;
+    setBusy(action + (apply ? ":apply" : "")); setErr(null);
+    try { const j = await postJson("/api/admin/hr/sync", { action, apply }); setRes(j); await onDone?.(); }
+    catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const rows = (report?.views || []).filter((v) => v.changes?.length || v.warnings?.length || v.error);
+  return (
+    <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }} aria-labelledby="hr-views-h">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+          <h2 id="hr-views-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Viste del CRM su ClickUp</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textMuted }}>Le viste copiate dal CRM vecchio raggruppano per «Role» e filtrano su «Project», vuoti nel New CRM: qui si ripuntano su Mansione e Progetto, si aggiunge la Partita IVA. L'ordine delle viste si cambia trascinandole su ClickUp: via API non si può.</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" onClick={() => go("views_realign")} disabled={Boolean(busy)} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy === "views_realign" ? "Leggo…" : "Anteprima"}</button>
+          <button type="button" onClick={() => go("views_realign", true)} disabled={Boolean(busy) || !report} style={{ ...btnPrimary, opacity: busy || !report ? 0.5 : 1 }}>{busy === "views_realign:apply" ? "Applico…" : "Applica"}</button>
+        </div>
+      </div>
+      {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
+      {report && (
+        <div style={{ marginTop: 12, fontSize: 13.5, color: CP.textSecondary }}>
+          <div style={{ marginBottom: 8, color: CP.textMuted }}>
+            {report.apply ? "Applicato" : "Anteprima"} del {fmtDateTime(report.at)} · {(report.views || []).length} viste lette{report.missingFields?.length ? ` · campi mancanti sulla lista: ${report.missingFields.join(", ")}` : ""}
+          </div>
+          {rows.length === 0 && <div>Niente da cambiare.</div>}
+          {rows.length > 0 && (
+            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
+              {rows.map((v) => (
+                <li key={v.id || v.name}>
+                  <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{v.name}</b>{v.changes?.length ? `: ${v.changes.join(", ")}` : ""}
+                  {report.apply && v.changes?.length ? (v.done ? <span style={{ color: CP.accentGreen }}> · fatto</span> : <span style={{ color: CP.accentRed }}> · non riuscito{v.error ? `: ${v.error}` : ""}</span>) : null}
+                  {!report.apply && v.error && <span style={{ color: CP.accentRed }}> · {v.error}</span>}
+                  {v.warnings?.map((w) => <div key={w} style={{ color: CP.textMuted, fontSize: 12.5 }}>{w}</div>)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(report.created || []).length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              Viste nuove per le creator senza vista: {report.created.map((c) => `${c.name}${report.apply ? (c.done ? " (creata)" : ` (non creata${c.error ? `: ${c.error}` : ""})`) : ""}`).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** «Contratti da recuperare» nello spazio Area Partner (18/10/2026): un sottotask per chi non ha il contratto firmato. */
+function MilestonesCard({ status, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState(null);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    setRes(null);
+    try { setRes({ ...(await postJson("/api/admin/hr/sync", { action: "contract_milestones" })), at: Date.now() }); await onDone?.(); }
+    catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }} aria-labelledby="hr-ms-h">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+          <h2 id="hr-ms-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Contratti da recuperare</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textMuted }}>
+            Nella lista «Milestone» dell'Area Partner: un sottotask per ogni persona del CRM senza contratto «Firmato». Va in done da solo quando nella scheda lo stato diventa «Firmato» (o la persona esce). Si aggiorna ogni notte e subito dopo ogni modifica alla scheda.
+            {status?.parentId ? <> · <a href={`https://app.clickup.com/t/${status.parentId}`} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>apri su ClickUp</a></> : null}
+          </p>
+          {status && (status.open || status.done) ? <p style={{ margin: "6px 0 0", fontSize: 13.5, color: CP.textSecondary }}>{status.open} da recuperare · {status.done} chiusi</p> : null}
+        </div>
+        <button type="button" onClick={go} disabled={busy} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy ? "Aggiorno…" : "Aggiorna adesso"}</button>
+      </div>
+      {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
+      {res && <div role="status" style={{ marginTop: 10, fontSize: 13.5, color: CP.textSecondary }}>Aggiornato alle {new Date(res.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}: {res.created || 0} creati, {res.closed || 0} chiusi, {res.updated || 0} aggiornati · {res.open} da recuperare{res.pending ? ` · ${res.pending} al prossimo giro (rilancia)` : ""}{res.errors?.length ? ` · errori: ${res.errors.slice(0, 3).join("; ")}` : ""}</div>}
+    </section>
   );
 }

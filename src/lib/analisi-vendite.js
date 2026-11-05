@@ -17,18 +17,21 @@ import {
   normalizeRange, previousRange, pctDelta, namesSql, recapSql, recapDailySql, conversioniSql,
   rapportoSql, metaMeseSql, transazioniSql, chargebackSql,
   nuoviMetricsSql, nuoviPersoneSql, nuoviLinkSql, trackingSql, coperturaSql, coperturaDailySql,
-  notificheAggSql, notificheListSql, welcomeSql, ricercaSql, cleanSearch, SUB_TYPES,
+  notificheAggSql, notificheListSql, ricercaSql, cleanSearch, SUB_TYPES,
   diagnosiSql, diagnosiDailySql,
 } from "@/lib/analisi-vendite-sql";
 import { buildDiagnosi, summaryOf, personOf } from "@/lib/analisi-vendite-diagnosi";
 import { withLettura } from "@/lib/confronto-lettura";
 import { duplicateIds } from "@/lib/warehouse-duplicates";
 import {
-  lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkWelcomeDailySql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
+  lkRecapDailyNetSql, lkRecapDailySubsSql, lkClicksSql, lkPerfSql, lkSubsRangeSql, lkAmountRangeSql,
   lkTxSummarySql, lkTxSeriesSql, lkTxTopUsersSql, lkTxListSql, lkUsersSql, lkChargebacksSql, lkOverallSql, lkOverallDailySql,
   lkNewsubsDailySql, lkNewsubsListSql, lkNewsubsCreatorSql, confrontoSql, confrontoTopFansSql,
 } from "@/lib/looker-sql";
 import { personKey } from "@/lib/live-creators";
+import { welcomeTrackingSql } from "@/lib/welcome-tracking-sql";
+import { summarize as summarizeWelcome, ruleWindows } from "@/lib/welcome-tracking-core";
+import { listRules, rulesStamp } from "@/lib/welcome-tracking";
 import { getLiveCreators } from "@/lib/live-creators-store";
 
 function daysOf(range) {
@@ -55,7 +58,8 @@ const TABLES = {
   reach: ["onlyfans", "reach"],
   notifications: ["postgres", "public_notifications"],
   linksSubscriptions: ["onlyfans", "links_subscriptions"],
-  welcomeUnlocks: ["onlyfans", "welcome_unlocks"],
+  // benvenuto a pagamento (31/10/2026): non più onlyfans.welcome_unlocks (prezzi a mano nel foglio dell'altra parte) → lib/welcome-tracking
+  organicSubs: ["onlyfans", "organic_subscriptions"],
   usersResearch: ["onlyfans", "users_research"],
   chat: ["onlyfans", "chat"],
   // viste del warehouse usate dal Report Looker (non sono nella copia di sicurezza: senza warehouse non rispondono)
@@ -108,7 +112,7 @@ export async function visibleCreators(scope) {
 
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
-function shape(view, rows, names, range, live) {
+function shape(view, rows, names, range, live, ctx = {}) {
   const nameOf = (id) => names[Number(id)] || `Creator ${id}`;
   if (view === "recap") {
     const [byCreator, daily] = rows;
@@ -224,12 +228,8 @@ function shape(view, rows, names, range, live) {
     };
   }
   if (view === "welcome") {
-    const list = rows[0].map((r) => {
-      const subs = Number(r.subs) || 0, unlocks = Number(r.unlocks) || 0, amount = Number(r.amount) || 0;
-      return { creator_id: Number(r.creator_id), name: nameOf(r.creator_id), amount, type: r.type, subs, unlocks, revenue: r2(amount * unlocks), cr: subs ? unlocks / subs : null };
-    }).sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "it"));
-    const unlocks = list.reduce((a, r) => a + r.unlocks, 0);
-    return { rows: list, total: { unlocks, revenue: r2(list.reduce((a, r) => a + r.revenue, 0)) } };
+    // righe pagina × prezzo × periodo (un cambio di prezzo = due righe), vedi lib/welcome-tracking-core
+    return summarizeWelcome(rows[0], { names, rules: ctx.rules || [], today: ctx.today });
   }
   if (view === "ricerca-fan") {
     return { rows: (rows[0] || []).map((r) => ({ ...r, creator_id: Number(r.creator_id), name: nameOf(r.creator_id), spent: r2(r.spent), transactions: Number(r.transactions) || 0 })) };
@@ -240,7 +240,8 @@ function shape(view, rows, names, range, live) {
     return { persons, summary: summaryOf(persons), previous: previousRange(range) };
   }
   if (view === "creator") {
-    const [agg, daily, links, cbs, welcome, ticket, types] = rows;
+    const [agg, daily, links, cbs, welcomeRows, ticket, types] = rows;
+    const welcome = summarizeWelcome(welcomeRows, { names, rules: ctx.rules || [], today: ctx.today });
     const person = buildDiagnosi(agg, names, daily, daysOf(range))[0] || null;
     const linkRows = links.map((r) => ({
       name: nameOf(r.creator_id), link_name: r.link_name, link_url: r.link_url, spending_id: r.spending_id,
@@ -258,8 +259,8 @@ function shape(view, rows, names, range, live) {
         total: linkRows.length,
       },
       chargebacks: cbs.slice(0, 10).map((r) => ({ ...r, name: nameOf(r.creator_id), amount: r2(r.amount) })),
-      welcome: welcome.filter((r) => Number(r.amount) > 0).map((r) => ({ name: nameOf(r.creator_id), amount: Number(r.amount), subs: Number(r.subs) || 0, unlocks: Number(r.unlocks) || 0, revenue: r2(Number(r.amount) * (Number(r.unlocks) || 0)) })),
-      welcomeMissing: welcome.filter((r) => !(Number(r.amount) > 0)).map((r) => nameOf(r.creator_id)),
+      welcome: welcome.rows,
+      welcomeUnpaid: welcome.unpaid.map((r) => r.name),
       ticket: ticket.filter((r) => r.month === range.to.slice(0, 7)).map((r) => ({ name: nameOf(r.creator_id), avg: r2(r.avg), median: r2(r.median), transactions: Number(r.transactions) })),
       newsubs: types.filter((r) => r.k != null).map((r) => ({ type: TYPE[r.k] || r.k, subs: Number(r.subs) || 0, d0: r.subs ? r2(r.spend_d0 / r.subs) : null, cr30: r.subs ? r.conv / r.subs : null, ltv30: r.subs ? r2(r.revenue / r.subs) : null })),
       previous: previousRange(range),
@@ -302,10 +303,7 @@ function shape(view, rows, names, range, live) {
     const cr = t.c ? t.s / t.c : null; const crp = t.cp ? t.sp / t.cp : null;
     return { rows: list, total: { clicks: t.c, clicks_delta: pctDelta(t.c, t.cp), subs: t.s, subs_delta: pctDelta(t.s, t.sp), cr, cr_delta: cr != null && crp ? (cr - crp) / crp : null }, previous: previousRange(range) };
   }
-  if (view === "lk-welcome") {
-    const w = shape("welcome", [rows[0]], names, range);
-    return { ...w, daily: rows[1].map((r) => ({ day: r.day, subs: Number(r.subs) || 0, unlocks: Number(r.unlocks) || 0 })) };
-  }
+  if (view === "lk-welcome") return shape("welcome", rows, names, range, live, ctx);
   if (view === "lk-perf") {
     const [perf, byRange, byCreatorRange, amount] = rows;
     const list = perf.map((r) => {
@@ -460,6 +458,8 @@ function confrontoShape(agg, topFans, nameOf, range) {
   };
 }
 
+const WELCOME_VIEWS = new Set(["welcome", "lk-welcome", "creator"]);
+
 const BUILDERS = {
   recap: (refs, ids, range) => [recapSql(refs, ids, range), recapDailySql(refs, ids, range)],
   conversioni: (refs, ids, range) => [conversioniSql(refs, ids, range)],
@@ -470,13 +470,13 @@ const BUILDERS = {
   tracking: (refs, ids, range) => [trackingSql(refs, ids, range)],
   copertura: (refs, ids, range) => [coperturaSql(refs, ids, range), coperturaDailySql(refs, ids, range)],
   notifiche: (refs, ids, range) => [notificheAggSql(refs, ids, range), notificheListSql(refs, ids, range)],
-  welcome: (refs, ids, range) => [welcomeSql(refs, ids, range)],
+  welcome: (refs, ids, range, q, f, nameOf, dups, ctx) => [welcomeTrackingSql(refs, ids, range, ctx.windows)],
   "ricerca-fan": (refs, ids, range, q) => [ricercaSql(refs, ids, q)],
   diagnosi: (refs, ids, range) => [diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range)],
   confronto: (refs, ids, range, q, f, nameOf) => [confrontoSql(refs, ids, range), confrontoTopFansSql(refs, ids, range, personGroups(ids, nameOf).pairs)],
   "lk-recap": (refs, ids, range) => [recapSql(refs, ids, range), lkRecapDailyNetSql(refs, ids, range), lkRecapDailySubsSql(refs, ids, range)],
   "lk-clicks": (refs, ids, range) => [lkClicksSql(refs, ids, range)],
-  "lk-welcome": (refs, ids, range) => [welcomeSql(refs, ids, range), lkWelcomeDailySql(refs, ids, range)],
+  "lk-welcome": (refs, ids, range, q, f, nameOf, dups, ctx) => [welcomeTrackingSql(refs, ids, range, ctx.windows)],
   "lk-perf": (refs, ids, range) => [lkPerfSql(refs, ids, range), lkSubsRangeSql(refs, ids, range, "subscription_range"), lkSubsRangeSql(refs, ids, range, "creator_id"), lkAmountRangeSql(refs, ids, range)],
   "lk-tx": (refs, ids, range, q, f) => [lkTxListSql(refs, ids, range, f), lkTxSummarySql(refs, ids, range, f), lkTxSeriesSql(refs, ids, range, f), lkTxTopUsersSql(refs, ids, range, f)],
   "lk-users": (refs, ids, range, q, f) => [lkUsersSql(refs, ids, range, f)],
@@ -486,9 +486,9 @@ const BUILDERS = {
     nuoviMetricsSql(refs, ids, range, "sub_type"), nuoviMetricsSql(refs, ids, range, "creator_id"), nuoviPersoneSql(refs, ids, range), nuoviLinkSql(refs, ids, range),
     lkNewsubsDailySql(refs, ids, range), lkNewsubsListSql(refs, ids, range), lkNewsubsCreatorSql(refs, ids, range),
   ],
-  creator: (refs, ids, range) => [
+  creator: (refs, ids, range, q, f, nameOf, dups, ctx) => [
     diagnosiSql(refs, ids, range), diagnosiDailySql(refs, ids, range), trackingSql(refs, ids, range), chargebackSql(refs, ids, range),
-    welcomeSql(refs, ids, range), rapportoSql(refs, ids, { from: `${range.to.slice(0, 7)}-01`, to: range.to }), nuoviMetricsSql(refs, ids, range, "sub_type"),
+    welcomeTrackingSql(refs, ids, range, ctx.windows), rapportoSql(refs, ids, { from: `${range.to.slice(0, 7)}-01`, to: range.to }), nuoviMetricsSql(refs, ids, range, "sub_type"),
   ],
 };
 
@@ -504,7 +504,11 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   // filtri delle pagine Looker (link, utente, tipo, spending, username, pagamento): validati nelle query
   const f = Object.fromEntries(Object.entries(query.f || {}).filter(([, v]) => v != null && String(v).trim() !== "").map(([k, v]) => [k, String(v).trim().slice(0, 80)]));
   const fk = Object.keys(f).sort().map((k) => `${k}=${f[k]}`).join("&");
-  const key = `analisi:v6:${view}:${range.from}:${range.to}:${q || ""}:${fk}:${[...ids].sort((a, b) => a - b).join(",")}`;
+  // viste con il benvenuto: i prezzi inseriti a mano entrano nella query e nella chiave di cache
+  const rules = WELCOME_VIEWS.has(view) ? (await listRules()).filter((r) => ids.includes(Number(r.creator_id))) : [];
+  const ctx = { rules, windows: ruleWindows(rules, range.to), today: new Date().toISOString().slice(0, 10) };
+  const wk = WELCOME_VIEWS.has(view) ? `:w${rulesStamp(rules)}` : "";
+  const key = `analisi:v7:${view}:${range.from}:${range.to}:${q || ""}:${fk}:${[...ids].sort((a, b) => a - b).join(",")}${wk}`;
   if (!force) {
     const hit = await kv.get(key).catch(() => null);
     if (hit) return { ...hit, cached: true };
@@ -512,8 +516,8 @@ export async function getAnalisi(view, ids, query = {}, { force = false } = {}) 
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
   const dups = await duplicateIds();
-  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f, (id) => names[Number(id)] || `Creator ${id}`, dups), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
-  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range, await getLiveCreators().catch(() => [])) };
+  const { source, rows } = await runOnSource((refs) => BUILDERS[view](refs, ids, range, q, f, (id) => names[Number(id)] || `Creator ${id}`, dups, ctx), view.startsWith("lk-") || view === "confronto" ? { maxBytesBilled: 20 * 1024 ** 3, timeoutMs: 45_000 } : undefined);
+  const out = { view, range, source, computed_at: new Date().toISOString(), ...(q ? { q } : {}), ...(fk ? { filters: f } : {}), ...shape(view, rows, names, range, await getLiveCreators().catch(() => []), ctx) };
   await kv.set(key, out, { ex: 600 }).catch(() => {});
   return out;
 }

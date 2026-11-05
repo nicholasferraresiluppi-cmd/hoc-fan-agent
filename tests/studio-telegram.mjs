@@ -131,7 +131,8 @@ console.log(`studio-telegram: ${n} gruppi di asserzioni ok`);
     else body = JSON.parse(init?.body || "{}");
     calls.push({ method, body });
     if (method === "sendMediaGroup") { const media = JSON.parse(body.media); return { ok: true, status: 200, json: async () => ({ ok: true, result: media.map(() => ({ message_id: ++msgId })) }) }; }
-    if (["sendMessage", "sendPhoto"].includes(method)) return { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: ++msgId } }) };
+    if (["sendMessage", "sendPhoto", "sendPoll"].includes(method)) return { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: ++msgId } }) };
+    if (method === "pinChatMessage") return { ok: true, status: 200, json: async () => ({ ok: true, result: true }) };
     throw new Error(`metodo inatteso ${method}`);
   };
   const S = await import("../src/lib/studio-telegram.js");
@@ -140,10 +141,15 @@ console.log(`studio-telegram: ${n} gruppi di asserzioni ok`);
   const PID = "instagram-prova";
   store.set("tg:ch:ch1", { id: "ch1", chat_id: -1001, title: "Canale prova", links: [{ key: "k1", name: "Instagram · bio", url: "https://t.me/+bio" }], bot: { status: "admin" }, members: 12 });
 
+  // un richiamo preparato prima che il link OF esista
+  const pre = await S.savePost(PID, { text: "Il resto è di là.", role: "richiamo", sendAt: Date.now() + 86400e3 }, "u1");
   // canale + link OF
   ok(!(await S.saveTgConfig(PID, { channelId: "nope" })).ok, "canale inesistente rifiutato");
   ok(!(await S.saveTgConfig(PID, { ofLinkUrl: "https://evil.com/x" })).ok, "link OF non OnlyFans rifiutato");
   ok((await S.saveTgConfig(PID, { channelId: "ch1", ofLinkUrl: "https://onlyfans.com/prova/c9" }, "u1")).ok, "canale collegato");
+  const preAfter = (await S.listPosts(PID)).find((p) => p.id === pre.post.id);
+  ok(preAfter.buttonUrl === "https://onlyfans.com/prova/c9" && preAfter.buttonLabel, "il link OF va da solo sui richiami in bozza");
+  await S.deletePost(PID, pre.post.id);
 
   // foto
   const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
@@ -200,6 +206,15 @@ console.log(`studio-telegram: ${n} gruppi di asserzioni ok`);
   globalThis.fetch = realFetch;
   const errPost = (await S.listPosts(PID)).find((p) => p.id === r5.post.id);
   ok(res.failed === 1 && errPost.status === "errore" && /not a member/.test(errPost.error), "errore Telegram scritto sul post");
+
+  // benvenuto fissato + sondaggio: testo, sondaggio, pin del primo messaggio
+  const r6 = await S.savePost(PID, { text: "Benvenuto", poll: { question: "Da dove arrivi?", options: ["Instagram", "TikTok"] }, pin: true, sendAt: now + 55 * 60e3, reviews: { conformita: { outcome: "ok" }, qualita: { outcome: "ok" } } }, "u1");
+  await S.approvePost(PID, r6.post.id, "nicholas");
+  const before = calls.length;
+  res = await S.sendDuePosts({ now: now + 56 * 60e3, listProfileIds: async () => [PID] });
+  const methods = calls.slice(before).map((c) => c.method);
+  ok(res.sent === 1 && methods.join() === "sendMessage,sendPoll,pinChatMessage", `benvenuto: ${methods.join()}`);
+  ok(calls.find((c) => c.method === "sendPoll").body.is_anonymous === true, "sondaggio anonimo (canale)");
 
   // landing: indirizzo unico, solo se attiva, conteggi
   ok((await S.saveTgConfig(PID, { landing: { slug: "prova", title: "Prova", target: "https://t.me/+bio", photoId: p2.id, active: true } }, "u1")).ok, "landing salvata");

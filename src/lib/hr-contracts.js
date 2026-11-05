@@ -156,9 +156,16 @@ export async function syncContracts({ budgetMs = 45_000, pdfSource = downloadCon
   }
 }
 
+// 18/10/2026 (Nicholas): i contratti si gestiscono A MANO. HOC Pro non scrive più «Stato del
+// contratto» né allega i PDF firmati: lo fa l'Area Partner, e il suo lavoro arretrato lo tiene
+// «Contratti da recuperare» (hr-contract-milestone.js). La lettura da Dropbox Sign resta per il
+// controllo in /admin/hr/contratti (a mano, dal bottone). Rimettere true = riaccendere tutto.
+export const CONTRACTS_WRITE_TO_CRM = false;
+
 /** Campo «Stato del contratto» + PDF allegati su ClickUp, per tutte le persone abbinate. */
 async function applyToCrm({ store, deadline, pdfSource, by, onlyPersonId = null }) {
   const out = { statusSet: 0, attached: 0, attachPending: 0, noPdf: 0, errors: [] };
+  if (!CONTRACTS_WRITE_TO_CRM) return { ...out, off: true };
   const [people, links, attached] = await Promise.all([listPeople(), getLinks(), getAttached()]);
   const view = buildView(people, store, links, attached);
   const byPersonId = Object.fromEntries(people.map((p) => [p.id, p]));

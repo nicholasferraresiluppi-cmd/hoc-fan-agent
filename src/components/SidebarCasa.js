@@ -9,13 +9,14 @@
  * Nello stile attuale non viene mai reso (vedi AppShell).
  */
 import { groupOf } from "@/lib/page-groups";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { prefetchNav, prefetchMenuWhenIdle } from "@/lib/nav-prefetch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { UserButton, SignedIn } from "@clerk/nextjs";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
-import { useStyle, useTheme } from "@/lib/theme-client";
+import { useTheme } from "@/lib/theme-client";
 import { Sun, Moon } from "lucide-react";
 import { NAV_GROUPS, SIDEBAR_WIDTH } from "./Sidebar";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -48,7 +49,6 @@ const MANAGER = [
     { href: "/admin/settimana", label: "Da seguire" },
     { href: "/cm-cockpit", label: "Cockpit turno" },
     { href: "/admin/sales-coaching", label: "Coaching vendite" },
-    { href: "/admin/scaletta", label: "La scaletta" },
     { href: "/admin/prova-fedelta", label: "Prova fedeltà" },
     { href: "/admin/s4s", label: "Calendario S4S" },
     { href: "/admin/telegram", label: "Canali Telegram" },
@@ -60,6 +60,7 @@ const MANAGER = [
     { href: "/me/score", label: "I miei score" },
     { href: "/me/compenso", label: "Il mio compenso" },
     { href: "/me/percorso", label: "Il mio percorso" },
+    { href: "/me/porta-un-amico", label: "Porta un amico" },
   ] },
   { title: "Noi", items: [
     { href: "/cultura", label: "Come lavoriamo" },
@@ -74,6 +75,7 @@ const OPERATOR = [
     { href: "/me/score", label: "Come sto andando" },
     { href: "/me/compenso", label: "Il mio compenso" },
     { href: "/me/coaching", label: "Come migliorare" },
+    { href: "/me/porta-un-amico", label: "Porta un amico" },
   ] },
   { title: "Allenamento", items: [
     { href: "/", label: "Allenarsi", exact: true },
@@ -95,6 +97,9 @@ function dateLabel() {
 }
 
 export default function SidebarCasa() {
+  const router = useRouter();
+  // precaricamento al passaggio (29/10/2026): pagina e dati pronti al clic
+  const warm = (href) => ({ onPointerEnter: () => prefetchNav(router, href), onFocus: () => prefetchNav(router, href), onTouchStart: () => prefetchNav(router, href) });
   const pathname = usePathname() || "";
   const { data: me } = useSWR("/api/whoami", silentFetcher, { revalidateOnFocus: false });
   // alert solo a chi li vede (prima: 403 a ogni pagina per gli altri — giro per persona, 10/10/2026)
@@ -102,7 +107,6 @@ export default function SidebarCasa() {
   // S4S (14/10/2026): richieste da accettare + S4S di oggi da programmare
   const { data: s4sInbox } = useSWR(me?.authenticated && canSee("/admin/s4s", me.capabilities, me.admin) ? "/api/admin/s4s/inbox" : null, silentFetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60 * 1000 });
   const s4sCount = s4sInbox?.count || 0;
-  const [style, setStyle] = useStyle();
   const [theme, setTheme] = useTheme();
   const [tools, setTools] = useState(false);
   const [today, setToday] = useState("");
@@ -134,6 +138,9 @@ export default function SidebarCasa() {
   // Pagina corrente fuori dal menu corto → si apre l'elenco completo, così si vede dove si è
   const inShort = (wsOn && pathname === "/admin") || sections.some((s) => s.items.some(isActive));
   const shortHrefs = new Set(sections.flatMap((s) => s.items.map((i) => i.href)));
+  // telefono: le pagine principali del menu precaricate quando l'app è ferma (niente hover)
+  const menuKey = [...shortHrefs].join(",");
+  useEffect(() => { if (me?.authenticated) prefetchMenuWhenIdle(router, [...shortHrefs]); }, [me?.authenticated, menuKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // la voce accesa resta sempre in vista, anche in fondo a "Tutti gli strumenti"
   useEffect(() => {
     try { document.querySelector(".casa-nav a.on")?.scrollIntoView({ block: "nearest" }); } catch {}
@@ -153,7 +160,7 @@ export default function SidebarCasa() {
           <div key={si}>
             {s.title && <h4>{s.title}</h4>}
             {s.items.map((i) => (
-              <Link key={i.href} href={i.href} className={isActive(i) ? "on" : undefined} aria-current={isActive(i) ? "page" : undefined}>
+              <Link key={i.href} href={i.href} {...warm(i.href)} className={isActive(i) ? "on" : undefined} aria-current={isActive(i) ? "page" : undefined}>
                 {i.label}
                 {i.badge && openAlerts > 0 && <span className="b">{openAlerts}</span>}
                 {i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}
@@ -174,7 +181,7 @@ export default function SidebarCasa() {
               <h4>{g.label}</h4>
               {items.map((i) => {
                 const on = i.match ? i.match(pathname) : i.href === "/" ? pathname === "/" : pathname === i.href || pathname.startsWith(i.href + "/");
-                return <Link key={i.href} href={i.href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}{i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}</Link>;
+                return <Link key={i.href} href={i.href} {...warm(i.href)} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>{i.label}{i.href === "/admin/s4s" && s4sCount > 0 && <span className="b" aria-label={`${s4sCount} cose da fare`}>{s4sCount}</span>}</Link>;
               })}
             </div>
           );
@@ -190,11 +197,6 @@ export default function SidebarCasa() {
             {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
           </button>
         </div>
-        {me?.admin && (
-          <button type="button" className="casa-style" onClick={() => setStyle(style === "v3" ? "v2" : "v3")}>
-            Stile nuovo (anteprima) · torna al vecchio
-          </button>
-        )}
       </SignedIn>
     </aside>
   );

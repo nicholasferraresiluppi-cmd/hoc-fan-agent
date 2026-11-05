@@ -35,6 +35,16 @@ async function summarize(c) {
   const shouldBe = goal && first.days_in_month ? (goal * first.day_of_month) / first.days_in_month : null;
   const paceRatio = shouldBe ? mtd / shouldBe : hist ? proj / hist : null;
 
+  // giorno per giorno (26/10/2026, grafici dello stile vetro): mese in corso e mese prima, tutti i paesi
+  // insieme, dalla stessa cache di Revenue (trend 95 gg) — niente query in più
+  const prevMonth = month ? (() => { const [y, m] = month.split("-").map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return d.toISOString().slice(0, 7); })() : null;
+  const dailyOf = (mm) => {
+    if (!mm) return [];
+    const out = new Array(31).fill(0);
+    for (const t of rev?.trend || []) if (String(t.date).startsWith(mm)) out[Number(String(t.date).slice(8, 10)) - 1] += Number(t.daily_revenue) || 0;
+    return out.map(Math.round);
+  };
+
   const now = Date.now();
   const countries = c.accounts.map((a) => {
     const cc = a.country;
@@ -48,7 +58,8 @@ async function summarize(c) {
       latMin: t.lat_med_s != null ? t.lat_med_s / 60 : null,
       welcomePending: t.welcome_pending ?? null,
       revenueToday: t.revenue ?? null,
-      top: q.slice(0, 3).map((x) => ({ user_id: x.user_id, username: x.username, reason: x.reason, tier: x.tier, wait_min: x.wait_min, last_fan_at: x.last_fan_at })),
+      // 8: la scheda ne mostra 3, la scheda aperta (stile vetro) tutti
+      top: q.slice(0, 8).map((x) => ({ user_id: x.user_id, username: x.username, reason: x.reason, tier: x.tier, wait_min: x.wait_min, last_fan_at: x.last_fan_at })),
       shift: shifts ? shiftStatus(shifts.byCountry?.[cc], now) : null,
     };
   });
@@ -60,7 +71,7 @@ async function summarize(c) {
 
   return {
     slug: c.slug, name: c.name, countries,
-    revenue: rev ? { month, mtd, proj, hist, goal, goalSuggested, shouldBe, paceRatio, day: first.day_of_month, days: first.days_in_month, updated_at: rev.updated_at } : null,
+    revenue: rev ? { month, mtd, proj, hist, goal, goalSuggested, shouldBe, paceRatio, day: first.day_of_month, days: first.days_in_month, updated_at: rev.updated_at, daily: dailyOf(month), prevDaily: dailyOf(prevMonth) } : null,
     chatUpdated: chat?.generated_at || null,
     light,
     missing: [!rev && "revenue", !chat && "chat", !shifts && "turni"].filter(Boolean),

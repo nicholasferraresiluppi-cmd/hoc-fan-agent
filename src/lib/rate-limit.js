@@ -50,6 +50,8 @@ export const LIMITS = {
   scouting_reels:  [{ window: 3600, max: 60 }],                             // carica reel, per persona
   // Landing dello Studio social (16/10/2026): pubblica. Non è un freno ai costi ma ai numeri gonfiati:
   // oltre questa soglia per IP e indirizzo la visita/il clic passa ma NON si conta.
+  // Agente qualità dello Studio social: ~15-20 centesimi a controllo (c'è anche il tetto mensile).
+  studio_qc:       [{ window: 3600, max: 30 }, { window: 86400, max: 120 }],
   landing_visit:   [{ window: 3600, max: 3 }],
   landing_click:   [{ window: 3600, max: 3 }],
 };

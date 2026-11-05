@@ -298,6 +298,55 @@ console.log(`scouting: ${n} asserzioni ok`);
   console.log("coda valuta: ok");
 }
 
+// --- voto a 4 livelli, engagement, filtri e ordinamento della coda (21/10/2026)
+{
+  const { review, unreview, reviewQueue, buildCreators, ratingOf, parseEr, passRanges, parseRefreshItem: pri, setStage: ss } = await import("../src/lib/scouting-core.js");
+  // engagement: testo con %, frazione, ripiego su like+commenti, valori assurdi
+  assert.equal(parseEr("3.4%"), 3.4);
+  assert.equal(parseEr("0.034"), 3.4);
+  assert.equal(parseEr("12"), 12, "numero > 1 senza % = già percento");
+  assert.equal(parseEr(null, { likes: 900, comments: 100, fol: 20000 }), 5);
+  assert.equal(parseEr("N/A"), null);
+  assert.equal(parseEr("250%"), null, "oltre 100% = dato sporco");
+  assert.equal(pri({ Account: "x", "Followers Count": 1000, "Median ER": "2.5%" }).er, 2.5);
+  // il voto: fase e coda
+  let crm = review({ creators: {} }, "h:a", "no", "N");
+  assert.equal(crm.creators["h:a"].stage, "scartata"); assert.equal(crm.creators["h:a"].rating, 1);
+  crm = review(crm, "h:b", "forse", "N");
+  assert.equal(crm.creators["h:b"].stage, "da_valutare", "forse resta da valutare");
+  crm = review(crm, "h:c", "top", "N");
+  assert.equal(crm.creators["h:c"].stage, "interessante"); assert.equal(crm.creators["h:c"].rating, 4);
+  // cambiare idea: da Sì a Forse torna da valutare; Annulla torna alla fase di prima del primo voto
+  crm = review(crm, "h:c", "forse", "N");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare");
+  crm = review(crm, "h:c", "si", "N");
+  crm = unreview(crm, "h:c");
+  assert.equal(crm.creators["h:c"].stage, "da_valutare"); assert.equal(crm.creators["h:c"].rating, undefined);
+  // un voto non fa tornare indietro una creator già contattata
+  crm = ss(crm, "h:d", "contattata");
+  crm = review(crm, "h:d", "no", "N");
+  assert.equal(crm.creators["h:d"].stage, "contattata"); assert.equal(crm.creators["h:d"].rating, 1);
+  // le decisioni del primo giro valgono come voti, senza riscrivere il CRM
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "interessante" }), 3);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "scartata" }), 1);
+  assert.equal(ratingOf({ reviewedAt: 1, stage: "da_valutare" }), 2);
+  assert.equal(ratingOf({ stage: "interessante" }), null, "interessante dalla scheda senza voto");
+  assert.equal(review({ creators: {} }, "h:z", "vista", "N").creators["h:z"].rating, 2, "vecchio «vista» = Forse");
+  // coda: «forse» = da rivedere; ordinamento e filtri
+  const cs = buildCreators([
+    { h: "a", sig: "forte", fol: 10000, medv: 5000, er: 2 }, { h: "b", sig: "forte", fol: 400000, medv: 90000, er: 1 },
+    { h: "e", sig: "forte", fol: 80000, medv: 60000, er: 7 }, { h: "f", sig: "forte", fol: 120000, medv: 20000 },
+  ], crm);
+  assert.deepEqual(reviewQueue(cs, { scope: "forse" }).map((c) => c.handles[0]), ["b"]);
+  assert.deepEqual(reviewQueue(cs, { sort: "er" }).map((c) => c.handles[0]), ["e", "f"], "senza engagement in fondo");
+  assert.deepEqual(reviewQueue(cs, { sort: "fol" }).map((c) => c.handles[0]), ["f", "e"]);
+  assert.deepEqual(reviewQueue(cs, { ranges: { er: "3" } }).map((c) => c.handles[0]), ["e"], "dato mancante non passa un filtro attivo");
+  assert.deepEqual(reviewQueue(cs, { ranges: { fol: "50-300", medv: "50k" } }).map((c) => c.handles[0]), ["e"]);
+  ok(passRanges({ fol: 50000 }, { fol: "50-300" }) && !passRanges({ fol: 300000 }, { fol: "50-300" }), "min incluso, max escluso");
+  assert.equal(cs.find((c) => c.handles[0] === "b").rating, 2);
+  console.log("voto e filtri: ok");
+}
+
 // --- catena dei seguiti: folAt/fing arrivano sulla creator (14/10/2026)
 {
   const { buildCreators } = await import("../src/lib/scouting-core.js");
@@ -306,4 +355,77 @@ console.log(`scouting: ${n} asserzioni ok`);
   assert.equal(cs.find((c) => c.handles[0] === "a").fing, 120);
   assert.equal(cs.find((c) => c.handles[0] === "b").folAt, null);
   console.log("catena seguiti: ok");
+}
+
+// --- test Elisa (17/10/2026): link che da soli non dicono niente, aperti dal server
+{
+  const { classifyUrl, probeVerdict, probeKind, probedOrClassified, probeUrlsOf, probeCandidates, applyProbes, buildCreators, whyLines, attentionScore } = await import("../src/lib/scouting-core.js");
+  // WhatsApp: canale = diretto come Telegram, numero = da guardare
+  assert.equal(classifyUrl("https://whatsapp.com/channel/0029Va").label, "Canale WhatsApp");
+  assert.equal(classifyUrl("https://whatsapp.com/channel/0029Va").strength, 2);
+  assert.equal(classifyUrl("https://wa.me/393331234567").strength, 1);
+  assert.equal(classifyUrl("https://cliickto.me/elisaaesp").label, "Pagina di link");
+  // codice delle pagine vere (ridotto): cliickto.me di Elisa, iambabye.com di Elena Maraga, elisaesposito.com
+  assert.equal(probeVerdict('<img src="https://assets.linkscale.to/icons/onlyfans/onlyfans-1.webp">').label, "OnlyFans");
+  assert.equal(probeVerdict('<a id="onlyfans" href="/go?k=of" class="link">').strength, 3);
+  assert.equal(probeVerdict('<img src="https://minisoft-cdn.pages.dev/sw/images/of.svg">').label, "OnlyFans");
+  assert.equal(probeVerdict('{"url":"https:\\/\\/onlyfans.com\\/sara_x"}').label, "OnlyFans", "indirizzo vero, anche nel JSON con le barre");
+  assert.equal(probeVerdict('<a href="https://onlyfans.com/legal/terms">'), null, "le pagine legali non sono un profilo");
+  // la sola parola non basta (Linktree, TikTok e i giornali la contengono per tutti)
+  assert.equal(probeVerdict('<script>var types=["onlyfans","telegram","18+"]</script>'), null);
+  // Telegram e WhatsApp contano solo sulle pagine di link, non su un sito qualsiasi
+  assert.equal(probeVerdict('<a href="https://t.me/ilfattoquotidiano">'), null, "il canale del giornale");
+  assert.deepEqual(probeVerdict('<a href="https://t.me/saracanale">', { linkPage: true }).strength, 1, "canale pubblico = indizio");
+  assert.equal(probeVerdict('<a href="https://t.me/+AbCdEf12">', { linkPage: true }).label, "Telegram privato");
+  assert.equal(probeVerdict('<a href="https://t.me/share/url?u=x">', { linkPage: true }), null, "pulsante condividi");
+  assert.equal(probeVerdict("<p>Benvenuti nel mio sito di gioielli</p>"), null);
+  // cosa si apre: pagine di link e siti propri sì; social, giornali e link già parlanti no
+  assert.deepEqual(probeKind("https://cliickto.me/elisaaesp"), { linkPage: true });
+  assert.deepEqual(probeKind("https://elisaesposito.com"), { linkPage: false });
+  assert.equal(probeKind("https://www.tiktok.com/@x"), null);
+  assert.equal(probeKind("https://www.corriere.it/scuola/x"), null);
+  assert.equal(probeKind("https://onlyfans.com/x"), null);
+  // il risultato aperto vince sull'etichetta del sito
+  const elisa = { h: "eli.espositoo", fol: 708000, sig: "nessuno", hlLinks: ["https://cliickto.me/elisaaesp"], hlVia: [] };
+  assert.deepEqual(probeUrlsOf(elisa), ["https://cliickto.me/elisaaesp"]);
+  const after = applyProbes(elisa, { "https://cliickto.me/elisaaesp": { label: "OnlyFans", strength: 3, hits: ["OnlyFans", "Telegram"] } }, 1000);
+  assert.equal(after.sig, "forte", "Elisa: da nessun segnale a profilo a pagamento");
+  assert.equal(probedOrClassified(after, "https://cliickto.me/elisaaesp").label, "OnlyFans dentro cliickto.me");
+  assert.deepEqual(probeUrlsOf(after, { now: 1000 + 86400000 }), [], "non si riapre prima di 30 giorni");
+  // una pagina che non dice niente non abbassa mai il livello e non crea un forte
+  const deb = applyProbes({ h: "x", sig: "debole", url: "https://miosito.it" }, { "https://miosito.it": null }, 1);
+  assert.equal(deb.sig, "debole");
+  // una pagina che non si è aperta si riprova dopo 7 giorni, non 30
+  const blk = applyProbes({ h: "w", sig: "nessuno", url: "https://linktr.ee/w" }, { "https://linktr.ee/w": { err: true } }, 0);
+  assert.equal(blk.sig, "nessuno");
+  assert.deepEqual(probeUrlsOf(blk, { now: 6 * 86400000 }), []);
+  assert.deepEqual(probeUrlsOf(blk, { now: 8 * 86400000 }), ["https://linktr.ee/w"]);
+  // link già parlanti o generici non si aprono; i forti non sono candidati
+  assert.deepEqual(probeUrlsOf({ h: "y", url: "https://onlyfans.com/y", hlLinks: ["https://open.spotify.com/a"] }), []);
+  assert.equal(probeCandidates([{ h: "z", sig: "forte", url: "https://miosito.it" }]).length, 0);
+  assert.equal(probeCandidates([{ h: "a", fol: 10, url: "https://a.it" }, { h: "b", fol: 99, url: "https://b.it" }])[0].h, "b", "prima i più seguiti");
+  // notorietà: famosa + OnlyFans sui giornali pesa e si dice in parole
+  const [c] = buildCreators([{ ...after, press: { n: 7, of: true, top: [{ title: "La prof del corsivo su OnlyFans", url: "https://www.fanpage.it/x", site: "fanpage.it" }], at: 5 } }], { creators: {} });
+  assert.equal(c.press.n, 7);
+  ok(whyLines(c).some((w) => w.includes("Famosa fuori da OnlyFans")), "il perché cita i giornali");
+  const [plain] = buildCreators([{ ...after }], { creators: {} });
+  ok(attentionScore(c) > attentionScore(plain) + 4, "la notorietà sposta la creator in alto");
+  console.log("test Elisa (pagine aperte + giornali): ok");
+}
+
+// --- scritture sovrapposte (17/10/2026): si salva la differenza, non la lista intera
+{
+  const { diffProfiles, applyProfileDiff } = await import("../src/lib/scouting-core.js");
+  const before = [{ h: "a", sig: "nessuno" }, { h: "b", fol: 1 }];
+  const mine = [{ h: "a", sig: "forte" }, { h: "b", fol: 1 }, { h: "nuova", fol: 5 }]; // la segnalazione
+  const meanwhile = [{ h: "a", sig: "nessuno", press: { n: 3 } }, { h: "b", fol: 2 }, { h: "x", fol: 9 }]; // scritto da altri nel frattempo
+  const out = applyProfileDiff(meanwhile, diffProfiles(before, mine));
+  assert.deepEqual(out.find((p) => p.h === "a"), { h: "a", sig: "forte", press: { n: 3 } }, "si tengono entrambe le modifiche");
+  assert.equal(out.find((p) => p.h === "b").fol, 2, "un campo non toccato da me resta quello nuovo");
+  ok(out.some((p) => p.h === "x") && out.some((p) => p.h === "nuova"), "nessun profilo perso, l'aggiunto c'è");
+  const del = applyProfileDiff(meanwhile, diffProfiles(before, [{ h: "b", fol: 1 }]));
+  ok(!del.some((p) => p.h === "a"), "una cancellazione resta cancellazione");
+  const unset = applyProfileDiff([{ h: "a", sig: "x", tmp: 1 }], diffProfiles([{ h: "a", sig: "x", tmp: 1 }], [{ h: "a", sig: "x" }]));
+  ok(!("tmp" in unset[0]), "un campo tolto si toglie");
+  console.log("scritture sovrapposte: ok");
 }

@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { CP, FONTS } from "@/lib/brand";
-import { PageHead, HeroMetric, Metric, DataTable, Notice, SectionTitle, NUM } from "@/components/ds";
+import { PageHead, HeroMetric, Metric, DataTable, Notice, SectionTitle, NUM, BTN, BTN_PRIMARY } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -37,8 +38,8 @@ const section = { display: "flex", flexDirection: "column", gap: 12, padding: "2
 const th = { textAlign: "right", padding: "8px 10px", fontSize: 12, color: CP.textMuted, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" };
 const td = { textAlign: "right", padding: "8px 10px", fontSize: 13, color: CP.textSecondary, borderBottom: `1px solid ${CP.borderSoft}`, whiteSpace: "nowrap", ...NUM };
 const tdL = { ...td, textAlign: "left", color: CP.textPrimary, whiteSpace: "normal" };
-const btn = { background: CP.surfaceAlt, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONTS.body, minHeight: 36 };
-const btnPrimary = { ...btn, background: CP.accent, color: CP.accentInk, border: `1px solid ${CP.accent}`, fontWeight: 500 };
+const btn = BTN;
+const btnPrimary = BTN_PRIMARY;
 const input = { background: CP.bgSunken, border: `1px solid ${CP.border}`, color: CP.textPrimary, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: FONTS.body, minHeight: 36 };
 
 function Text({ children, muted, style }) {
@@ -147,8 +148,8 @@ function ProvaForm({ data, onSaved }) {
             <td style={td}>{fmtVal(kind, cur)}</td>
             <td style={td}>
               <input id={`scal-t-${k}`} inputMode="decimal" value={vals[k] ?? ""} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} aria-label={`Obiettivo ${label}`}
-                style={{ ...input, width: 90, textAlign: "right" }} />
-              <span style={{ color: CP.textMuted, marginLeft: 6 }}>{kind === "pct" ? "%" : kind === "usd" ? "$" : ""}</span>
+                style={{ ...input, width: 90, height: 34, minHeight: 0, boxSizing: "border-box", padding: "6px 10px", textAlign: "right" }} />
+              <span style={{ color: CP.textMuted, marginLeft: 6, display: "inline-block", width: 12, textAlign: "left" }}>{kind === "pct" ? "%" : kind === "usd" ? "$" : ""}</span>
             </td>
           </tr>
         );
@@ -185,7 +186,7 @@ export default function ScalettaPage() {
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false, refreshInterval: (d) => (d?.computing ? 8000 : 0) });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  const wrap = { padding: "28px 20px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body };
+  const wrap = { padding: "28px 20px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
 
   const post = async (body) => {
     setBusy(true);
@@ -341,7 +342,7 @@ export default function ScalettaPage() {
       <section style={section}>
         <SectionTitle>{data.prova ? "La prova in corso" : "Avvia una prova"}</SectionTitle>
         {data.prova
-          ? <ProvaView prova={data.prova} onEnd={() => post({ action: "end_prova", creator_id: p.id })} />
+          ? <ProvaView prova={data.prova} onEnd={async () => { if (await confirmDialog("Chiudere la prova? Le misure si fermano a oggi.", { ok: "Chiudi la prova", danger: true })) post({ action: "end_prova", creator_id: p.id }); }} />
           : <ProvaForm data={data} onSaved={() => mutate()} />}
       </section>
 
