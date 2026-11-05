@@ -897,14 +897,14 @@ const FIRST_NAMES = new Set([
   "alesandra", "alesia", "alice", "amanda", "amelia", "ana", "analisa", "anastasia", "angela",
   "angelica", "antonela", "ariana", "ashley", "asia", "aurora", "azura", "barbara", "beatrice",
   "benedeta", "bianca", "britany", "camila", "carla", "carlota", "carmen", "caterina", "cecilia",
-  "chiara", "chloe", "claudia", "cristina", "dalila", "daniela", "debora", "denise", "diana",
+  "chiara", "chloe", "clara", "clarisa", "claudia", "cristina", "dalila", "daniela", "debora", "denise", "diana",
   "elena", "eleonora", "elisa", "elisabeta", "ema", "emanuela", "emily", "erica", "erika", "eva",
   "federica", "fiorela", "francesca", "gaia", "giada", "giana", "ginevra", "gioia", "giorgia",
   "giovana", "giulia", "giuliana", "giusepina", "greta", "hanah", "ilaria", "irene", "isabela",
   "jasmin", "jasmine", "jenifer", "jesica", "kate", "katie", "kimberly", "laura", "lavinia",
   "letizia", "lily", "lisa", "lorena", "lucia", "ludovica", "luisa", "madalena", "madison",
   "manuela", "mara", "margherita", "maria", "mariana", "marika", "marina", "marta", "martina",
-  "matilde", "megan", "melanie", "melisa", "michela", "miriam", "monica", "nadia", "natalia",
+  "matilde", "megan", "melanie", "melisa", "michela", "michele", "miriam", "monica", "nadia", "natalia",
   "natalie", "nicole", "noemi", "olivia", "paola", "patrizia", "rachel", "rachele", "rebeca",
   "roberta", "rosa", "rosalba", "rosela", "sabrina", "samantha", "sara", "serena", "silvia",
   "simona", "sofia", "sonia", "sophia", "sophie", "stefania", "stela", "teresa", "tiziana",
@@ -982,7 +982,10 @@ export function matchWebResults(h, results) {
     else {
       const us = webStem(user);
       const near = us.length >= 5 && stem.length >= 7 && (us.includes(stem) || stem.includes(us));
-      if (stem.length >= 7 && webStem(title) === stem) how = near || /^u\d+$/.test(user) ? "titolo" : "simile";
+      // handle di UNA parola ("sinister", "michelle"): il titolo uguale lo può avere chiunque, prova solo
+      // se l'indirizzo è quello a numeri di default (giro del 5/11: @sssinister_ → "Sinister" di un'altra)
+      const strong = /^u\d+$/.test(user) || (near && webTokens(handle).length > 1);
+      if (stem.length >= 7 && webStem(title) === stem) how = strong ? "titolo" : "simile";
       else if (near && us.length >= 7) how = "simile";
     }
     if (!how || (best && rank[how] <= rank[best.how])) continue;
