@@ -146,15 +146,15 @@ const TINTS = {
   notte: {
     scheme: "dark",
     vars: toVars(CP_VETRO_NOTTE),
-    // stesse macchie del vetro bianco, accese su un fondo quasi nero
-    bg: "radial-gradient(620px 620px at 28% -6%,rgba(99,83,224,.34) 0,rgba(99,83,224,0) 70%),radial-gradient(560px 560px at 104% 38%,rgba(47,107,255,.22) 0,rgba(47,107,255,0) 70%),radial-gradient(520px 520px at -4% 96%,rgba(15,138,138,.22) 0,rgba(15,138,138,0) 70%),#0a0d16",
-    shadow: "0 10px 40px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.07)",
-    ink: "linear-gradient(160deg,#7466ee,#4e3fcf)",
-    tiles: ["#6353e0", "#2f6bff", "#0f8a8a", "#147a4c", "#e0a33b", "#c2508a"],
-    solid: "--cp-surface:rgba(22,28,44,.97);--cp-surfaceAlt:#262f47;--cp-border:rgba(255,255,255,.12)",
-    // validate_palette --mode dark sul fondo #141a28: lightness, chroma, daltonici e contrasto passano
-    series: ["#8b7cf6", "#14a8aa", "#bf8320", "#d06aa0", "#5c87f0", "#7d869c"],
-    darkTiles: [4], lvl1: "rgba(224,163,59,.7)", lvl2: "rgba(240,140,140,.55)",
+    // «mezzanotte» (5/11/2026): luce indaco in alto, ciano a destra, su un nero blu profondo
+    bg: "radial-gradient(800px 600px at 20% -10%,rgba(99,102,241,.5),rgba(99,102,241,0) 65%),radial-gradient(700px 600px at 100% 50%,rgba(34,211,238,.22),rgba(34,211,238,0) 65%),#060818",
+    shadow: "0 0 0 1px rgba(255,255,255,.06),0 20px 50px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)",
+    ink: "linear-gradient(160deg,#6366f1,#4338ca)",
+    tiles: ["#6366f1", "#2563eb", "#0891b2", "#059669", "#f59e0b", "#db2777"],
+    solid: "--cp-surface:rgba(17,22,52,.97);--cp-surfaceAlt:#222a5c;--cp-border:rgba(129,140,248,.24)",
+    // validate_palette --mode dark sul fondo #11163a: lightness, chroma, daltonici e contrasto passano
+    series: ["#7c83f2", "#0f9fb6", "#c38618", "#de5f9c", "#4a84ee", "#7d869c"],
+    darkTiles: [4], lvl1: "rgba(251,191,36,.7)", lvl2: "rgba(251,113,133,.6)",
   },
 };
 // :root davanti = vince sulle regole dello stile Casa ([data-style="v3"] .ds-hero …)

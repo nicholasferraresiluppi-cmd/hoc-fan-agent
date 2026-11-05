@@ -265,8 +265,10 @@ const SH = { blue: "#4a7fd4", green: "#3f9b5a", grey: "#8a92a2", amber: "#d9a520
 // 4/11/2026) le stesse tinte velate sul fondo scuro e testo chiaro. Variabili in BIL_CSS.
 const FILL_HEX = { peach: "#fce5cd", blue: "#c9daf8", green: "#d9ead3", grey: "#e6e6e6", yellow: "#fff2cc", yellowStrong: "#ffe599", coral: "#f4cccc", target: "#cfe2f3", hit: "#b6d7a8", navy: "#1f2a44", section: "#e8ebf2", lilac: "#e4dcfb" };
 const FILL = Object.fromEntries(Object.keys(FILL_HEX).map((k) => [k, `var(--bil-${k})`]));
-const BIL_CSS = `:root{${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${v};`).join("")}--bil-ink:#1f2a44;--bil-rule:rgba(31,42,68,.18)}`
-  + `:root:not([data-theme="light"]){${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${k === "navy" ? "#26314f" : `color-mix(in srgb, ${v} ${k === "yellowStrong" || k === "hit" ? 30 : 18}%, transparent)`};`).join("")}--bil-ink:#e8ecf5;--bil-rule:rgba(255,255,255,.12)}`;
+// scuro «mezzanotte» (5/11/2026): le stesse famiglie di colore del foglio, vive e velate sul fondo scuro
+const BIL_DARK = { peach: "rgba(251,191,36,.20)", blue: "rgba(129,140,248,.24)", green: "rgba(52,211,153,.22)", grey: "rgba(255,255,255,.05)", yellow: "rgba(251,191,36,.20)", yellowStrong: "rgba(251,191,36,.30)", coral: "rgba(251,113,133,.22)", target: "rgba(129,140,248,.24)", hit: "rgba(52,211,153,.22)", navy: "#3338a8", section: "rgba(255,255,255,.05)", lilac: "rgba(167,139,250,.22)" };
+const BIL_CSS = `:root{${Object.entries(FILL_HEX).map(([k, v]) => `--bil-${k}:${v};`).join("")}--bil-band:#1f2a44;--bil-ink:#1f2a44;--bil-rule:rgba(31,42,68,.18)}`
+  + `:root:not([data-theme="light"]){${Object.entries(BIL_DARK).map(([k, v]) => `--bil-${k}:${v};`).join("")}--bil-band:linear-gradient(90deg,#3730a3,#1d4ed8);--bil-ink:#ffffff;--bil-rule:rgba(255,255,255,.12)}`;
 const ECO_DOT = { rosa: "#e58bb5", viola: "#8b6fe0", verde: "#3f9b5a" };
 const COUNTRY_SHORT = { IT: "IT", EN: "ENG", ES: "ESP" };
 const COUNTRY_TINT = { IT: SH.blue, EN: SH.green, ES: SH.grey };
@@ -286,7 +288,7 @@ function Sheet({ data, go, mine, editing, onSaved }) {
   return (
     <>
       <div className="vt-glass" style={{ ...card, overflow: "hidden", marginBottom: 18 }}>
-        <div style={{ background: FILL.navy, color: "#fff", padding: "12px 18px", fontSize: 16, fontWeight: 600, letterSpacing: 0.2 }}>
+        <div style={{ background: "var(--bil-band)", color: "#fff", padding: "12px 18px", fontSize: 16, fontWeight: 600, letterSpacing: 0.2 }}>
           Bilancio creator · {monthLabel(data.month)} <span style={{ fontWeight: 400, opacity: 0.75 }}>· dati live dal warehouse</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
