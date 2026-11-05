@@ -26,7 +26,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
     }
     if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: probedOrClassified(p, p.url) });
     // trovato cercando su Google: la prova (porta al suo Instagram, stesso nome…) e il prezzo letto da Google
-    if (p.web?.url) links.push({ url: p.web.url, where: "Trovato su Google", h: p.h, k: { label: `${p.web.strength >= 2 ? "OnlyFans" : "OnlyFans con un nome simile, da confermare"}${p.web.price ? ` · ${String(p.web.price).replace(".", ",")} $ al mese` : ""}`, strength: p.web.strength } });
+    if (p.web?.url) links.push({ url: p.web.url, where: "Trovato su Google", h: p.h, k: { label: `${p.web.strength >= 2 ? "OnlyFans" : p.web.how === "citata" ? "Nominata in un post di un'altra creator, da confermare" : "OnlyFans con un nome simile, da confermare"}${p.web.price ? ` · ${String(p.web.price).replace(".", ",")} $ al mese` : ""}`, strength: p.web.strength } });
   }
   const googled = ps.some((p) => p.web?.at && !p.web.url);
 

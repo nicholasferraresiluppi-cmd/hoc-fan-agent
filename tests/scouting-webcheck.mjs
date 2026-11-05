@@ -58,6 +58,12 @@ eq([m.user, m.how], ["sara_yourdream", "utente"], "stesso nome, separatori diver
 m = matchWebResults("biancanevehh", [r("https://onlyfans.com/biancaneveeeh", "biancaneveeh", "italy. https://instagram.com/biancanevehh?igshid=YmMyMTA2M2Y=")]);
 eq(m.how, "ig", "la prova più forte vince anche se l'indirizzo è simile");
 
+m = matchWebResults("minuminula", [r("https://onlyfans.com/2830000000/chiaramente_ginger.free", "Post — OnlyFans", "Abbonati anche a @minuminula ❤️")]);
+eq([m.how, m.strength, m.url, m.price], ["citata", 1, "https://onlyfans.com/2830000000/chiaramente_ginger.free", null], "primo giro: nominata nel post di un'altra → indizio, link al post");
+m = matchWebResults("minuminula", [r("https://onlyfans.com/2830000001/minuminula", "Post — OnlyFans", "@minuminula · Sep 7")]);
+eq(m.how, "ig", "un suo post vale come la sua pagina");
+m = matchWebResults("minuminula", [r("https://onlyfans.com/2830000000/altra", "Post —", "@minuminula"), r("https://onlyfans.com/minuminula", "Minu", "")]);
+eq([m.how, m.url], ["utente", "https://onlyfans.com/minuminula"], "la sua pagina vince sulla citazione");
 m = matchWebResults("serenamotore", [r("https://onlyfans.com/laserenamotore", "Serena", "")]);
 eq([m.how, m.strength], ["simile", 1], "indirizzo che contiene il suo nome: da guardare, non certo");
 console.log("trovate: ok");
