@@ -48,9 +48,6 @@ const PHONE_CSS = `
   .rx-page .ds-h1{font-size:30px !important;line-height:1.08 !important}
   .rx-tabs{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;gap:22px !important;margin:0 -16px 20px !important;padding:0 16px}
   .rx-tabs::-webkit-scrollbar{display:none}
-  .ro-nums{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:18px 16px !important;padding:18px 0 !important}
-  .ro-nums > div > span:first-child{font-size:34px !important}
-  .ro-nums > div > span:last-child{font-size:12.5px !important}
   .ro-today{display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;gap:16px !important;margin:0 -16px;padding:0 16px 6px;scrollbar-width:none}
   .ro-today::-webkit-scrollbar{display:none}
   .ro-today > article{flex:0 0 86%;scroll-snap-align:start}
