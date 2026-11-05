@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
 import { tabStyle, TABS_BAR } from "@/components/ds";
+import { useShownPath } from "@/lib/nav-pending";
 
 const TOOLS = [
   { href: "/admin/pnl-live",         label: "P&L Live" },
@@ -25,13 +26,13 @@ const TOOLS = [
 
 export default function CompNav({ palette } = {}) {
   const P = palette || CP; // palette alternativa (tema chiaro del pilota)
-  const pathname = String(usePathname() || "").replace(/\/$/, "");
+  const pathname = String(useShownPath(usePathname()) || "").replace(/\/$/, ""); // si accende al tocco, non all'arrivo della pagina
   return (
     <nav aria-label="Comp & Ben" className="ds-tabs" style={{ ...TABS_BAR, borderBottom: `1px solid ${P.borderStrong}`, margin: "0 0 22px", fontFamily: FONTS.body }}>
       {TOOLS.map(({ href, label, also }) => {
         const active = pathname === href || (also || []).includes(pathname);
         return (
-          <Link key={href} href={href} aria-current={active ? "page" : undefined} className="hoc-tab" style={tabStyle(active, { P })}>
+          <Link key={href} href={href} prefetch aria-current={active ? "page" : undefined} className="hoc-tab" style={tabStyle(active, { P })}>
             {label}
           </Link>
         );
