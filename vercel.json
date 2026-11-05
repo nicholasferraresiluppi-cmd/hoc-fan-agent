@@ -21,6 +21,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/scouting-webcheck",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/studio-telegram",
       "schedule": "*/10 * * * *"
     },

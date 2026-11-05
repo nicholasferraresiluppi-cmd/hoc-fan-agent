@@ -66,6 +66,12 @@ m = matchWebResults("minuminula", [r("https://onlyfans.com/2830000000/altra", "P
 eq([m.how, m.url], ["utente", "https://onlyfans.com/minuminula"], "la sua pagina vince sulla citazione");
 m = matchWebResults("serenamotore", [r("https://onlyfans.com/laserenamotore", "Serena", "")]);
 eq([m.how, m.strength], ["simile", 1], "indirizzo che contiene il suo nome: da guardare, non certo");
+// giro completo 5/11: handle di una parola sola, titolo uguale su una pagina di un'altra → indizio
+eq(matchWebResults("sssinister_", [r("https://onlyfans.com/sinisterdollz", "Sinister", "")])?.how, "simile", "una parola sola nel titolo non è una prova");
+eq(matchWebResults("mysteria.ita", [r("https://onlyfans.com/u94299833", "Mysteria", "")])?.how, "titolo", "…ma con l'indirizzo a numeri sì");
+eq(matchWebResults("michelle002841", [r("https://onlyfans.com/godessmichelle", "Michelle", "")]), null, "Michelle = nome di battesimo");
+eq(matchWebResults("claariissa_", [r("https://onlyfans.com/clarissa.x", "Clarissa", "")]), null, "Clarissa = nome di battesimo");
+eq(matchWebResults("martina.rinaldii", [r("https://onlyfans.com/martinarin05", "Martina rinaldi", "")])?.how, "titolo", "nome e cognome nel titolo, indirizzo vicino");
 console.log("trovate: ok");
 
 // ---------- scartate ----------

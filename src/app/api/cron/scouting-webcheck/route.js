@@ -1,7 +1,9 @@
 /**
  * POST /api/cron/scouting-webcheck — porta avanti la ricerca su Google degli OnlyFans delle
  * creator del Radar (lib/scouting-webcheck). Si AUTO-CONCATENA finché il giro non finisce.
- * La sveglia è il dispatcher (una volta al giorno): avvia il primo giro, lo fa ripartire ogni
+ * Sveglie: il dispatcher (una volta al giorno) e un cron suo ogni 10 minuti in vercel.json — la
+ * catena da sola si ferma al 4º salto (protezione anti-ricorsione di Vercel, vedi lib/cron-chain):
+ * il primo giro vero si è fermato a 600 su 2.238. Avvia il primo giro, lo fa ripartire ogni
  * settimana sugli account nuovi e lo riprende se la catena si è interrotta (deploy, timeout).
  * A giro finito è un giro a vuoto (1 lettura KV). Lucchetto `scouting:webcheck:lock`: mai due
  * passi insieme (lancerebbero due run Apify). Auth: Bearer CRON_SECRET o sessione SEED; GET solo cron.
