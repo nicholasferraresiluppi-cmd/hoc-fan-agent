@@ -376,7 +376,7 @@ export function publicAlerts(a, pub, now = Date.now()) {
   const w = pub.wakes?.list?.[0];
   if (w && a.platform !== "x") {
     const altri = pub.wakes.list.length - 1;
-    out.push({ lev: "ok", t: `Un reel di ${w.ageDays} giorni fa è ripartito su ${a.username}`, d: `Sta facendo ${w.perDay.toLocaleString("it-IT")} visualizzazioni al giorno (un reel tipico del profilo ne fa ${pub.wakes.median.toLocaleString("it-IT")} in tutto) ed è a ${w.views.toLocaleString("it-IT")}.${altri > 0 ? ` Altri ${altri} reel vecchi stanno ripartendo.` : ""} Guarda cosa ha di diverso e rifanne una versione: lo trovi in Dati.` });
+    out.push({ lev: "ok", t: `Un reel di ${w.ageDays} giorni fa è ripartito su ${a.username}`, d: `Sta facendo ${w.perDay.toLocaleString("it-IT")} visualizzazioni al giorno (un reel tipico del profilo ne fa ${pub.wakes.median.toLocaleString("it-IT")} in tutto) ed è a ${w.views.toLocaleString("it-IT")}.${altri === 1 ? " Anche un altro reel vecchio sta ripartendo." : altri > 1 ? ` Altri ${altri} reel vecchi stanno ripartendo.` : ""} Guarda cosa ha di diverso e rifanne una versione: lo trovi in Dati.` });
   }
   if (a.platform === "x" && !last.notFound && last.premium === false) out.push({ lev: "warn", t: `Premium non attivo su ${a.username}`, d: "Letto dal profilo pubblico: senza Premium un post fa in media meno di 100 visualizzazioni." });
   return out;
