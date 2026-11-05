@@ -741,7 +741,7 @@ export function bestLink(ps) {
     }
     // trovato cercando su Google (5/11/2026): qui la forza la dà la prova che è lei, non il dominio
     const w = p.web;
-    if (w?.url && w.strength > (best?.strength ?? -1)) best = { label: w.strength >= 2 ? "OnlyFans" : "OnlyFans con un nome simile", strength: w.strength, where: "web", url: w.url, how: w.how };
+    if (w?.url && w.strength > (best?.strength ?? -1)) best = { label: w.strength >= 2 ? "OnlyFans" : w.how === "citata" ? "Nominata su OnlyFans" : "OnlyFans con un nome simile", strength: w.strength, where: "web", url: w.url, how: w.how };
   }
   return best;
 }
@@ -888,6 +888,7 @@ const WEB_HOW = {
   titolo: "la pagina OnlyFans ha il suo stesso nome",
   utente: "l'indirizzo OnlyFans è il suo stesso nome",
   simile: "indirizzo OnlyFans con un nome simile, da confermare",
+  citata: "un'altra creator la nomina in un post su OnlyFans, da confermare",
 };
 const WEB_HOSTS = /(^|\.)(onlyfans\.com|fansly\.com|fanvue\.com)$/;
 const WEB_NOISE = new Set(["official", "officiale", "ufficiale", "real", "the", "its", "im", "iam", "private", "privato", "privata", "backup", "back", "up", "reel", "reels", "of", "vip", "ita", "italy", "xx", "xo"]);
@@ -927,15 +928,21 @@ export function webQuery(h) {
 
 /** Indirizzo di una pagina OnlyFans → nome utente ("/soryugeggy", "/2736337520/irenemarinaroo"), o null. */
 export function webUserOf(url) {
+  return webPageOf(url)?.user || null;
+}
+
+/** Come webUserOf, più `post`: la pagina è un post (/<numero>/<utente>), non il profilo. */
+function webPageOf(url) {
   try {
     const u = new URL(url);
     if (!WEB_HOSTS.test(u.hostname.replace(/^www\./, "").toLowerCase())) return null;
     const seg = u.pathname.split("/").filter(Boolean);
-    const user = /^\d+$/.test(seg[0] || "") ? seg[1] : seg[0];
+    const post = /^\d+$/.test(seg[0] || "");
+    const user = post ? seg[1] : seg[0];
     // "/@francesca-tocca/media": pagine che OnlyFans genera per un nome, senza un profilo dietro
     // (Google: "Nessuna informazione disponibile"), primo giro del 5/11/2026 — non sono una prova
     if (!user || user.startsWith("@") || OF_PATHS_NOT_PROFILES.test(user)) return null;
-    return user.toLowerCase();
+    return { user: user.toLowerCase(), post };
   } catch {
     return null;
   }
@@ -958,15 +965,18 @@ export function matchWebResults(h, results) {
   // che porta al suo Instagram (primo giro: @rosalba abbinata a una "Rosalba" spagnola)
   const onlyName = FIRST_NAMES.has(stem);
   const igRe = new RegExp(`(instagram\\.com/|@)${reEsc(handle)}(?![a-z0-9_.])`, "i");
-  const rank = { ig: 4, titolo: 3, utente: 2, simile: 1 };
+  const rank = { ig: 4, titolo: 3, utente: 2, simile: 1, citata: 1 };
   let best = null;
   for (const r of results || []) {
-    const user = webUserOf(r?.url || "");
-    if (!user) continue;
+    const page = webPageOf(r?.url || "");
+    if (!page) continue;
+    const { user, post } = page;
     const text = `${r.title || ""} ${r.description || ""}`;
     const title = String(r.title || "").replace(/\s*onlyfans\s*$/i, "").trim();
     let how = null;
-    if (igRe.test(text)) how = "ig";
+    // nominata nel post di un'ALTRA creator (scambi di promozione: "abbonati a @…"): indizio, e il
+    // link resta quel post — non è la sua pagina (primo giro: @minuminula in un post di un'altra)
+    if (igRe.test(text)) how = post && webStem(user) !== stem ? "citata" : "ig";
     else if (onlyName) continue;
     else if (stem.length >= 7 && webStem(user) === stem) how = "utente";
     else {
@@ -976,9 +986,9 @@ export function matchWebResults(h, results) {
       else if (near && us.length >= 7) how = "simile";
     }
     if (!how || (best && rank[how] <= rank[best.how])) continue;
-    // la pagina del profilo, non quella di un suo post
-    const url = `https://onlyfans.com/${user}`;
-    best = { url, user, strength: how === "simile" ? 1 : 3, how, price: webPrice(r.description), title: title.slice(0, 80) };
+    // la pagina del profilo, non quella di un suo post (se citata, il post dove la nominano)
+    const url = how === "citata" ? r.url : `https://onlyfans.com/${user}`;
+    best = { url, user, strength: how === "simile" || how === "citata" ? 1 : 3, how, price: how === "citata" ? null : webPrice(r.description), title: title.slice(0, 80) };
   }
   return best;
 }
