@@ -14,8 +14,8 @@ import { Plus } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, card, NUM } from "@/components/ds";
-import { useInVetro } from "@/components/VetroScope";
-import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
+import { Panel, MixBar } from "@/components/VetroCharts";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 import { PLATFORMS, PLATFORM_LABEL, STATUSES, phaseLine } from "@/lib/studio-social-core";
 
 const fetcher = async (url) => {
@@ -69,31 +69,49 @@ function NewProfile({ open, onClose, onSaved }) {
   );
 }
 
-/*
- * Vetro: «a che punto è la coda dei contenuti, e cosa aspetta una persona?» — tutti i contenuti dei
- * profili in una barra nell'ordine del lavoro (idea → pubblicato), accanto «Da approvare».
- */
+// Intestazione «stile reel» (05/11/2026): una frase con il numero che conta (da approvare) e i
+// conteggi della coda; sotto, la barra della coda dall'idea al pubblicato.
 function StudioTop({ profiles }) {
   const sum = (k) => profiles.reduce((a, p) => a + (p.counts?.[k] || 0), 0);
   const items = STATUSES.filter((x) => x.key !== "scartato").map((x, k) => ({ label: x.label, value: sum(x.key), color: x.key === "pubblicato" ? CP.accentGreen : undefined, k }));
   const toApprove = sum("da_approvare");
+  const working = STATUSES.filter((x) => !["pubblicato", "scartato"].includes(x.key)).reduce((n, x) => n + sum(x.key), 0);
   return (
-    <div className="vt-row21" style={{ marginBottom: 16 }}>
-      <Panel title="La coda dei contenuti" aside={`${profiles.length} ${profiles.length === 1 ? "profilo" : "profili"} · dall'idea al pubblicato`} i={0}>
-        {items.some((x) => x.value > 0) ? <MixBar items={items} format={(v) => String(v)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun contenuto in coda.</div>}
-      </Panel>
-      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
-        <HotTile i={1} lvl={toApprove ? "ink" : "0"} label="Da approvare" value={toApprove} sub={toApprove ? "pronti: una persona li guarda prima che escano" : "niente in attesa"} />
+    <>
+      <HeroHead
+        eyebrow="La redazione oggi"
+        title={toApprove ? "Da approvare ci sono" : "La redazione segue"}
+        accent={toApprove ? `${toApprove} ${toApprove === 1 ? "contenuto" : "contenuti"}` : `${profiles.length} ${profiles.length === 1 ? "profilo" : "profili"}`}
+        sub={toApprove ? "Pronti: una persona li guarda prima che escano." : "Niente in attesa di approvazione."}
+        numbers={<>
+          <BigNum label="Profili" value={profiles.length} />
+          <BigNum label="In lavorazione" value={working} />
+          <BigNum label="Da approvare" value={toApprove} strong={toApprove > 0} />
+          <BigNum label="Pubblicati" value={sum("pubblicato")} />
+        </>}
+      />
+      <div style={{ marginBottom: 16 }}>
+        <Panel title="La coda dei contenuti" aside="dall'idea al pubblicato" i={0}>
+          {items.some((x) => x.value > 0) ? <MixBar items={items} format={(v) => String(v)} /> : <div style={{ fontSize: 13, color: CP.textMuted }}>Ancora nessun contenuto in coda.</div>}
+        </Panel>
       </div>
-    </div>
+    </>
   );
 }
 
+// Schede dei profili: entrano una dopo l'altra e si sollevano al passaggio (fermi con «Riduci movimento»).
+const SS_CSS = `
+.ss-card{animation:ssIn .42s cubic-bezier(.2,.7,.2,1) both;transition:transform .18s ease, box-shadow .18s ease}
+@media (hover:hover){.ss-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px -14px rgba(0,0,0,.35)}}
+@keyframes ssIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ss-card{animation:none;transition:none}.ss-card:hover{transform:none}}
+`;
+
 /** Una scheda profilo nell'elenco (anche negli archiviati). */
-function ProfileCard({ p, today }) {
+function ProfileCard({ p, today, i = 0 }) {
   const open = STATUSES.filter((s) => !["pubblicato", "scartato"].includes(s.key)).reduce((n, s) => n + (p.counts?.[s.key] || 0), 0);
   return (
-    <Link href={`/admin/studio-social/${encodeURIComponent(p.id)}`} style={{ ...card, padding: 16, textDecoration: "none", display: "block" }}>
+    <Link href={`/admin/studio-social/${encodeURIComponent(p.id)}`} className="ss-card" style={{ ...card, padding: 18, borderRadius: 18, textDecoration: "none", display: "block", animationDelay: `${Math.min(i, 12) * 50}ms` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
         <div style={{ width: 42, height: 42, borderRadius: "50%", background: CP.accentSoft, color: CP.accentSoftText, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>
           {(p.handle || "?").replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase()}
@@ -126,7 +144,6 @@ export default function StudioSocialPage() {
   const profiles = all.filter((p) => !p.archived);
   const archived = all.filter((p) => p.archived);
   const [showArchived, setShowArchived] = useState(false);
-  const inVetro = useInVetro();
 
   return (
     <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
@@ -156,10 +173,11 @@ export default function StudioSocialPage() {
         </div>
       )}
 
-      {inVetro && profiles.length > 0 && <StudioTop profiles={profiles} />}
+      <style>{SS_CSS}</style>
+      {profiles.length > 0 && <StudioTop profiles={profiles} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 14 }}>
-        {profiles.map((p) => <ProfileCard key={p.id} p={p} today={data?.today} />)}
+        {profiles.map((p, i) => <ProfileCard key={p.id} p={p} i={i} today={data?.today} />)}
       </div>
 
       {archived.length > 0 && (
