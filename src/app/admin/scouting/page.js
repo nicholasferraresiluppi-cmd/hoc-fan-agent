@@ -39,6 +39,10 @@ const TABS = [
 // Telefono (10/10/2026, richiesta Nicholas: "il radar deve essere comodo dal telefono").
 // Esplora e Mercato hanno un disegno apposta (useIsPhone); qui le regole di contorno.
 const PHONE_CSS = `
+.rx-card{animation:rxIn .4s cubic-bezier(.2,.7,.2,1) both;transition:transform .18s ease, box-shadow .18s ease}
+@media (hover:hover){.rx-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px -16px rgba(0,0,0,.35)}}
+@keyframes rxIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rx-card{animation:none;transition:none}.rx-card:hover{transform:none}}
 .rx-strip{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
 .rx-strip::-webkit-scrollbar{display:none}
 @media (max-width:699px){
