@@ -44,6 +44,23 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+/**
+ * Engagement in percento (21/10/2026). L'attore restituisce «Median ER» come testo ("3.4%"):
+ * con il simbolo è già in percento; un numero nudo ≤ 1 è una frazione (0,034 → 3,4%).
+ * Senza ER: (like medi + commenti medi) ÷ follower. Valori assurdi (> 100%) = dato sporco → null.
+ */
+export function parseEr(raw, { likes, comments, fol } = {}) {
+  let v = null;
+  if (raw != null && raw !== "" && raw !== "N/A") {
+    const t = String(raw).trim();
+    const n = Number(t.replace("%", "").replace(",", ".").trim());
+    if (Number.isFinite(n)) v = t.includes("%") || n > 1 ? n : n * 100;
+  }
+  if (v == null && fol > 0 && (likes != null || comments != null)) v = (((likes || 0) + (comments || 0)) / fol) * 100;
+  if (v == null || !(v >= 0) || v > 100) return null;
+  return Math.round(v * 100) / 100;
+}
+
 /** Riga del giro settimanale (output Apify "analyzeSpecificAccounts") → numeri del profilo. */
 /** Toglie dalla bio email e numeri di telefono: non li teniamo (docs/SCOUTING_PRIVACY.md). Gli @handle restano, servono ai collegamenti. */
 export function scrubContacts(text) {
@@ -89,7 +106,7 @@ export function parseRefreshItem(it) {
     fol: num(it["Followers Count"]),
     medv: num(it["Median Views"]),
     vf: num(it["Views.Followers Ratio"]),
-    er: num(it["Median ER"]),
+    er: parseEr(it["Median ER"], { likes: num(it["Avg Likes"]), comments: num(it["Avg Comments"]), fol: num(it["Followers Count"]) }),
     url: url && url !== "N/A" ? String(url) : "",
     bio: typeof it.Biography === "string" ? scrubContacts(it.Biography).slice(0, 300) : undefined,
     pic: igPicUrl(it["Profile Picture"]),
@@ -155,6 +172,7 @@ export function applyRefresh(profiles, items, now = new Date()) {
       fol: r.fol ?? p.fol,
       medv: r.medv ?? p.medv,
       vf: r.vf ?? p.vf,
+      er: r.er ?? p.er ?? null,
       url: r.url || p.url,
       ...(r.bio !== undefined ? { bio: r.bio } : {}),
       ...(r.pic ? { pic: r.pic } : {}),
@@ -296,6 +314,8 @@ export function buildCreators(profiles, crm) {
       fol: ps.reduce((s, p) => s + (p.fol || 0), 0) || null,
       medv: Math.max(...ps.map((p) => p.medv || 0)) || null,
       vf: main.vf ?? null,
+      // engagement dell'account principale (il più seguito), in percento
+      er: main.er ?? null,
       g1: growthPct(hist, 1),
       g4: growthPct(hist, 4),
       sig,
@@ -313,6 +333,7 @@ export function buildCreators(profiles, crm) {
       agency: c.agency || null,
       reviewedAt: c.reviewedAt || null,
       reviewedBy: c.reviewedBy || null,
+      rating: ratingOf(c),
       notes: c.notes?.length || 0,
       updatedAt: c.updatedAt || null,
       missing: ps.every((p) => p.missing),
@@ -378,35 +399,104 @@ export function setStage(crm, id, stage, by) {
 }
 
 /**
- * Coda «Valuta» (13/10/2026): ogni creator riceve una decisione — scartata, vista (guardata, nessuna
- * azione per ora) o interessante — ed esce dalla coda. La fase di prima resta salvata per «Annulla».
+ * Coda «Valuta» (13/10/2026) e voto a 4 livelli (21/10/2026, decisione di Nicholas). Ogni creator
+ * riceve un voto ed esce dalla coda; la fase di prima resta salvata per «Annulla».
+ * Quattro livelli SENZA punto di mezzo (come le scorecard delle assunzioni): con 5 stelle quasi tutto
+ * finisce su 3, che è il voto di chi non decide. «Assolutamente» = priorità di contatto.
+ *   1 No → scartata · 2 Forse → resta da valutare (rivedere) · 3 Sì e 4 Assolutamente → interessante.
+ * Le decisioni del primo giro (scartata/vista/interessante) valgono come 1/2/3, senza riscrivere nulla.
  */
-export const REVIEW_DECISIONS = ["scartata", "vista", "interessante"];
+export const RATINGS = [
+  { v: 1, id: "no", label: "No", stage: "scartata" },
+  { v: 2, id: "forse", label: "Forse", stage: null },
+  { v: 3, id: "si", label: "Sì", stage: "interessante" },
+  { v: 4, id: "top", label: "Assolutamente", stage: "interessante" },
+];
+export const RATING_LABEL = Object.fromEntries(RATINGS.map((r) => [r.v, r.label]));
+const LEGACY_DECISION = { scartata: "no", vista: "forse", interessante: "si" };
+export const REVIEW_DECISIONS = [...RATINGS.map((r) => r.id), ...Object.keys(LEGACY_DECISION)];
+// fasi della valutazione: un voto le cambia; più avanti (contattata, trattativa, firmata) il voto non tocca la fase
+const REVIEW_STAGES = new Set([DEFAULT_STAGE, "interessante", "scartata"]);
+
+/** Voto di una creator dal CRM (1-4), anche per chi è stata valutata prima del voto. */
+export function ratingOf(c) {
+  if (!c) return null;
+  if (RATINGS.some((r) => r.v === c.rating)) return c.rating;
+  if (!c.reviewedAt) return null;
+  return c.stage === "scartata" ? 1 : c.stage === "interessante" ? 3 : 2;
+}
+
 export function review(crm, id, decision, by) {
   if (!REVIEW_DECISIONS.includes(decision)) throw new Error("decisione non valida");
+  const r = RATINGS.find((x) => x.id === (LEGACY_DECISION[decision] || decision));
   const handles = id.startsWith("h:") ? [id.slice(2)] : undefined;
   const next = ensureCreator(crm, id, handles);
   const cur = next.creators[id];
-  const prevStage = cur.stage || DEFAULT_STAGE;
-  next.creators[id] = { ...cur, stage: decision === "vista" ? prevStage : decision, prevStage, reviewedAt: Date.now(), reviewedBy: by || null, updatedAt: Date.now(), updatedBy: by || null };
+  const stageNow = cur.stage || DEFAULT_STAGE;
+  // «Annulla» torna alla fase di PRIMA del primo voto, anche se il voto si cambia più volte
+  const prevStage = cur.reviewedAt && cur.prevStage ? cur.prevStage : stageNow;
+  const stage = !REVIEW_STAGES.has(stageNow) ? stageNow : r.stage || (stageNow === "scartata" || stageNow === "interessante" ? DEFAULT_STAGE : stageNow);
+  next.creators[id] = { ...cur, stage, rating: r.v, prevStage, reviewedAt: Date.now(), reviewedBy: by || null, updatedAt: Date.now(), updatedBy: by || null };
   return next;
 }
 export function unreview(crm, id) {
   const cur = crm?.creators?.[id];
   if (!cur) return crm;
   const next = { ...crm, creators: { ...crm.creators } };
-  const { reviewedAt, reviewedBy, prevStage, ...rest } = cur;
+  const { reviewedAt, reviewedBy, prevStage, rating, ...rest } = cur;
   next.creators[id] = { ...rest, stage: prevStage || cur.stage || DEFAULT_STAGE, updatedAt: Date.now() };
   return next;
 }
 
-/** La coda: non ancora valutate, non nostre, ancora «da valutare», dalla più promettente. */
-export function reviewQueue(creators, { scope = "paid", newCut } = {}) {
+/**
+ * Filtri a intervallo (21/10/2026): follower, view per reel, engagement. Preimpostati e non a
+ * numero libero, così dal telefono si sceglie con un tocco. Un dato mancante non passa un filtro attivo.
+ */
+export const RANGE_FILTERS = {
+  fol: { label: "Follower", opts: [
+    { id: "all", label: "Tutti" }, { id: "lt50", label: "Sotto 50k", max: 5e4 }, { id: "50-300", label: "50k–300k", min: 5e4, max: 3e5 },
+    { id: "300-1m", label: "300k–1M", min: 3e5, max: 1e6 }, { id: "gt1m", label: "Oltre 1M", min: 1e6 },
+  ] },
+  medv: { label: "View per reel", opts: [
+    { id: "all", label: "Tutte" }, { id: "10k", label: "Oltre 10k", min: 1e4 }, { id: "50k", label: "Oltre 50k", min: 5e4 },
+    { id: "200k", label: "Oltre 200k", min: 2e5 },
+  ] },
+  er: { label: "Engagement", opts: [
+    { id: "all", label: "Tutti" }, { id: "1", label: "Oltre 1%", min: 1 }, { id: "3", label: "Oltre 3%", min: 3 }, { id: "6", label: "Oltre 6%", min: 6 },
+  ] },
+};
+export function passRanges(c, f = {}) {
+  for (const [k, def] of Object.entries(RANGE_FILTERS)) {
+    const o = def.opts.find((x) => x.id === f[k]);
+    if (!o || o.id === "all") continue;
+    const v = c[k];
+    if (v == null) return false;
+    if (o.min != null && v < o.min) return false;
+    if (o.max != null && v >= o.max) return false;
+  }
+  return true;
+}
+export const activeRanges = (f = {}) => Object.keys(RANGE_FILTERS).filter((k) => f[k] && f[k] !== "all").length;
+
+/** Ordinamenti della coda: «consigliato» = il punteggio di Oggi; gli altri dal più alto. */
+export const QUEUE_SORTS = [
+  { id: "auto", label: "Consigliato" },
+  { id: "fol", label: "Follower" },
+  { id: "medv", label: "View per reel" },
+  { id: "er", label: "Engagement" },
+  { id: "g4", label: "Crescita" },
+];
+
+/** La coda: non ancora valutate, non nostre, ancora «da valutare», ordinate e filtrate. */
+export function reviewQueue(creators, { scope = "paid", newCut, sort = "auto", ranges } = {}) {
+  const key = QUEUE_SORTS.some((s) => s.id === sort) && sort !== "auto" ? sort : null;
   return creators
-    .filter((c) => !c.reviewedAt && !c.ours && c.stage === DEFAULT_STAGE)
-    .filter((c) => scope === "all" || (scope === "paid" ? c.sig === "forte" : c.sig === "debole"))
+    // «forse» = la coda da rivedere: chi ha avuto Forse ed è ancora da valutare
+    .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && (scope === "forse" ? c.rating === 2 : !c.reviewedAt))
+    .filter((c) => scope === "all" || scope === "forse" || (scope === "paid" ? c.sig === "forte" : c.sig === "debole"))
+    .filter((c) => passRanges(c, ranges))
     .map((c) => ({ c, s: attentionScore(c, newCut) }))
-    .sort((a, b) => b.s - a.s)
+    .sort((a, b) => (key ? (b.c[key] ?? -Infinity) - (a.c[key] ?? -Infinity) : 0) || b.s - a.s)
     .map(({ c }) => c);
 }
 
@@ -815,7 +905,7 @@ export function hookLine(c, opts) {
 export function pickToday(creators, { n = 3, newCut = Date.now() - 8 * DAY } = {}) {
   const score = (c) => attentionScore(c, newCut);
   return creators
-    .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && c.sig !== "nessuno" && !c.missing)
+    .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && !c.reviewedAt && c.sig !== "nessuno" && !c.missing)
     .map((c) => ({ c, s: score(c) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, n)

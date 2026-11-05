@@ -22,6 +22,7 @@ import { fmt$, fmtInt, MONTHS_IT } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, DataTable, Notice, card } from "@/components/ds";
 
 import { tierLabel, tierColor } from "@/lib/tier-label";
+import { alertDialog } from "@/components/AppDialogs";
 const fetcher = async (url) => {
   const r = await fetch(url);
   const j = await r.json().catch(() => ({}));
@@ -63,7 +64,7 @@ export default function EmployeeDrilldownPage({ params }) {
   async function previewAsOperator() {
     const r = await fetch("/api/admin/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employee }) });
     if (r.ok) window.location.href = "/profilo";
-    else alert((await r.json().catch(() => ({}))).error || "Non riuscito");
+    else alertDialog((await r.json().catch(() => ({}))).error || "Non riuscito");
   }
   const cp = cpData?.cp;
   const cpHistory = cpHist?.history || [];
@@ -132,7 +133,7 @@ export default function EmployeeDrilldownPage({ params }) {
     .map((h) => ({ ...h, id: h.period_id, infw: infwBy.get(h.period_id)?.score ?? null }));
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Performance" }, { label: "Classifica vendite", href: "/leaderboard/sales-cp" }, { label: employee }]}
         title={employee}

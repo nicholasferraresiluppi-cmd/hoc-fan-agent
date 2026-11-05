@@ -12,6 +12,7 @@ import Link from "next/link";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, Notice, DataTable, FilterChip, card } from "@/components/ds";
 import { fmt$, fmtInt } from "@/lib/format";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const CATEGORIES = ["Big", "Medium", "Small"];
 
@@ -90,7 +91,7 @@ export default function GroupCategoriesPage() {
   }
 
   async function applySuggested() {
-    if (!confirm("Applicare i suggerimenti automatici a TUTTI i gruppi? Sovrascrive le scelte fatte a mano.")) return;
+    if (!(await confirmDialog({ title: "Applicare i suggerimenti automatici a TUTTI i gruppi?", message: "Sovrascrive le scelte fatte a mano.", ok: "Applica", danger: true }))) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -115,7 +116,7 @@ export default function GroupCategoriesPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Cancellare TUTTE le assegnazioni? I gruppi resteranno senza categoria finché non li assegni a mano o applichi i suggerimenti.")) return;
+    if (!(await confirmDialog({ title: "Cancellare TUTTE le assegnazioni?", message: "I gruppi resteranno senza categoria finché non li assegni a mano o applichi i suggerimenti.", ok: "Cancella", danger: true }))) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -175,7 +176,7 @@ export default function GroupCategoriesPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
         {head}
         <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento gruppi e statistiche…</div>
       </div>
@@ -184,7 +185,7 @@ export default function GroupCategoriesPage() {
 
   if (groupList.length === 0) {
     return (
-      <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
         {head}
         {error ? <Notice danger>{error}</Notice> : (
           <Notice>
@@ -220,7 +221,7 @@ export default function GroupCategoriesPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 96px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       {head}
 
       {error && <Notice danger>{error}</Notice>}

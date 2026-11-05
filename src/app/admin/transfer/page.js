@@ -101,7 +101,7 @@ export default function TransferPage() {
   const shown = operators.slice(0, 40);
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 20px 64px" }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "32px 20px 64px" }}>
       <PageHeader
         section="Academy · misura del transfer"
         title="Il comportamento si muove?"

@@ -4,9 +4,9 @@
 // porta, da dove viene ogni dato; di lato il lavoro (fase, chi la segue, account, note).
 import { useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { whyLines, probedOrClassified, agencies } from "@/lib/scouting-core";
+import { whyLines, probedOrClassified, agencies, RATINGS } from "@/lib/scouting-core";
 import RadarReels from "./RadarReels";
-import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, input, igProfile, Initials, LinkChip, Spark, H2, STAGE_LABEL } from "./radar-ui";
+import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, input, igProfile, Initials, LinkChip, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
 
 
 export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, onBack, onSelectHandle }) {
@@ -40,10 +40,12 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
         </div>
         <div className="rs-acts" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {c.handles.map((h) => <a key={h} href={igProfile(h)} target="_blank" rel="noopener noreferrer" style={btn}>Apri @{h} ↗</a>)}
-          {c.stage === "da_valutare" && <>
-            <button style={btnPrimary} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "interessante" }, `${c.name}: interessante.`)}>Interessante</button>
-            <button style={btnQuiet} disabled={busy} onClick={() => act({ action: "stage", id: c.id, stage: "scartata" }, `${c.name}: scartata.`)}>Scarta</button>
-          </>}
+          {["da_valutare", "interessante", "scartata"].includes(c.stage) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+              <span style={{ fontSize: 12.5, color: CP.textMuted }}>{c.rating ? "Il voto (si può cambiare)" : "Il tuo voto"}</span>
+              <RatingChips value={c.rating} disabled={busy} onRate={(id) => act({ action: "review", id: c.id, decision: id }, `${c.name}: ${RATINGS.find((r) => r.id === id).label}.`)} />
+            </div>
+          )}
         </div>
       </header>
 

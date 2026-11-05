@@ -20,7 +20,7 @@ import { pathAllowed } from "@/lib/restricted-roles";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
-import Sidebar, { NAV_ITEMS } from "./Sidebar";
+import Sidebar, { NAV_ITEMS, SIDEBAR_WIDTH } from "./Sidebar";
 import { groupMatch } from "@/lib/page-groups";
 import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
@@ -30,6 +30,7 @@ import { CP } from "@/lib/brand";
 import { uxPageChange } from "@/lib/ux-client";
 import { useStyle } from "@/lib/theme-client";
 import { V3TopBar, V3MobileHeader, V3TabBar } from "./ShellV3";
+import VetroScope, { useVetro, isVetroPath } from "./VetroScope";
 
 // Command bar (stile v3): scaricata solo alla prima apertura
 const CommandBar = dynamic(() => import("./CommandBar"), { ssr: false });
@@ -66,21 +67,25 @@ const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch((
  * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
  * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
  */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Studio social", "/admin/supervisor": "Account social", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/contabilita": "Contabilità" };
+const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Regia social", "/admin/supervisor": "Account social", "/admin/warmup": "Clipping", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico", "/me/porta-un-amico": "Porta un amico", "/contabilita": "Contabilità" };
 
 function RestrictedShell({ restriction, allowed, children, pathname }) {
+  // badge sulle schede (27/10/2026): l'HR col menu ridotto vede qui i premi di «Porta un amico» da pagare
+  const hasRef = restriction.paths.includes("/admin/referral");
+  const { data: refInbox } = useSWR(hasRef ? "/api/admin/referral/inbox" : null, (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null), { revalidateOnFocus: false, refreshInterval: 10 * 60 * 1000 });
+  const badge = { "/admin/referral": refInbox?.count || 0 };
   return (
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
         <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
         {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
         {restriction.paths.length > 1 ? (
-          <nav style={{ display: "flex", gap: 4, overflowX: "auto", minWidth: 0 }}>
+          <nav data-restricted-tabs="" style={{ display: "flex", gap: 18, overflowX: "auto", minWidth: 0, alignSelf: "stretch", alignItems: "flex-end" }}>
             {restriction.paths.map((p, _i, all) => {
               // scheda accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
               const hits = all.filter((x) => pathname === x || pathname.startsWith(x + "/"));
               const on = hits.length > 0 && hits.reduce((a, b) => (b.length > a.length ? b : a)) === p;
-              return <a key={p} href={p} style={{ fontSize: 13.5, padding: "6px 12px", borderRadius: 999, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${on ? CP.accent : CP.border}`, background: on ? CP.accentSoft : "transparent", color: on ? CP.accentSoftText : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}</a>;
+              return <a key={p} href={p} aria-current={on ? "page" : undefined} style={{ fontSize: 14, padding: "6px 0 8px", textDecoration: "none", whiteSpace: "nowrap", borderBottom: `2px solid ${on ? CP.accent : "transparent"}`, fontWeight: on ? 500 : 400, color: on ? CP.textPrimary : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}{badge[p] > 0 && <span aria-label={`${badge[p]} cose da fare`} style={{ marginLeft: 6, minWidth: 18, padding: "0 6px", borderRadius: 9, background: CP.accent, color: CP.accentInk, fontSize: 11, fontWeight: 600, display: "inline-block", textAlign: "center", lineHeight: "18px" }}>{badge[p]}</span>}</a>;
             })}
           </nav>
         ) : <span style={{ color: CP.textMuted, fontSize: 15 }}>· {restriction.label}</span>}
@@ -112,6 +117,9 @@ export default function AppShell({ children }) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdLoaded, setCmdLoaded] = useState(false);
   const openCmd = () => { setCmdLoaded(true); setCmdOpen(true); setMobileOpen(false); };
+  // Stile vetro in prova (VetroScope): sulle sue pagine avvolge anche menu, avvisi e schede in alto
+  const [vetro] = useVetro();
+  const vetroShell = vetro && isVetroPath(pathname);
 
   // ⌘K / Ctrl+K globale, solo nello stile v3
   useEffect(() => {
@@ -162,6 +170,7 @@ export default function AppShell({ children }) {
   }
 
   return (
+    <VetroScope on={vetroShell} stable>
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
       <div className="hoc-desk">
@@ -204,7 +213,7 @@ export default function AppShell({ children }) {
                 <button
                   onClick={() => setMobileOpen(false)}
                   aria-label="Chiudi menu"
-                  style={{ position: "absolute", top: 14, right: -36, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
+                  style={{ position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: "min(calc(100vw - 44px), " + (SIDEBAR_WIDTH + 8) + "px)", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
                 >
                   <X size={18} />
                 </button>
@@ -259,5 +268,6 @@ export default function AppShell({ children }) {
         <WelcomeAttestato />
       </ErrorBoundary>
     </div>
+    </VetroScope>
   );
 }

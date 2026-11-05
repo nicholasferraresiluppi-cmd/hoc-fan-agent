@@ -12,6 +12,7 @@ import Link from "next/link";
 import { FlaskConical, History } from "lucide-react";
 import { FONTS, CP } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, NUM, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 // KPI: nome in italiano + cosa misura (il nome Infloww resta sotto, piccolo)
 const KPI_LABELS = {
@@ -115,7 +116,7 @@ export default function LeaderboardSettingsPage() {
   }
 
   async function resetAll() {
-    if (!confirm("Ripristinare tutti i valori scritti nel codice?\n\nCancella pesi, soglie e fasce salvati (anche quelli pubblicati dalle Bozze formula; la regola dei gruppi piccoli resta): lo score torna ai valori di fabbrica, anche sui mesi passati.")) return;
+    if (!(await confirmDialog({ title: "Ripristinare tutti i valori scritti nel codice?", message: "Cancella pesi, soglie e fasce salvati (anche quelli pubblicati dalle Bozze formula; la regola dei gruppi piccoli resta): lo score torna ai valori di fabbrica, anche sui mesi passati.", ok: "Ripristina", danger: true }))) return;
     setSaving(true);
     setError("");
     setMessage("");
@@ -175,7 +176,7 @@ export default function LeaderboardSettingsPage() {
     });
   }
 
-  const page = { padding: "28px 24px 96px", maxWidth: 1080, margin: "0 auto", fontFamily: FONTS.body };
+  const page = { padding: "28px 24px 96px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body };
   const input = { padding: "6px 10px", background: CP.bg, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, fontSize: 14, fontFamily: FONTS.body, width: 84, textAlign: "right", ...NUM };
   const inputText = { ...input, textAlign: "left", width: 120 };
   const th = { textAlign: "left", padding: "10px 12px", color: CP.textMuted, fontSize: 12, fontWeight: 500, borderBottom: `1px solid ${CP.border}`, whiteSpace: "nowrap" };

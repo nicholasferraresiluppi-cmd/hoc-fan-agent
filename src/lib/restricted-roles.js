@@ -7,11 +7,16 @@
 // permesso, social.manage); qui si evita che la persona finisca su pagine che non la riguardano.
 
 export const RESTRICTED_ROLES = {
-  social: { home: "/admin/supervisor", paths: ["/admin/supervisor"], label: "Account social" },
+  // 22/10/2026: + Warm-up, che diventa la pagina d'arrivo (è il lavoro di ogni giorno di chi ha questo ruolo)
+  social: { home: "/admin/warmup", paths: ["/admin/warmup", "/admin/editoriale", "/admin/supervisor"], label: "Social" },
   // 18/10/2026: People Partner — CRM persone e contratti; Contabilità solo se il titolare gliel'ha aperta
   // `needs`: pagina mostrata solo con quel permesso (la Contabilità la apre il titolare a mano)
-  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
-  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor"], label: "Radar creator" },
+  people: { home: "/admin/hr", paths: ["/admin/hr", "/admin/hr/contratti", "/admin/referral", "/admin/publisher-x", "/contabilita"], label: "Persone", needs: { "/contabilita": "accounting.private" } },
+  // 26/10/2026: chi ha portato un collega e non lavora in HOC Pro vede solo i suoi guadagni
+  referente: { home: "/me/porta-un-amico", paths: ["/me/porta-un-amico"], label: "Porta un amico" },
+  // 27/10/2026: il publisher su X vede solo i suoi fan e le sue buste
+  publisher: { home: "/me/publisher", paths: ["/me/publisher"], label: "I miei fan" },
+  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
 };
 
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */

@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
 import HowToRead from "@/components/HowToRead";
 import { fmtInt } from "@/lib/format";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, DataTable, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 // Redesign 26/09/2026 (design system, pannello tester PAY/BOARD/UX): gergo
 // tradotto (KV / CP live / wage / gap → scaricati da noi / dichiarati da
@@ -153,7 +154,7 @@ export default function WageAuditPage() {
     if (bulkState.running) return;
     const gapMonths = months.filter((m) => m.status === "missing" || m.status === "not_synced").map((m) => m.period_id);
     if (gapMonths.length === 0) { setBulkState({ running: false, message: "Tutti i mesi sono già completi." }); return; }
-    if (!confirm(`Scaricare e completare ${gapMonths.length} mesi?\nPuoi ricaricare la pagina: riprende da solo. Se chiudi la scheda si mette in pausa.`)) return;
+    if (!(await confirmDialog({ title: `Scaricare e completare ${gapMonths.length} mesi?`, message: "Puoi ricaricare la pagina: riprende da solo. Se chiudi la scheda si mette in pausa.", ok: "Scarica" }))) return;
     setBulkState({ running: true, message: "Avvio…" });
     try {
       await fetch("/api/admin/cp-sync-job", {
@@ -224,7 +225,7 @@ export default function WageAuditPage() {
   ];
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Sync e controllo CP" }]}
         title="Sync e controllo CreatorsPro"

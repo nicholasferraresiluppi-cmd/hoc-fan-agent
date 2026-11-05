@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHeader } from "@/components/cp-style";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
@@ -71,7 +72,7 @@ export default function CreatorDetailPage(props) {
   }
 
   async function onDelete() {
-    if (!confirm(`Eliminare il creator "${slug}"? Operazione irreversibile.`)) return;
+    if (!(await confirmDialog({ title: `Eliminare il creator "${slug}"?`, message: "Operazione irreversibile.", ok: "Elimina", danger: true }))) return;
     const r = await fetch(`/api/content-pipeline/creators/${slug}`, {
       method: "DELETE",
     });
@@ -84,7 +85,7 @@ export default function CreatorDetailPage(props) {
   }
 
   return (
-    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1100, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }} className="space-y-4">
+    <div style={{ padding: "32px 28px 64px 28px", maxWidth: 1600, margin: "0 auto", color: CP.textPrimary, fontFamily: FONTS.body }} className="space-y-4">
       <PageHeader
         breadcrumb={
           <div style={{ display: "flex", gap: 10, fontSize: 13, color: CP.textSecondary }}>

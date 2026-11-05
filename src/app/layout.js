@@ -14,6 +14,7 @@ const LOCALE = {
 };
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
+import AppDialogHost from "@/components/AppDialogs";
 import "./globals.css";
 import { themeCss, CP } from "@/lib/brand";
 import { Manrope, Instrument_Serif, Cinzel } from "next/font/google";
@@ -90,7 +91,7 @@ export default function RootLayout({ children }) {
           {/* Tema chiaro/scuro: variabili dei due temi + scelta salvata applicata PRIMA
               del primo disegno (niente lampo del tema sbagliato). Default: scuro. */}
           <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
-          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3"){document.documentElement.setAttribute("data-style","v3");if(!sessionStorage.getItem("hoc:intro")&&!matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.classList.add("casa-intro");sessionStorage.setItem("hoc:intro","1")}}}catch(e){}` }} />
+          <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hoc:theme")==="dark")document.documentElement.removeAttribute("data-theme");if(localStorage.getItem("hoc:style")==="v3")localStorage.removeItem("hoc:style");}catch(e){}` }} />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link
@@ -101,6 +102,7 @@ export default function RootLayout({ children }) {
         <body style={{ background: "var(--cp-bg)", color: "var(--cp-textPrimary)", minHeight: "100vh", fontFamily: "var(--cp-font)" }}>
           <Providers>
             <AppShell>{children}</AppShell>
+            <AppDialogHost />
           </Providers>
         </body>
       </html>

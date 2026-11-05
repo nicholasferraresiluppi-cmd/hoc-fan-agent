@@ -18,7 +18,7 @@ export default function CreatorsAdmin() {
   const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Training" }, { label: "Voce delle creator" }]}
         title="Voce delle creator"

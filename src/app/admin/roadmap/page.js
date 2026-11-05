@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, NUM } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 const COLUMNS = [
   { key: "now",    label: "In corso",     hint: "Ci stiamo lavorando adesso" },
@@ -99,7 +100,7 @@ export default function RoadmapPage() {
   };
 
   const remove = async (item) => {
-    if (!confirm(`Rimuovere "${item.title}" dalla roadmap?`)) return;
+    if (!(await confirmDialog({ title: `Rimuovere "${item.title}" dalla roadmap?`, ok: "Rimuovi", danger: true }))) return;
     try {
       const r = await fetch(`/api/admin/roadmap?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
       const j = await r.json().catch(() => null);
@@ -116,7 +117,7 @@ export default function RoadmapPage() {
   };
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1400, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Prodotto" }, { label: "Roadmap" }]}
         title="Roadmap"

@@ -20,6 +20,8 @@ t("filtro creator", agencySales(wages, { periodId: "2026-10", allow: (a) => a.st
 t("mono senza takes", shiftSalesByAlias({ creator_aliases: ["X"], total_attributed: 9 }).get("X") === 9);
 t("multi senza takes = niente", shiftSalesByAlias({ creator_aliases: ["X", "Y"], total_attributed: 9 }).size === 0);
 t("vuoto", agencySales(null).sales === 0);
+t("giorno per giorno somma al totale", all.byDay.length === 31 && all.byDay.reduce((a, b) => a + b, 0) === all.sales);
+t("per creator dal più alto", all.byCreator.length > 0 && all.byCreator.every((x, i, a) => i === 0 || a[i - 1].sales >= x.sales));
 
 t("ora di Roma: 23:30 UTC del 30/9 è già 1/10", romeDay("2026-09-30T23:30:00Z") === "2026-10-01");
 t("mese passato = intero", compareUntilDay("2026-09", "2026-10-03", 30) === null);

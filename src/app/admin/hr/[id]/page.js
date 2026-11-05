@@ -103,7 +103,7 @@ export default function HrPersonPage() {
   const subtitle = p ? [(f.mansioni || []).join(", ") || f.currentJob, since ? `con noi dal ${since}` : null, f.referredBy ? `su segnalazione di ${f.referredBy}` : null].filter(Boolean).join(" · ") : null;
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1100, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 10 }}><Link href="/admin/hr" style={{ color: CP.textSecondary, textDecoration: "none" }}>← Persone</Link></div>
 
       {error && <Notice danger={error.status !== 403}>{error.status === 403 ? "Pagina riservata a chi gestisce le persone (Area Partner o admin)." : error.status === 404 ? <>Scheda non trovata. <Link href="/admin/hr" style={{ color: CP.accentSoftText }}>Torna all'elenco</Link></> : `Non riesco a caricare la scheda: ${error.message}`}</Notice>}
@@ -210,7 +210,7 @@ function Overview({ p, onGo }) {
   const rows = [
     ["Telefono", f.personalPhone], ["Email", f.personalEmail],
     ["Vive a", f.residenceComune?.abroad ? [f.residenceComune.city, f.residenceComune.country].filter(Boolean).join(", ") : f.residenceComune?.name],
-    ["Lingue", langs], ["Punti forti", skills.join(", ")], ["Partita IVA", f.partitaIva === true ? "Sì" : f.partitaIva === false ? "No" : null],
+    ["Lingue", langs], ["Punti forti", skills.join(", ")], ["Partita IVA", f.partitaIva === true ? (f.partitaIvaNumero ? `Sì · ${f.partitaIvaNumero}` : "Sì") : f.partitaIva === false ? "No" : null],
     ["Progetto", (f.progetto || []).join(", ") || (f.project || []).join(", ")], ["Referente", (f.referent || []).map((u) => u.name).join(", ")],
     ["Come ci ha conosciuto", f.source], ["Privacy", p.consent?.at ? `consenso il ${fmtDate(p.consent.at)}` : null],
   ].filter(([, v]) => v);

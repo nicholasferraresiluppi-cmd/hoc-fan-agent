@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FlaskConical, Play, Trash2, Plus, CheckCircle2, History, ChevronDown, ChevronRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, SectionTitle, Notice, Disclosure, FilterChip, NUM, card } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/score-config-drafts
@@ -98,7 +99,7 @@ export default function ScoreConfigDraftsPage() {
   );
 
   return (
-    <div style={{ padding: "28px 24px 64px", maxWidth: 1180, margin: "0 auto", fontFamily: FONTS.body }}>
+    <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
       <PageHead
         crumbs={[{ label: "Hub", href: "/admin" }, { label: "Dati" }, { label: "Bozze formula" }]}
         title="Bozze della formula score"
@@ -184,7 +185,7 @@ function DraftCard({ draft, open, onToggle, call, busy }) {
     setConfirmText("");
   }
   async function onDelete() {
-    if (!window.confirm(`Eliminare la bozza "${draft.name}"?`)) return;
+    if (!(await confirmDialog({ title: `Eliminare la bozza "${draft.name}"?`, ok: "Elimina", danger: true }))) return;
     await call(`/api/admin/score-config-drafts?id=${encodeURIComponent(draft.id)}`, { method: "DELETE" });
   }
 

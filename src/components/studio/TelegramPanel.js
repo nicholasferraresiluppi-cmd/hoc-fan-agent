@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, Check, Copy, Upload, ExternalLink, Star } from "l
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
+import { confirmDialog } from "@/components/AppDialogs";
 import { TG_ROLES } from "@/lib/studio-editorial-core";
 import { TG_REVIEWERS, TG_STATUSES, TG_MAX_PHOTOS, TG_TEXT_MAX_PHOTO, canApproveTg, msToRomeLocal, romeLocalToMs } from "@/lib/studio-telegram-core";
 
@@ -193,7 +194,7 @@ export function PostModal({ post, photos, cfg, pid, onClose, onDone, arcs = [] }
           <button style={btn(false)} disabled={busy} onClick={() => save(false)}>{busy ? "Salvataggio…" : "Salva in bozza"}</button>
           {approvable.ok && <button style={btn(true)} disabled={busy} onClick={() => save(true)}><Check size={14} aria-hidden="true" /> Approva e programma</button>}
           {post?.id && post.status !== "annullato" && <button style={btn(false)} disabled={busy} onClick={() => act({ action: "status", postId: post.id, status: "annullato" })}>Annulla</button>}
-          {post?.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={() => confirm("Eliminare il post?") && act({ action: "deletePost", postId: post.id })}><Trash2 size={14} aria-hidden="true" /> Elimina</button>}
+          {post?.id && <button style={{ ...btn(false), marginLeft: "auto", color: CP.accentRed }} disabled={busy} onClick={async () => { if (await confirmDialog({ title: "Eliminare il post?", ok: "Elimina", danger: true })) act({ action: "deletePost", postId: post.id }); }}><Trash2 size={14} aria-hidden="true" /> Elimina</button>}
         </div>
       )}
     </Modal>
@@ -301,7 +302,7 @@ export default function TelegramPanel({ pid, arcs = [] }) {
     await mutate();
   };
   const removePhoto = async (id) => {
-    if (!confirm("Togliere la foto?")) return;
+    if (!(await confirmDialog({ title: "Togliere la foto?", ok: "Togli", danger: true }))) return;
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deletePhoto", photoId: id }) });
     const j = await r.json().catch(() => null);
     setMsg(r.ok ? { text: "Foto tolta" } : { danger: true, text: j?.error || "Non riuscito" });
