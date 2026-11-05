@@ -16,8 +16,8 @@ import useSWR from "swr";
 import { Check, Copy, Eye, EyeOff, ExternalLink, Plus, Trash2, Upload, X, Search, KeyRound } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, Tabs, card, NUM, BTN_PRIMARY } from "@/components/ds";
-import { useInVetro } from "@/components/VetroScope";
-import { Panel, HotTile, MixBar } from "@/components/VetroCharts";
+import { Panel, MixBar } from "@/components/VetroCharts";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 import { fmtInt, fmtAgo } from "@/lib/format";
 import {
   ENUMS, PLATFORMS, PLATFORM_LABEL, PLATFORM_SHORT, SECRET_FIELDS, linkGroups, mapHeaders,
@@ -392,52 +392,52 @@ function auditText(e) {
 const STATUS_COLS = [["ok", "Attivi"], ["suspended", "Sospesi"], ["not_recommended", "Non raccomandati"]];
 
 /*
- * Vetro: «gli account stanno bene, e cosa c'è da sistemare?» — lo stato degli account vivi in una
- * barra (stessi stati della tabella sotto), la creazione in corso, e accanto «Da sistemare»
- * (rosso se c'è qualcosa di critico) che porta all'elenco trovato dal sistema.
+ * Intestazione «stile reel» (05/11/2026): una frase con la cosa che conta (da sistemare, o quanti
+ * account sono vivi) e i numeri grandi; sotto, lo stato degli account vivi in una barra (stessi
+ * stati della tabella) con la creazione in corso. Prima era una lastra solo col vetro acceso.
  */
 function SupTop({ data }) {
   const s = data.stats;
   const byStatus = STATUS_COLS.map(([k, l]) => ({ label: l, value: Object.entries(s.grid).filter(([key]) => key.endsWith(`|${k}`)).reduce((a, [, n]) => a + n, 0), color: k === "ok" ? CP.accentGreen : undefined }));
-  const crit = data.issues.some((i) => i.severity === "critical");
-  const nIss = data.issues.reduce((a, i) => a + (i.count || 0), 0);
+  const nIssues = data.issues.length;
+  const toIssues = () => document.getElementById("sup-issues")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
-    <div className="vt-row21" style={{ marginBottom: 18 }}>
-      <Panel title={`${fmtInt(s.liveTotal)} account vivi`} aside={`${fmtInt(s.retired)} ritirati`} i={0}>
-        {s.liveTotal ? <MixBar items={byStatus} format={fmtInt} /> : <div style={{ fontSize: 13, ...muted }}>Ancora nessun account.</div>}
-        <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 14, fontSize: 13, color: CP.textSecondary, ...NUM }}>
-          <span>Da creare <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.to_do)}</b></span>
-          <span>In creazione <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.in_progress)}</b></span>
-          <span>In riscaldamento <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.warming)}</b></span>
-          <span>Telefoni <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.devices.total)}</b>{s.devices.unassigned ? ` (${fmtInt(s.devices.unassigned)} senza publisher)` : ""}</span>
-          <span>Caselle mail <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.mailboxes)}</b></span>
-        </div>
-      </Panel>
-      <div className="vt-side" style={{ display: "grid", gap: 14, alignContent: "start" }}>
-        <HotTile i={1} lvl={!data.issues.length ? "0" : crit ? "2" : "ink"} label="Da sistemare" value={fmtInt(data.issues.length)}
-          sub={data.issues.length ? `${fmtInt(nIss)} righe in tutto · trovate dal sistema` : "niente da sistemare"}
-          onClick={data.issues.length ? () => document.getElementById("sup-issues")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+    <>
+      <HeroHead
+        eyebrow="Panoramica"
+        title={nIssues ? "Da sistemare ci sono" : "Gli account vivi sono"}
+        accent={nIssues ? `${fmtInt(nIssues)} ${nIssues === 1 ? "cosa" : "cose"}` : fmtInt(s.liveTotal)}
+        sub={nIssues ? "Trovate dal sistema: doppioni, credenziali mancanti, telefoni senza publisher." : "Niente da sistemare: il sistema non ha trovato problemi."}
+        numbers={<>
+          <BigNum label="Account attivi" value={s.activeTotal} title={`${fmtInt(s.liveTotal)} creati, ${fmtInt(s.retired)} ritirati`} />
+          <BigNum label="In riscaldamento" value={s.creation.warming} />
+          <BigNum label="Telefoni" value={s.devices.total} />
+          {s.duplicates > 0 && <BigNum label="Doppioni" value={s.duplicates} />}
+          <BigNum label="Da sistemare" value={nIssues} strong={nIssues > 0} />
+        </>}
+        actions={nIssues ? <button type="button" style={BTN_PRIMARY} onClick={toIssues}>Vedi cosa sistemare</button> : null}
+      />
+      <div style={{ marginBottom: 18 }}>
+        <Panel title={`${fmtInt(s.liveTotal)} account vivi`} aside={`${fmtInt(s.retired)} ritirati`} i={0}>
+          {s.liveTotal ? <MixBar items={byStatus} format={fmtInt} /> : <div style={{ fontSize: 13, ...muted }}>Ancora nessun account.</div>}
+          <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 14, fontSize: 13, color: CP.textSecondary, ...NUM }}>
+            <span>Da creare <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.to_do)}</b></span>
+            <span>In creazione <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.creation.in_progress)}</b></span>
+            <span>Caselle mail <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.mailboxes)}</b></span>
+            {s.devices.unassigned > 0 && <span>Telefoni senza publisher <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{fmtInt(s.devices.unassigned)}</b></span>}
+          </div>
+        </Panel>
       </div>
-    </div>
+    </>
   );
 }
 
 function Overview({ data, goAccounts, goIssue }) {
   const s = data.stats;
   const owners = [["agency", "agenzia"], ["creator", "creator"]];
-  const inVetro = useInVetro();
   return (
     <>
-      {inVetro && <SupTop data={data} />}
-      {!inVetro && <div style={{ ...card, padding: "16px 18px", display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 18 }}>
-        <Metric label="Account attivi" value={fmtInt(s.activeTotal)} note={`${fmtInt(s.liveTotal)} creati, ${fmtInt(s.retired)} ritirati`} />
-        <Metric label="Da creare" value={fmtInt(s.creation.to_do)} />
-        <Metric label="In creazione" value={fmtInt(s.creation.in_progress)} />
-        <Metric label="In riscaldamento" value={fmtInt(s.creation.warming)} />
-        <Metric label="Doppioni" value={fmtInt(s.duplicates)} danger={s.duplicates > 0} />
-        <Metric label="Telefoni" value={fmtInt(s.devices.total)} note={`${fmtInt(s.devices.unassigned)} senza publisher`} />
-        <Metric label="Caselle mail" value={fmtInt(s.mailboxes)} />
-      </div>}
+      <SupTop data={data} />
 
       <SectionTitle aside="clic su un numero per vedere gli account">Account per piattaforma e stato</SectionTitle>
       {s.platforms.length === 0 ? <Notice>Ancora nessun account. Parti da «Importa» (telefoni, poi mail, poi account) o crea il primo a mano.</Notice> : (
