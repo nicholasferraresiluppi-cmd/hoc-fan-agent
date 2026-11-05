@@ -12,6 +12,7 @@ import Link from "next/link";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { FilterChip, DataTable, Notice, NUM, card, Tabs, Spiega } from "@/components/ds";
 import { SLOTS, WEAK, STRONG, SLOT_DIFF, SLOT_MIN_H } from "@/lib/fasce-core";
+import FasceDuo from "@/components/FasceDuo";
 
 const fetcher = (url) =>
   fetch(url).then(async (r) => {
@@ -184,7 +185,7 @@ const tdL = { ...td, textAlign: "left", color: CP.textPrimary };
 
 export default function FasceTab({ splitId }) {
   const url = `/api/admin/sales-coaching/fasce${splitId ? `?split=${encodeURIComponent(splitId)}` : ""}`;
-  const { data, error, mutate, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, refreshInterval: (d) => (d?.computing && !d?.pages ? 15000 : 0) });
+  const { data, error, mutate, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false, refreshInterval: (d) => ((d?.computing && !d?.pages) || d?.duo?.computing ? 15000 : 0) });
   const [view, setView] = useState("persone");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -286,7 +287,7 @@ export default function FasceTab({ splitId }) {
       <SlotValues overall={ov} />
 
 
-      <Tabs small items={[["persone", "Ogni persona, fascia per fascia", ops.length], ["azioni", "Da spostare", togliere.length + portare.length], ["pagine", "Per pagina", data.pages.length]]} value={view} onChange={setView} />
+      <Tabs small items={[["persone", "Ogni persona, fascia per fascia", ops.length], ["azioni", "Da spostare", togliere.length + portare.length], ["pagine", "Per pagina", data.pages.length], ["duo", "Due operatori"]]} value={view} onChange={setView} />
 
       {view === "azioni" && (
         <>
@@ -308,6 +309,8 @@ export default function FasceTab({ splitId }) {
         </>
       )}
 
+      {view === "duo" && <FasceDuo duo={data.duo} onRecomputed={mutate} />}
+
       {view === "persone" && (
         <>
           <Spiega label="Come leggere i numeri della tabella">
@@ -323,11 +326,11 @@ export default function FasceTab({ splitId }) {
         </>
       )}
 
-      <Spiega label="Come si calcola">
+      {view !== "duo" && <Spiega label="Come si calcola">
       <Note>
         Bravura dalla scheda Squadra (venduto Infloww all'ora di turno ÷ quello dei colleghi sulla stessa pagina e fascia, escluso sé stessi; 1,00 = come loro). Ore e fasce dal calendario CreatorsPro {fromTxt} al {dmy(data.until)}. Valore di un'ora = venduto della pagina in quella fascia ÷ ore di turno pesate per la bravura di chi c'era (il venduto per pagina di CreatorsPro combacia con le transazioni Infloww: 0,97-1,01 a settembre). Il confronto giorni pari/dispari è fatto sui turni, l'unica fonte con le vendite per turno. Fasce dall'ora di inizio del turno (ora italiana): 22–3, 17–22 (anche 19–01), 12–17 (anche 13–19), 7–12 (anche 7–13), 1–7. Fuori dalle liste chi è uscito nel CRM o non fa turni da 3 settimane. Correlazione, non causa; le fasce dipendono anche dalla disponibilità delle persone. Non entra in score né compensi.
       </Note>
-      </Spiega>
+      </Spiega>}
     </div>
   );
 }

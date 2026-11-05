@@ -15,6 +15,12 @@ const COMUNI_JSON = ["./public/data/comuni-istat.json"];
 
 const nextConfig = {
   reactStrictMode: true,
+  // Cambio pagina "da app" (21/10/2026): una pagina già aperta o già scaricata in anticipo si
+  // riapre dalla memoria del browser invece di richiederla di nuovo al server. Quasi tutte le
+  // pagine sono client e i dati arrivano dalle API (SWR), quindi riusare il guscio non mostra
+  // numeri vecchi. dynamic = pagine visitate (default 0), static = scaricate in anticipo coi
+  // link delle barre di schede (prefetch, default 300).
+  experimental: { staleTimes: { dynamic: 120, static: 300 } },
   outputFileTracingIncludes: {
     "/api/hr/clickup-webhook": COMUNI_JSON,
     "/api/cron/hr-clickup": COMUNI_JSON,

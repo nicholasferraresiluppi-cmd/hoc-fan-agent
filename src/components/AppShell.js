@@ -13,6 +13,8 @@
  * Su mobile (<900px) la sidebar diventa drawer toggleable da hamburger button.
  */
 import PageTabs from "@/components/PageTabs";
+import NavProgress from "@/components/NavProgress";
+import { usePendingHref } from "@/lib/nav-pending";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { UserButton } from "@clerk/nextjs";
@@ -20,7 +22,7 @@ import { pathAllowed } from "@/lib/restricted-roles";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
-import Sidebar, { NAV_ITEMS } from "./Sidebar";
+import Sidebar, { NAV_ITEMS, SIDEBAR_WIDTH } from "./Sidebar";
 import { groupMatch } from "@/lib/page-groups";
 import SidebarCasa from "./SidebarCasa";
 import ErrorBoundary from "./ErrorBoundary";
@@ -76,6 +78,7 @@ function RestrictedShell({ restriction, allowed, children, pathname }) {
   const badge = { "/admin/referral": refInbox?.count || 0 };
   return (
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
+      <NavProgress />
       <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
         <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
         {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
@@ -146,8 +149,9 @@ export default function AppShell({ children }) {
   // globals.css), non da JS dopo l'idratazione: prima il telefono disegnava il
   // layout desktop (sidebar + margine 248px) e poi saltava (revisione 26/09).
 
-  // Close drawer on route change
-  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  // Close drawer on route change — già al tocco della voce (21/10/2026), non quando arriva la pagina
+  const pendingHref = usePendingHref();
+  useEffect(() => { setMobileOpen(false); }, [pathname, pendingHref]);
 
   // Analytics d'uso (/admin/utilizzo): una riga per pagina aperta — solo
   // persona+pagina+giorno. sendBeacon non blocca la navigazione.
@@ -172,6 +176,7 @@ export default function AppShell({ children }) {
   return (
     <VetroScope on={vetroShell} stable>
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
+      <NavProgress />
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
       <div className="hoc-desk">
         <ErrorBoundary silent label="Sidebar">
@@ -213,7 +218,7 @@ export default function AppShell({ children }) {
                 <button
                   onClick={() => setMobileOpen(false)}
                   aria-label="Chiudi menu"
-                  style={{ position: "absolute", top: 14, right: -36, background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
+                  style={{ position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: "min(calc(100vw - 44px), " + (SIDEBAR_WIDTH + 8) + "px)", background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 8, color: CP.textPrimary, cursor: "pointer", padding: 6 }}
                 >
                   <X size={18} />
                 </button>

@@ -25,7 +25,10 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
       if (!(v.urls || []).length) links.push({ url: igProfile(v.h), where: "Taggato nella prima storia in evidenza", h: p.h, k: { label: `@${v.h}${v.priv ? " (privato)" : ""}`, strength: 1 } });
     }
     if (p.url) links.push({ url: p.url, where: "Bio", h: p.h, k: probedOrClassified(p, p.url) });
+    // trovato cercando su Google: la prova (porta al suo Instagram, stesso nome…) e il prezzo letto da Google
+    if (p.web?.url) links.push({ url: p.web.url, where: "Trovato su Google", h: p.h, k: { label: `${p.web.strength >= 2 ? "OnlyFans" : p.web.how === "citata" ? "Nominata in un post di un'altra creator, da confermare" : "OnlyFans con un nome simile, da confermare"}${p.web.price ? ` · ${String(p.web.price).replace(".", ",")} $ al mese` : ""}`, strength: p.web.strength } });
   }
+  const googled = ps.some((p) => p.web?.at && !p.web.url);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
@@ -80,7 +83,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
 
           <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <H2>Dove porta</H2>
-            {links.length === 0 ? <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>{(ps.some((p) => p.hlVia) ? "Nessun link in bio, nella prima storia in evidenza né negli account che tagga." : "Nessun link in bio né nella prima storia in evidenza.")}</p> : (
+            {links.length === 0 ? <p style={{ margin: 0, color: CP.textSecondary, fontSize: 14 }}>{(ps.some((p) => p.hlVia) ? "Nessun link in bio, nella prima storia in evidenza né negli account che tagga" : "Nessun link in bio né nella prima storia in evidenza") + (googled ? ", e nemmeno cercando su Google." : ".")}</p> : (
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                 {links.map((l, i) => (
                   <li key={i} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 200px) minmax(0,1fr) auto", gap: 14, padding: "11px 0", borderBottom: `1px solid ${CP.borderSoft || CP.border}`, fontSize: 14, alignItems: "baseline" }}>
@@ -118,6 +121,7 @@ export default function RadarScheda({ c, newCut, data, profilesBy, act, busy, on
               <dt style={{ color: CP.textSecondary }}>Trovata</dt><dd style={{ margin: 0 }}>{main.src === "segnalata" ? `Segnalata${main.by ? ` da ${main.by}` : ""}` : main.src === "profili simili" ? "Ricerca nei profili collegati" : main.src === "parole chiave" ? "Ricerca per parole chiave" : "Prima ricerca"}{c.firstSeen ? ` · ${fmtDate(c.firstSeen)}` : ""}</dd>
               <dt style={{ color: CP.textSecondary }}>Numeri</dt><dd style={{ margin: 0 }}>Giro settimanale{main.lastSeen ? ` · ultimo ${fmtDate(main.lastSeen)}` : ""}</dd>
               <dt style={{ color: CP.textSecondary }}>Chi segue</dt><dd style={{ margin: 0 }}>{c.folAt ? `Letto il ${fmtDate(c.folAt)}${c.fing != null ? ` · segue ${fmtFull(c.fing)} account` : ""}` : c.sig === "forte" ? `Da leggere${c.fing != null ? ` · segue ${fmtFull(c.fing)} account` : ""}: è il prossimo anello della catena` : "Non serve finché non ha un profilo a pagamento"}</dd>
+              <dt style={{ color: CP.textSecondary }}>OnlyFans su Google</dt><dd style={{ margin: 0 }}>{(() => { const w = ps.map((p) => p.web).filter((x) => x?.at).sort((x, y) => (y.url ? 1 : 0) - (x.url ? 1 : 0))[0]; return !w ? (c.sig === "forte" ? "Non serve: il link c'è già" : "Non ancora cercato") : `Cercato il ${fmtDate(w.at)} · ${w.url ? (w.strength >= 2 ? "pagina trovata" : "un indizio da confermare") : "nessuna pagina sua"}`; })()}</dd>
               <dt style={{ color: CP.textSecondary }}>Nicchia e format</dt><dd style={{ margin: 0 }}>{c.g === "Da classificare" ? "Da classificare" : "Letti da bio e ultimi post · da confermare a occhio"}</dd>
               {main.nota && <><dt style={{ color: CP.textSecondary }}>Nota della ricerca</dt><dd style={{ margin: 0 }}>{main.nota}</dd></>}
             </dl>

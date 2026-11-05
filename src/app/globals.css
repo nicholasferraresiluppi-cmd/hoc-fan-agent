@@ -379,3 +379,10 @@ html.casa-intro[data-style="v3"]::after {
 .hoc-tab { transition: background-color .12s ease, color .12s ease; }
 .hoc-tab:not([aria-selected="true"]):not([aria-current]):hover { background-color: color-mix(in srgb, var(--cp-accent) 7%, transparent) !important; color: var(--cp-textPrimary) !important; }
 .hoc-tab:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: -2px; }
+/* Barra di cambio pagina (components/NavProgress, 21/10/2026): avanza veloce e poi rallenta finché
+   la pagina arriva, si chiude di colpo quando è montata. */
+.hoc-navbar > div { transform: scaleX(0); }
+.hoc-navbar-run > div { animation: hoc-navbar-run 8s cubic-bezier(.1,.7,.2,1) forwards; }
+.hoc-navbar-done > div { transform: scaleX(1); opacity: 0; transition: transform .15s ease-out, opacity .2s .1s; }
+@keyframes hoc-navbar-run { 0% { transform: scaleX(0); } 10% { transform: scaleX(.45); } 100% { transform: scaleX(.92); } }
+@media (prefers-reduced-motion: reduce) { .hoc-navbar-run > div { animation: none; transform: scaleX(.6); } }

@@ -739,6 +739,9 @@ export function bestLink(ps) {
       if (!c) continue;
       if (!best || c.strength > best.strength) best = { ...c, where, url, ...(via ? { via } : {}) };
     }
+    // trovato cercando su Google (5/11/2026): qui la forza la dà la prova che è lei, non il dominio
+    const w = p.web;
+    if (w?.url && w.strength > (best?.strength ?? -1)) best = { label: w.strength >= 2 ? "OnlyFans" : w.how === "citata" ? "Nominata su OnlyFans" : "OnlyFans con un nome simile", strength: w.strength, where: "web", url: w.url, how: w.how };
   }
   return best;
 }
@@ -857,7 +860,180 @@ export function linkWhere(link, { short = false } = {}) {
   if (!link) return "";
   if (link.where === "tag") return short ? `tramite @${link.via}` : `nella bio di @${link.via}, l'account taggato nella prima storia in evidenza`;
   if (link.where === "evidenza") return short ? "nella prima evidenza" : "nella prima storia in evidenza";
+  if (link.where === "web") return short ? "da Google" : `cercando su Google: ${WEB_HOW[link.how] || "da confermare"}`;
   return "in bio";
+}
+
+// ---------- OnlyFans cercato su Google (5/11/2026, caso @soryu_geggy_cosplay) ----------
+//
+// 731k follower, OnlyFans da 15 $ al mese, e il radar non lo sapeva: niente link in bio né nelle
+// evidenze, perché tiene Instagram e OnlyFans separati (fa l'ospite alle fiere). Google però ha
+// in archivio la pagina OnlyFans: `site:onlyfans.com soryu geggy cosplay` la dà come primo
+// risultato. Provato su 11 creator di cui sapevamo già l'indirizzo OnlyFans: ne trova 7, e
+// spesso perché la pagina OnlyFans stessa porta il link al suo Instagram.
+// Il punto delicato è che è LEI: la ricerca restituisce anche pagine di altri con un nome simile.
+// Prove, dalla più forte:
+//   "ig"     la pagina cita il suo Instagram (instagram.com/<handle> o @<handle>)          → forte
+//   "titolo" il nome della pagina è il suo handle, e l'indirizzo è il suo o quello a numeri
+//            che OnlyFans dà di partenza (u123…)                                          → forte
+//            con un indirizzo di un'altra persona è "simile": pagine false col nome di una famosa
+//            esistono (provato: "Irene Marinaro" su onlyfans.com/noemyferretti)
+//   "utente" l'indirizzo OnlyFans è il suo handle (senza punti, numeri e lettere ripetute) → forte
+//   "simile" l'indirizzo contiene il suo nome                                              → da guardare
+// Nome, indirizzo e titolo contano solo da 7 lettere in su: un nome di battesimo non basta mai
+// (provato su 40 creator del radar: "amelia_81" prendeva una pagina "Amelia" di un'altra).
+
+const WEB_HOW = {
+  ig: "la pagina OnlyFans porta al suo Instagram",
+  titolo: "la pagina OnlyFans ha il suo stesso nome",
+  utente: "l'indirizzo OnlyFans è il suo stesso nome",
+  simile: "indirizzo OnlyFans con un nome simile, da confermare",
+  citata: "un'altra creator la nomina in un post su OnlyFans, da confermare",
+};
+const WEB_HOSTS = /(^|\.)(onlyfans\.com|fansly\.com|fanvue\.com)$/;
+const WEB_NOISE = new Set(["official", "officiale", "ufficiale", "real", "the", "its", "im", "iam", "private", "privato", "privata", "backup", "back", "up", "reel", "reels", "of", "vip", "ita", "italy", "xx", "xo"]);
+// Nomi di battesimo comuni (radice: senza doppie): un handle fatto solo di uno di questi non identifica nessuno.
+const FIRST_NAMES = new Set([
+  "alesandra", "alesia", "alice", "amanda", "amelia", "ana", "analisa", "anastasia", "angela",
+  "angelica", "antonela", "ariana", "ashley", "asia", "aurora", "azura", "barbara", "beatrice",
+  "benedeta", "bianca", "britany", "camila", "carla", "carlota", "carmen", "caterina", "cecilia",
+  "chiara", "chloe", "clara", "clarisa", "claudia", "cristina", "dalila", "daniela", "debora", "denise", "diana",
+  "elena", "eleonora", "elisa", "elisabeta", "ema", "emanuela", "emily", "erica", "erika", "eva",
+  "federica", "fiorela", "francesca", "gaia", "giada", "giana", "ginevra", "gioia", "giorgia",
+  "giovana", "giulia", "giuliana", "giusepina", "greta", "hanah", "ilaria", "irene", "isabela",
+  "jasmin", "jasmine", "jenifer", "jesica", "kate", "katie", "kimberly", "laura", "lavinia",
+  "letizia", "lily", "lisa", "lorena", "lucia", "ludovica", "luisa", "madalena", "madison",
+  "manuela", "mara", "margherita", "maria", "mariana", "marika", "marina", "marta", "martina",
+  "matilde", "megan", "melanie", "melisa", "michela", "michele", "miriam", "monica", "nadia", "natalia",
+  "natalie", "nicole", "noemi", "olivia", "paola", "patrizia", "rachel", "rachele", "rebeca",
+  "roberta", "rosa", "rosalba", "rosela", "sabrina", "samantha", "sara", "serena", "silvia",
+  "simona", "sofia", "sonia", "sophia", "sophie", "stefania", "stela", "teresa", "tiziana",
+  "valentina", "valeria", "vanesa", "veronica", "victoria", "viola", "virginia", "vitoria", "ylenia",
+  "zoe",
+]);
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Parole del nome per la ricerca: "carla.fitness_official" → "carla fitness". */
+// parole vere (con lettere) di un nome: "principessa.23" è UNA parola, il numero non conta
+const webWords = (s) => webTokens(s).filter((t) => /[a-z]{2}/i.test(t)).length;
+
+export function webTokens(h) {
+  return normHandle(h).split(/[._-]+/).filter((t) => t && !WEB_NOISE.has(t));
+}
+/** Radice per il confronto: senza separatori, numeri e lettere ripetute ("biancaneveeeh" = "biancanevehh"). */
+export function webStem(s) {
+  return String(s || "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && !WEB_NOISE.has(t)).join("").replace(/\d+/g, "").replace(/(.)\1+/g, "$1");
+}
+/** La ricerca Google per un account. */
+export function webQuery(h) {
+  return `site:onlyfans.com ${webTokens(h).join(" ")}`;
+}
+
+/** Indirizzo di una pagina OnlyFans → nome utente ("/soryugeggy", "/2736337520/irenemarinaroo"), o null. */
+export function webUserOf(url) {
+  return webPageOf(url)?.user || null;
+}
+
+/** Come webUserOf, più `post`: la pagina è un post (/<numero>/<utente>), non il profilo. */
+function webPageOf(url) {
+  try {
+    const u = new URL(url);
+    if (!WEB_HOSTS.test(u.hostname.replace(/^www\./, "").toLowerCase())) return null;
+    const seg = u.pathname.split("/").filter(Boolean);
+    const post = /^\d+$/.test(seg[0] || "");
+    const user = post ? seg[1] : seg[0];
+    // "/@francesca-tocca/media": pagine che OnlyFans genera per un nome, senza un profilo dietro
+    // (Google: "Nessuna informazione disponibile"), primo giro del 5/11/2026 — non sono una prova
+    if (!user || user.startsWith("@") || OF_PATHS_NOT_PROFILES.test(user)) return null;
+    return { user: user.toLowerCase(), post };
+  } catch {
+    return null;
+  }
+}
+
+const webPrice = (text) => {
+  const m = String(text || "").match(/subscribe\s*\$\s*(\d+(?:\.\d+)?)\s*per month/i);
+  return m ? Number(m[1]) : null;
+};
+
+/**
+ * Tra i risultati Google ([{ url, title, description }]) la pagina che è davvero sua:
+ * { url, user, strength, how, price, title } o null. A parità di forza vince la prova più forte.
+ */
+export function matchWebResults(h, results) {
+  const handle = normHandle(h);
+  const stem = webStem(handle);
+  if (!handle) return null;
+  // handle = solo un nome di battesimo ("rosalba", "vittoria"): l'unica prova che regge è la pagina
+  // che porta al suo Instagram (primo giro: @rosalba abbinata a una "Rosalba" spagnola)
+  const onlyName = FIRST_NAMES.has(stem);
+  const igRe = new RegExp(`(instagram\\.com/|@)${reEsc(handle)}(?![a-z0-9_.])`, "i");
+  const rank = { ig: 4, titolo: 3, utente: 2, simile: 1, citata: 1 };
+  let best = null;
+  for (const r of results || []) {
+    const page = webPageOf(r?.url || "");
+    if (!page) continue;
+    const { user, post } = page;
+    const text = `${r.title || ""} ${r.description || ""}`;
+    const title = String(r.title || "").replace(/\s*onlyfans\s*$/i, "").trim();
+    let how = null;
+    // nominata nel post di un'ALTRA creator (scambi di promozione: "abbonati a @…"): indizio, e il
+    // link resta quel post — non è la sua pagina (primo giro: @minuminula in un post di un'altra)
+    if (igRe.test(text)) how = post && webStem(user) !== stem ? "citata" : "ig";
+    else if (onlyName) continue;
+    else if (stem.length >= 7 && webStem(user) === stem) how = "utente";
+    else {
+      const us = webStem(user);
+      const near = us.length >= 5 && stem.length >= 7 && (us.includes(stem) || stem.includes(us));
+      // UNA parola sola in handle e titolo ("sinister", "michelle"): il titolo uguale lo può avere chiunque,
+      // prova solo con l'indirizzo a numeri di default (giro del 5/11: @sssinister_ → "Sinister" di un'altra);
+      // nome e cognome nel titolo ("Giulia Scarozza Vip") restano una prova
+      const strong = /^u\d+$/.test(user) || (near && (webWords(handle) > 1 || webWords(title.replace(/\s+/g, "_")) > 1));
+      if (stem.length >= 7 && webStem(title) === stem) how = strong ? "titolo" : "simile";
+      else if (near && us.length >= 7) how = "simile";
+    }
+    if (!how || (best && rank[how] <= rank[best.how])) continue;
+    // la pagina del profilo, non quella di un suo post (se citata, il post dove la nominano)
+    const url = how === "citata" ? r.url : `https://onlyfans.com/${user}`;
+    best = { url, user, strength: how === "simile" || how === "citata" ? 1 : 3, how, price: how === "citata" ? null : webPrice(r.description), title: title.slice(0, 80) };
+  }
+  return best;
+}
+
+/** Righe dell'attore → Map ricerca → risultati ([{ url, title, description }]); le ricerche andate male restano fuori. */
+export function parseGoogleItems(items) {
+  const out = new Map();
+  for (const it of items || []) {
+    const q = it?.searchQuery?.term;
+    if (!q || it["#error"]) continue;
+    const rs = (it.organicResults || []).map((r) => ({ url: r.url, title: r.title, description: r.description }));
+    out.set(q, [...(out.get(q) || []), ...rs]);
+  }
+  return out;
+}
+
+/** Profilo dopo la ricerca: `found` = matchWebResults, `null` = cercato e niente. Il livello non scende mai. */
+export function applyWebCheck(p, found, { q, now = Date.now() } = {}) {
+  const next = { ...p, web: found ? { ...found, q, at: now } : { q, at: now } };
+  const s = sigFromLink(bestLink([{ ...next, url: "", hlLinks: [], hlVia: [] }]));
+  next.sig = SIG_RANK[s] > SIG_RANK[p.sig || "nessuno"] ? s : p.sig || "nessuno";
+  return next;
+}
+
+/**
+ * Chi cercare: account ancora da valutare, non nostri, senza un profilo a pagamento già trovato,
+ * mai cercati (o cercati più di 90 giorni fa). Prima i più seguiti: lì la scoperta vale di più.
+ */
+export function webCheckCandidates(profiles, crm, forgotten = new Set(), { now = Date.now(), maxAgeDays = 90 } = {}) {
+  const ok = new Set();
+  for (const c of buildCreators(profiles, crm)) {
+    if (c.ours || c.stage !== DEFAULT_STAGE || c.sig === "forte" || c.missing) continue;
+    for (const h of c.handles) ok.add(h);
+  }
+  return profiles
+    .filter((p) => ok.has(p.h) && !forgotten.has(p.h) && !p.missing && webTokens(p.h).join("").length >= 4 && !(p.web?.at && now - p.web.at < maxAgeDays * 86400000))
+    .sort((a, b) => (b.fol || 0) - (a.fol || 0))
+    .map((p) => p.h);
 }
 
 const DAY = 86400000;
@@ -947,6 +1123,92 @@ export function parseInstagramLink(text) {
   if (["stories"].includes(seg[0].toLowerCase()) && seg[1]) return { handle: seg[1].toLowerCase() };
   if (/^[a-z0-9._]{2,30}$/i.test(seg[0]) && !["explore", "accounts", "direct"].includes(seg[0].toLowerCase())) return { handle: seg[0].toLowerCase() };
   return null;
+}
+
+// ---------- chi l'aveva già trovata (21/10/2026) ----------
+//
+// Nicholas: «non si capisce se la creator c'era già… è venuta fuori da me o da te?». Una
+// segnalazione dice SEMPRE chi l'ha trovata per primo (il radar con una delle sue ricerche,
+// o una persona) e cosa ne è stato fatto (valutata, fase, nostra). Fatti presi PRIMA della
+// segnalazione, dal profilo e dalla scheda del CRM.
+
+const SIGNAL_NOTE = /^Segnalata da ([^:]+)/;
+const sameName = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+
+/** Fatti noti su un account già nel radar, prima che arrivi la segnalazione. null se non c'è. */
+export function knownBefore(profile, crmCreator) {
+  if (!profile) return null;
+  const signals = (crmCreator?.notes || [])
+    .filter((n) => SIGNAL_NOTE.test(n.text || ""))
+    .map((n) => ({ by: n.by || (n.text.match(SIGNAL_NOTE)[1] || "").trim() || null, at: n.at || null }));
+  const how = profile.src === "segnalata" ? "segnalata" : profile.src === "profili simili" || profile.src === "parole chiave" ? profile.src : "ricerca";
+  const stage = STAGE_IDS.includes(crmCreator?.stage) ? crmCreator.stage : DEFAULT_STAGE;
+  return {
+    how,
+    by: how === "segnalata" ? profile.by || signals[0]?.by || null : null,
+    at: profile.firstSeen || null,
+    signals: signals.length,
+    lastSignal: signals.length ? signals[signals.length - 1] : null,
+    stage,
+    reviewedAt: crmCreator?.reviewedAt || null,
+    reviewedBy: crmCreator?.reviewedBy || null,
+    ours: !!profile.ours,
+    sig: profile.sig || "nessuno",
+  };
+}
+
+const dmy = (t) => (t ? new Date(t).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "Europe/Rome" }) : "");
+const HOW_LABEL = { "profili simili": "cercando tra i profili collegati", "parole chiave": "cercando per parole chiave", ricerca: "con la prima grande ricerca" };
+
+/**
+ * Da dove viene una segnalazione, in parole, per chi la guarda (`me` = il suo nome).
+ * kind: "lettura" | "nuova" | "gia" | "errore"; who: "radar" | "persona" (chi l'ha trovata per primo).
+ * title + line per la finestra, short per la riga dell'elenco. Già nel radar si sa SUBITO
+ * (`pre.known`, letto quando arriva la segnalazione), prima che la verifica finisca.
+ */
+export function signalOrigin(item, { me, profile } = {}) {
+  if (!item) return null;
+  const mine = (who) => (sameName(who, me) ? "te" : who || "qualcuno");
+  if (["errore", "non_trovata", "non_instagram", "cancellata"].includes(item.status)) return { kind: "errore", title: item.status === "cancellata" ? "Tolta su richiesta" : "Non letta", line: item.msg || "", short: item.msg || "" };
+  const reading = item.status === "in_lettura";
+  if (reading && !item.pre?.known) {
+    return { kind: "lettura", title: item.pre?.h ? "Non è nel radar" : "In lettura", line: item.pre?.h ? "La leggo per la prima volta." : "Cerco chi l'ha pubblicato.", short: "La leggo adesso." };
+  }
+  if (item.status === "nuova") {
+    const who = mine(item.by);
+    return { kind: "nuova", who: "persona", title: who === "te" ? "Trovata da te" : `Trovata da ${who}`, line: "Il radar non la conosceva.", short: who === "te" ? "Trovata da te" : `Trovata da ${who}` };
+  }
+  // già nel radar: i fatti salvati con la segnalazione; per quelle di prima del 21/10, dal profilo
+  const saved = reading ? item.pre.known : item.known;
+  const k = saved || (profile ? knownBefore(profile, null) : null);
+  if (!k) return { kind: reading ? "lettura" : "gia", who: "radar", title: "Era già nel radar", line: "", short: "Era già nel radar" };
+  const at = saved ? k.at : k.at && item.at && k.at < item.at ? k.at : null;
+  const when = at ? ` il ${dmy(at)}` : "";
+  let title;
+  let first;
+  if (k.how === "segnalata") {
+    const w = mine(k.by);
+    title = w === "te" ? "L'avevi già segnalata tu" : `L'aveva già segnalata ${w}`;
+    first = w === "te" ? `Segnalata già da te${when}` : `Segnalata prima da ${w}${when}`;
+  } else {
+    title = "L'aveva già trovata il radar";
+    first = `Trovata dal radar${when}`;
+  }
+  let state;
+  if (k.ours) state = "è già una creator HOC";
+  else if (k.reviewedAt) state = `${k.stage === "scartata" ? "scartata" : k.stage === DEFAULT_STAGE ? "vista" : `«${(STAGES.find((s) => s.id === k.stage) || {}).label}»`} da ${mine(k.reviewedBy)} il ${dmy(k.reviewedAt)}`;
+  else if (k.stage !== DEFAULT_STAGE) state = `fase «${(STAGES.find((s) => s.id === k.stage) || {}).label}»`;
+  else state = "non ancora valutata";
+  const others = saved ? k.signals - (k.how === "segnalata" ? 1 : 0) : 0;
+  const again = others > 0 ? (others === 1 ? "segnalata un'altra volta" : `segnalata altre ${others} volte`) : null;
+  const line = [at ? (k.how === "segnalata" ? `il ${dmy(at)}` : `il ${dmy(at)}, ${HOW_LABEL[k.how]}`) : null, state, again].filter(Boolean).join(" · ");
+  return { kind: reading ? "lettura" : "gia", who: k.how === "segnalata" ? "persona" : "radar", title, line, short: [first, state].join(" · ") };
+}
+
+/** Altri account del radar che sembrano la stessa persona di `h` (massimo 2), con il perché. */
+export function sameAsSuggestions(profiles, crm, h, max = 2) {
+  const all = suggestLinks(profiles, (x) => creatorIdOf(crm, x), new Set(crm?.dismissed || []), { max: 5000 });
+  return all.filter((s) => s.a === h || s.b === h).slice(0, max).map((s) => ({ h: s.a === h ? s.b : s.a, reason: s.reason }));
 }
 
 // ---------- scritture sovrapposte (17/10/2026) ----------

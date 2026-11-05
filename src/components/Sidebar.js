@@ -18,6 +18,7 @@
  */
 import { collapseItems } from "@/lib/page-groups";
 import { usePathname } from "next/navigation";
+import { useShownPath } from "@/lib/nav-pending";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,7 +35,7 @@ import { Headphones,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
   Wallet, Scale, CalendarDays, FlaskConical, Activity, Search, Link2, Ruler, MessagesSquare,
-  History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, MessageCircle, Sun, Moon, Snowflake,
+  History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, Footprints, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
   FileSignature, Repeat, Gift, MailOpen } from "lucide-react";
@@ -80,7 +81,9 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/conversation-intelligence", label: "Presidio chat", icon: Activity },
       { href: "/admin/shift-quality",            label: "Qualità turni", icon: MessagesSquare },
       { href: "/admin/sales-coaching",           label: "Coaching vendite", icon: HandCoins },
+      { href: "/admin/scaletta",                 label: "La scaletta", icon: Footprints },
       { href: "/admin/s4s",                      label: "Calendario S4S", icon: ArrowLeftRight },
+      { href: "/admin/rete-amici",               label: "Rete amici", icon: Share2 },
       { href: "/admin/telegram",                 label: "Canali Telegram", icon: Send },
       { href: "/admin/sales-ai",                 label: "Sales manager AI", icon: Bot },
       { href: "/admin/manuale-vendite",          label: "Manuale vendite", icon: BookMarked },
@@ -340,7 +343,7 @@ const silentFetcher = async (url) => {
 };
 
 export default function Sidebar() {
-  const pathname = usePathname() || "";
+  const pathname = useShownPath(usePathname() || ""); // voce accesa al tocco
 
   // Menu per ruolo: si nascondono le voci che per questi permessi risponderebbero
   // "non hai il permesso" (lib/nav-access). Finché i permessi non arrivano si

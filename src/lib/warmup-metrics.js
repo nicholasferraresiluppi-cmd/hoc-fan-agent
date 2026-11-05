@@ -9,13 +9,14 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { lastWeeks } from "@/lib/warmup-plan";
-import { parseInstagram, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
+import { parseInstagram, parseReels, withReels, wakeups, reelBudget, REEL_DAYS, REEL_LIMIT, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 
 const API = "https://api.apify.com/v2";
 const RUN = "warmup:pub:run";
 const PUB = (id) => `warmup:pub:${id}`;
 const IG_ACTOR = "apify~instagram-profile-scraper";
+const IG_REEL_ACTOR = "apify~instagram-reel-scraper"; // le view dei reel (il primo non le dà più dal 3/11/2026)
 const X_PROFILE_ACTOR = "danek~twitter-profile-ppr";
 const X_POSTS_ACTOR = "apidojo~twitter-profile-scraper";
 
@@ -54,12 +55,14 @@ export async function refreshPublicMetrics({ force = false } = {}) {
     const list = all.filter((x) => x.handle);
     const ig = list.filter((x) => x.platform === "ig"), xs = list.filter((x) => x.platform === "x");
     const at = Date.now();
-    const [igRows, xProfiles, xPosts] = await Promise.all([
+    const [igRows, reelRows, xProfiles, xPosts] = await Promise.all([
       ig.length ? runSync(IG_ACTOR, { usernames: ig.map((x) => x.handle) }, { maxUsd: runBudget(ig.length, 0) }).catch((e) => { errors.push(e.message); return null; }) : [],
+      ig.length ? runSync(IG_REEL_ACTOR, { username: ig.map((x) => x.handle), resultsLimit: REEL_LIMIT, onlyPostsNewerThan: `${REEL_DAYS} days` }, { maxUsd: reelBudget(ig.length) }).catch((e) => { errors.push("reel: " + e.message); return null; }) : [],
       xs.length ? runSync(X_PROFILE_ACTOR, { usernames: xs.map((x) => x.handle) }, { maxUsd: runBudget(0, xs.length) }).catch((e) => { errors.push(e.message); return null; }) : [],
       xs.length ? runSync(X_POSTS_ACTOR, { twitterHandles: xs.map((x) => x.handle), maxItems: 40 * xs.length, getAboutData: false }, { maxUsd: runBudget(0, xs.length) }).catch((e) => { errors.push(e.message); return null; }) : [],
     ]);
     const key = (h) => String(h || "").toLowerCase();
+    const reelsBy = parseReels(reelRows);
     const igBy = new Map((igRows || []).map((r) => [key(r.username || r.inputUrl?.split("/").filter(Boolean).pop()), r]));
     const xBy = new Map((xProfiles || []).map((r) => [key(r.profile), r]));
     const tweetsBy = new Map();
@@ -67,7 +70,7 @@ export async function refreshPublicMetrics({ force = false } = {}) {
     let read = 0, notFound = 0;
     for (const t of list) {
       let reading = null;
-      if (t.platform === "ig" && igRows) reading = parseInstagram(igBy.get(key(t.handle)), at);
+      if (t.platform === "ig" && igRows) reading = withReels(parseInstagram(igBy.get(key(t.handle)), at), reelsBy.get(key(t.handle)));
       if (t.platform === "x" && xProfiles) reading = parseX(xBy.get(key(t.handle)), tweetsBy.get(key(t.handle)) || [], at);
       if (!reading) continue;
       const merged = mergeReading(await kv.get(PUB(t.id)), reading);
@@ -87,7 +90,7 @@ export async function refreshPublicMetrics({ force = false } = {}) {
         } catch (e) { errors.push("link OnlyFans: " + (e.message || e)); }
       }
     }
-    const estUsd = Math.round((ig.length * PRICE.ig + xs.length * (PRICE.xProfile + PRICE.xPosts)) * 1000) / 1000;
+    const estUsd = Math.round((ig.length * PRICE.ig + (reelRows?.length || 0) * PRICE.igReel + xs.length * (PRICE.xProfile + PRICE.xPosts)) * 1000) / 1000;
     const done = { lastDay: today, lastAt: Date.now(), profiles: list.length, read, notFound, links, estUsd, errors: errors.slice(0, 5), runningSince: null };
     await kv.set(RUN, done);
     return done;
@@ -120,6 +123,7 @@ export async function loadPublicSummaries(ids, platforms = {}) {
       posts: postsFromStore(s, platforms[id] || "ig"),
       linkDays: s.link && !s.link.missing ? s.link.days || {} : null,
       reach: reachCheck(s, platforms[id] || "ig"),
+      wakes: (platforms[id] || "ig") === "x" ? null : wakeups(s),
       link: s.link ? { url: s.link.url, from: s.link.from, name: s.link.name || null, created: s.link.created || null, total: s.link.total || null, lastDay: s.link.lastDay || null, missing: Boolean(s.link.missing) } : null,
     };
   });
