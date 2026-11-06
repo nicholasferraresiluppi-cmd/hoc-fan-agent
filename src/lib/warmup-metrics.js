@@ -9,7 +9,7 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { lastWeeks } from "@/lib/warmup-plan";
-import { parseInstagram, parseReels, withReels, wakeups, reelBudget, REEL_DAYS, REEL_LIMIT, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows } from "@/lib/warmup-metrics-core";
+import { parseInstagram, parseReels, withReels, wakeups, reelBudget, REEL_DAYS, REEL_LIMIT, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows, linkNeedsCheck } from "@/lib/warmup-metrics-core";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 
 const API = "https://api.apify.com/v2";
@@ -82,13 +82,7 @@ export async function refreshPublicMetrics({ force = false } = {}) {
     if (bigQueryConfigured()) {
       const want = [];
       for (const t of all) { const s0 = await kv.get(PUB(t.id)); const l = effectiveLink(t.rec, s0?.last); if (l) want.push({ id: t.id, ...l, store: s0 }); }
-      const sql = linkStatsSQL(want.map((w) => w.url), { dataset: process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213", orgId: HOC_ORGANIZATION_ID });
-      if (sql) {
-        try {
-          const { rows } = await bqQuery(sql, { maxBytesBilled: 2 * 1024 ** 3, timeoutMs: 30_000 });
-          for (const w of want) { await kv.set(PUB(w.id), mergeLinkRows(w.store, w.url, rows, w.from)); links++; }
-        } catch (e) { errors.push("link OnlyFans: " + (e.message || e)); }
-      }
+      try { links = (await readLinks(want)).length; } catch (e) { errors.push("link OnlyFans: " + (e.message || e)); }
     }
     const estUsd = Math.round((ig.length * PRICE.ig + (reelRows?.length || 0) * PRICE.igReel + xs.length * (PRICE.xProfile + PRICE.xPosts)) * 1000) / 1000;
     const done = { lastDay: today, lastAt: Date.now(), profiles: list.length, read, notFound, links, estUsd, errors: errors.slice(0, 5), runningSince: null };
@@ -100,6 +94,33 @@ export async function refreshPublicMetrics({ force = false } = {}) {
   }
 }
 
+/** Clic/iscritti/ricavo dei link dal magazzino dati → storico di ciascun profilo. Restituisce gli store aggiornati. */
+async function readLinks(want, timeoutMs = 30_000) {
+  const sql = linkStatsSQL(want.map((w) => w.url), { dataset: process.env.BIGQUERY_DATA_PROJECT || "house-of-creators-358213", orgId: HOC_ORGANIZATION_ID });
+  if (!sql) return [];
+  const { rows } = await bqQuery(sql, { maxBytesBilled: 2 * 1024 ** 3, timeoutMs });
+  const at = Date.now();
+  const out = [];
+  for (const w of want) { const s = mergeLinkRows(w.store, w.url, rows, w.from, at); await kv.set(PUB(w.id), s); out.push([w.id, s]); }
+  return out;
+}
+
+/** All'apertura della pagina: i link nuovi, cambiati o non ancora trovati si cercano subito. */
+async function recheckLinks(ids, stores) {
+  if (!bigQueryConfigured()) return;
+  const recs = await kv.mget(...ids.map((id) => `warmup:p:${id}`));
+  const want = [];
+  ids.forEach((id, i) => {
+    const rec = recs[i];
+    if (!rec || rec.archived || !stores[i]) return;
+    const l = effectiveLink(rec, stores[i].last);
+    if (linkNeedsCheck(stores[i], l)) want.push({ id, ...l, store: stores[i], i });
+  });
+  if (!want.length) return;
+  const fresh = new Map(await readLinks(want, 12_000));
+  for (const w of want) if (fresh.has(w.id)) stores[w.i] = fresh.get(w.id);
+}
+
 export async function getRunState() {
   return (await kv.get(RUN)) || null;
 }
@@ -108,6 +129,7 @@ export async function getRunState() {
 export async function loadPublicSummaries(ids, platforms = {}) {
   if (!ids.length) return {};
   const stores = await kv.mget(...ids.map(PUB));
+  await recheckLinks(ids, stores).catch(() => {});
   const weeks = lastWeeks(18).map((w) => w.key); // i post si tengono 120 giorni
   const out = {};
   ids.forEach((id, i) => {

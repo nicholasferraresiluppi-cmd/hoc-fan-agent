@@ -266,15 +266,24 @@ GROUP BY 1, 2`;
 }
 
 /** Righe del magazzino → link nello storico del profilo (totali per giorno). */
-export function mergeLinkRows(store, url, rows, from) {
+export function mergeLinkRows(store, url, rows, from, at = Date.now()) {
   const s = store && store.v === METRICS_VERSION ? { ...store } : { v: METRICS_VERSION, days: {}, posts: {} };
   const mine = rows.filter((r) => r.url === url);
-  if (!mine.length) { s.link = { url, from, missing: true, days: {} }; return s; }
+  if (!mine.length) { s.link = { url, from, missing: true, days: {}, checkedAt: at }; return s; }
   const days = {};
   for (const r of mine) days[r.day] = { clicks: Number(r.clicks) || 0, subs: Number(r.subs) || 0, revenue: Math.round((Number(r.revenue) || 0) * 100) / 100 };
   const last = mine.map((r) => r.day).sort().pop();
-  s.link = { url, from, name: mine[0].name || null, created: String(mine[0].created || "").slice(0, 10), days, total: days[last], lastDay: last };
+  s.link = { url, from, name: mine[0].name || null, created: String(mine[0].created || "").slice(0, 10), days, total: days[last], lastDay: last, checkedAt: at };
   return s;
+}
+
+/** Da ricontrollare subito (non alla notte dopo): link mai cercato, cambiato o non ancora trovato,
+ *  al massimo una volta ogni `every` ms — un link appena creato arriva nel magazzino con ore di ritardo. */
+export function linkNeedsCheck(store, want, now = Date.now(), every = 30 * 60000) {
+  if (!want) return false;
+  const l = store?.link;
+  if (l && l.url === want.url && !l.missing) return false;
+  return !l?.checkedAt || now - l.checkedAt >= every;
 }
 
 /** Clic, iscritti e ricavo del link nella settimana (differenza dei totali). */
