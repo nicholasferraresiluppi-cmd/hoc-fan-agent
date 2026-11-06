@@ -47,6 +47,13 @@ export async function getBanco(pid, { force = false } = {}) {
   return { folder, rows: mergeFiles(doc.files, await readMarks(pid)), at: doc.at, error: doc.error, truncated: Boolean(doc.truncated) };
 }
 
+/** Il Banco dall'ultimo elenco già letto, senza mai chiamare Drive (per le viste d'insieme come la sala di Editing). */
+export async function getBancoCached(pid) {
+  const [folder, doc] = await Promise.all([kv.get(folderKey(pid)), kv.get(filesKey(pid))]);
+  if (!folder) return { folder: null, rows: [], at: null };
+  return { folder, rows: mergeFiles(doc?.files || [], await readMarks(pid)), at: doc?.at || null };
+}
+
 export async function setBancoFolder(pid, url, userId) {
   const id = folderIdFromUrl(url);
   if (!id) return { ok: false, error: "Il link non sembra una cartella di Drive" };
