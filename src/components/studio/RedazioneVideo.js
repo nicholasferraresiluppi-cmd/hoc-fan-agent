@@ -71,12 +71,13 @@ function Lista({ title, list }) {
   );
 }
 
-export default function RedazioneVideo({ pid }) {
+// senzaPercorso: in Editing il percorso sta già in alto (le sette tappe), qui resterebbe doppio.
+export default function RedazioneVideo({ pid, senzaPercorso = false, title: titleProp }) {
   const url = `/api/admin/studio-social/${encodeURIComponent(pid)}/redazione`;
   const { data, error, isLoading } = useSWR(url, fetcher, { revalidateOnFocus: false });
   const [open, setOpen] = useState(null);
 
-  const title = "La redazione";
+  const title = titleProp || "La redazione";
   if (isLoading) return (<><SectionTitle>{title}</SectionTitle><div style={{ fontSize: 14, color: CP.textMuted, marginBottom: 24 }}>Caricamento…</div></>);
   if (error) return (<><SectionTitle>{title}</SectionTitle><div style={{ marginBottom: 24 }}><Notice danger>{`Errore nel caricamento: ${error.message}`}</Notice></div></>);
 
@@ -86,7 +87,7 @@ export default function RedazioneVideo({ pid }) {
     <div style={{ marginBottom: 24 }}>
       <SectionTitle aside={t.ultimo ? `ultimo giro ${fmtDay(t.ultimo)}` : null}>{title}</SectionTitle>
       <Squadra team={data?.team || []} work={data?.work || {}} />
-      <Percorso steps={data?.funnel || []} />
+      {!senzaPercorso && <Percorso steps={data?.funnel || []} />}
       {giri.length === 0 ? (
         <EmptyState title="Nessun giro registrato">
           Ogni giro di montaggio si registra alla fine, con cosa è stato montato, cosa ha scartato il revisore e perché. Da lì si vede il lavoro della squadra e si confrontano i giri.

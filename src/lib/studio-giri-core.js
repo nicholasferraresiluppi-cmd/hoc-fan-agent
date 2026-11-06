@@ -7,7 +7,8 @@
 // sceglie cosa pubblicare; poi «Cosa ha funzionato» misura cosa è uscito.
 //
 // Un GIRO (registrato a fine lavoro da chi l'ha fatto, con scripts/studio-giro.mjs):
-//   { n, titolo, day, cartella, montati, tenuti, revisioni, scartati: [{ titolo, motivo }], fermati: [{ titolo, motivo }] }
+//   { n, titolo, day, cartella, montati, tenuti, revisioni, scartati: [{ titolo, motivo }], fermati: [{ titolo, motivo }],
+//     girato: { stato: ok|poco|finito, nota } }
 // fermati = idee bloccate PRIMA del montaggio (dal direttore creativo).
 
 export const GIRI_VERSION = "giri-1";
@@ -30,6 +31,13 @@ function items(list, max = 60) {
   return list.slice(0, max).map((x) => ({ titolo: str(x?.titolo, 80), motivo: str(x?.motivo, 240) })).filter((x) => x.titolo);
 }
 
+// Stato del girato a fine giro (per la tappa «Girato» di Editing): ok | poco | finito, con una nota su cosa serve.
+const GIRATO_STATI = new Set(["ok", "poco", "finito"]);
+function girato(g) {
+  if (!g || !GIRATO_STATI.has(g.stato)) return null;
+  return { stato: g.stato, nota: str(g.nota, 300) || null };
+}
+
 /** Controlla e pulisce un giro. Ritorna { ok, giro } o { ok:false, error }. */
 export function validateGiro(raw = {}) {
   const n = int(raw.n);
@@ -47,6 +55,7 @@ export function validateGiro(raw = {}) {
       n, day, titolo: str(raw.titolo, 120) || `Giro ${n}`, cartella: str(raw.cartella, 160) || null,
       montati, tenuti, revisioni: int(raw.revisioni) ?? null,
       scartati, fermati: items(raw.fermati),
+      girato: girato(raw.girato),
     },
   };
 }

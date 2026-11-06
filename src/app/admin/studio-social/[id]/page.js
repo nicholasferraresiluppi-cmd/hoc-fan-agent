@@ -4,15 +4,16 @@
  * /admin/studio-social/[id] — un profilo social della redazione.
  *
  * Dall'alto: fase e numeri, cosa fare oggi a mano, la settimana (calendario fisso + contenuti del
- * giorno), il banco dei video montati (BancoMontaggi) e cosa ha funzionato una volta usciti (EsitiReel), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
+ * giorno), il rimando al montaggio dei reel (in Editing, dal 6/11/2026), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
  * da cui tutto deve discendere, poi Telegram e landing (TelegramPanel). Un contenuto va in
  * "Programmati" solo col video montato, i quattro revisori, la qualità «ok» con tutte le voci e
  * nessun blocco: la regola la applica il server.
  */
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { Plus, Pencil, Trash2, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, Scissors, ArrowRight } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Notice, SectionTitle, card, NUM, alpha } from "@/components/ds";
@@ -24,9 +25,7 @@ import TelegramPanel, { FunnelTiles, PostModal } from "@/components/studio/Teleg
 import EditorialSection from "@/components/studio/EditorialSection";
 import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
-import BancoMontaggi from "@/components/studio/BancoMontaggi";
-import EsitiReel from "@/components/studio/EsitiReel";
-import RedazioneVideo from "@/components/studio/RedazioneVideo";
+import { slugify } from "@/lib/editing-core";
 import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -398,14 +397,16 @@ export default function StudioProfilePage() {
         onSaveArc={saveArc} onDeleteArc={deleteArc}
       />
 
-      {/* La redazione: la squadra che monta i reel, giro per giro, e quanto lavoro arriva al reel che rende */}
-      <RedazioneVideo pid={id} />
-
-      {/* Banco montaggi: i video della cartella Drive, da guardare e scegliere */}
-      <BancoMontaggi pid={id} />
-
-      {/* Cosa ha funzionato: i reel usciti, le loro misure e il video del Banco da cui vengono */}
-      <EsitiReel pid={id} />
+      {/* Il montaggio dei reel (Banco, giri della squadra, cosa ha funzionato) vive in Editing, alla scrivania della creator */}
+      <Link href={`/admin/editing/${slugify(profile.creator || profile.handle || id)}`}
+        style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 24, textDecoration: "none", color: CP.textPrimary }}>
+        <Scissors size={18} color={CP.textSecondary} aria-hidden="true" />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Montaggio dei reel in Editing</span>
+          <span style={{ display: "block", fontSize: 13, color: CP.textSecondary }}>Banco montaggi, giri della squadra e cosa ha funzionato sono alla scrivania di {profile.creator || `@${profile.handle}`}</span>
+        </span>
+        <ArrowRight size={16} color={CP.textMuted} aria-hidden="true" />
+      </Link>
 
       {/* Coda */}
       <SectionTitle>Coda dei contenuti</SectionTitle>

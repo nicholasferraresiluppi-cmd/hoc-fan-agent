@@ -16,7 +16,7 @@ export const RESTRICTED_ROLES = {
   referente: { home: "/me/porta-un-amico", paths: ["/me/porta-un-amico"], label: "Porta un amico" },
   // 27/10/2026: il publisher su X vede solo i suoi fan e le sue buste
   publisher: { home: "/me/publisher", paths: ["/me/publisher"], label: "I miei fan" },
-  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
+  smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/editing", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
 };
 
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */
