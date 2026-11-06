@@ -4,7 +4,7 @@
  * /admin/studio-social/[id] — un profilo social della redazione.
  *
  * Dall'alto: fase e numeri, cosa fare oggi a mano, la settimana (calendario fisso + contenuti del
- * giorno), il banco dei video montati (BancoMontaggi), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
+ * giorno), il banco dei video montati (BancoMontaggi) e cosa ha funzionato una volta usciti (EsitiReel), la coda dei contenuti a colonne con gli esiti dei revisori, e l'identità (la "bibbia")
  * da cui tutto deve discendere, poi Telegram e landing (TelegramPanel). Un contenuto va in
  * "Programmati" solo col video montato, i quattro revisori, la qualità «ok» con tutte le voci e
  * nessun blocco: la regola la applica il server.
@@ -25,6 +25,7 @@ import EditorialSection from "@/components/studio/EditorialSection";
 import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
 import BancoMontaggi from "@/components/studio/BancoMontaggi";
+import EsitiReel from "@/components/studio/EsitiReel";
 import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -398,6 +399,9 @@ export default function StudioProfilePage() {
 
       {/* Banco montaggi: i video della cartella Drive, da guardare e scegliere */}
       <BancoMontaggi pid={id} />
+
+      {/* Cosa ha funzionato: i reel usciti, le loro misure e il video del Banco da cui vengono */}
+      <EsitiReel pid={id} />
 
       {/* Coda */}
       <SectionTitle>Coda dei contenuti</SectionTitle>
