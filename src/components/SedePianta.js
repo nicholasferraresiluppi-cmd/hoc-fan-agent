@@ -24,7 +24,7 @@ const SERIF = 'var(--f-display), "Instrument Serif", Georgia, serif';
 // colonne = tappe del lavoro; dentro, le stanze (una per area)
 const COLS = [
   { id: "entra", label: "I dati entrano", x: 16, w: 258, rooms: ["dati"] },
-  { id: "lavora", label: "Si lavora", x: 384, w: 318, rooms: ["vendite", "formazione", "persone"] },
+  { id: "lavora", label: "Si lavora", x: 384, w: 318, rooms: ["vendite", "formazione", "contenuti", "persone"] },
   { id: "controlla", label: "Si controlla", x: 812, w: 258, rooms: ["controllo"] },
   { id: "decide", label: "Si decide", x: 1180, w: 214, rooms: ["direzione"] },
 ];

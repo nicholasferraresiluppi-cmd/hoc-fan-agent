@@ -53,17 +53,21 @@ WHERE platform_id = '${pidSql}' AND date_key = '${lastDay}'`, { maxBytesBilled: 
 }
 
 /** Dati del profilo dal magazzino (dalla cache se fresca). `computing` = un'altra lettura è in corso. */
-export async function getEsitiData(pid, handle, { force = false } = {}) {
+export async function getEsitiData(pid, handle, { force = false, cacheOnly = false } = {}) {
   const h = cleanHandle(handle);
   if (!h) return { error: "Il profilo non ha un nome utente Instagram valido", reels: [], accountDays: {} };
   const cached = await kv.get(dataKey(pid));
   const fresh = cached && cached.v === ESITI_VERSION && cached.handle === h && Date.now() - (cached.at || 0) < WARM_MS;
   if (fresh && !force) return cached;
+  // chi vuole solo i numeri già letti (la Redazione) non fa partire il magazzino
+  if (cacheOnly) return cached && cached.v === ESITI_VERSION && cached.handle === h ? cached : { reels: [], accountDays: {} };
   if (!bigQueryConfigured()) return cached || { error: "Magazzino dati non configurato in questo ambiente", reels: [], accountDays: {} };
   if (!(await kv.set(lockKey(pid), Date.now(), { nx: true, ex: 90 }))) return { ...(cached || { reels: [], accountDays: {} }), computing: true };
   try {
     const doc = { v: ESITI_VERSION, at: Date.now(), handle: h, error: null, ...(await readWarehouse(h)) };
     await kv.set(dataKey(pid), doc);
+    // prova di lavoro per la Sede (ufficio «Cosa ha funzionato»)
+    await kv.set("cron:heartbeat:misura-reel", { at: doc.at, via: "pagina", result: `@${h}: ${doc.reels.length} reel letti, dati al ${doc.lastDay || "—"}` }, { ex: 60 * 86400 });
     return doc;
   } catch (e) {
     // il magazzino non risponde: restano i numeri già letti, con l'errore in vista

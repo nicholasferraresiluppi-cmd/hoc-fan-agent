@@ -79,7 +79,7 @@ const STATE = {
   persona: { c: 0xd9b46a, css: "var(--gold)", t: "Persona" },
 };
 const TIPO = { persona: "Persona", AI: "Agente AI", codice: "Programma", robot: "Robot" };
-const FLOOR_ORDER = ["dati", "vendite", "formazione", "persone", "controllo", "direzione"];
+const FLOOR_ORDER = ["dati", "vendite", "formazione", "contenuti", "persone", "controllo", "direzione"];
 const FILTERS = [
   { k: null, l: "Tutto l'edificio" },
   { k: "fermi", l: "Fermi o in ritardo" },

@@ -26,6 +26,7 @@ import { IG_ROLES } from "@/lib/studio-editorial-core";
 import QualityAgent from "@/components/studio/QualityAgent";
 import BancoMontaggi from "@/components/studio/BancoMontaggi";
 import EsitiReel from "@/components/studio/EsitiReel";
+import RedazioneVideo from "@/components/studio/RedazioneVideo";
 import { confirmDialog } from "@/components/AppDialogs";
 
 const fetcher = async (url) => {
@@ -396,6 +397,9 @@ export default function StudioProfilePage() {
         onNewPost={(prefill) => setPostEditing(prefill)}
         onSaveArc={saveArc} onDeleteArc={deleteArc}
       />
+
+      {/* La redazione: la squadra che monta i reel, giro per giro, e quanto lavoro arriva al reel che rende */}
+      <RedazioneVideo pid={id} />
 
       {/* Banco montaggi: i video della cartella Drive, da guardare e scegliere */}
       <BancoMontaggi pid={id} />
