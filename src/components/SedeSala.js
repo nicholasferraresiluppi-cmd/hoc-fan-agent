@@ -75,15 +75,15 @@ THEMES.executive = {
 };
 const THEME_ORDER = ["vetro", "legno", "executive", "trading"];
 // colore d'accento per area: filo sulla porta e bordo dell'insegna (riconosci la stanza a colpo d'occhio)
-const ACCENT = { dati: "#6fb3ff", vendite: "#4fbf78", formazione: "#f0b060", persone: "#e07aa8", controllo: "#b9aef9", direzione: "#d9b46a" };
+const ACCENT = { dati: "#6fb3ff", vendite: "#4fbf78", formazione: "#f0b060", contenuti: "#5fd0c8", persone: "#e07aa8", controllo: "#b9aef9", direzione: "#d9b46a" };
 // disposizioni: centro di ogni area [x, z] e angolo relax
 const LAYOUTS = {
-  islands: { meeting: [16, -9.6, 6.6, 5], reception: [19.6, 1.4], isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
-  rooms: { meeting: [-8, -6.6, 5.4, 5.2], reception: [19.6, 0], isle: { dati: [-15.2, -6.6], vendite: [0, -6.6], formazione: [14, -6.6], persone: [-14, 6.2], controllo: [0, 6.2], direzione: [8, 6.2] }, lounge: [16.6, 11], lanes: [0] },
-  tiers: { isle: { dati: [-3, -11], vendite: [-3, -6.8], formazione: [-3, -2.6], persone: [-3, 1.6], controllo: [-3, 5.8], direzione: [-3, 10] }, lounge: [15.5, 10.2], aisle: 8 },
+  islands: { meeting: [16, -9.6, 6.6, 5], reception: [19.6, 1.4], isle: { dati: [-15, -6.5], vendite: [-3.5, -7], formazione: [9, -1.5], contenuti: [9, 5.2], persone: [-15, 4.5], controllo: [-3.5, 3.5], direzione: [3.5, 10.5] }, lounge: [15.5, 10.2], lanes: [-1.2, 8.6] },
+  rooms: { meeting: [-8, -6.6, 5.4, 5.2], reception: [19.6, 0], isle: { dati: [-15.2, -6.6], vendite: [0, -6.6], formazione: [14, -6.6], contenuti: [-7, 6.2], persone: [-14, 6.2], controllo: [0, 6.2], direzione: [8, 6.2] }, lounge: [16.6, 11], lanes: [0] },
+  tiers: { isle: { dati: [-3, -11], vendite: [-3, -6.8], formazione: [-3, -2.6], persone: [-3, 1.6], controllo: [-3, 5.8], direzione: [-3, 10], contenuti: [-3, 14.2] }, lounge: [15.5, 10.2], aisle: 8 },
 };
-const GO_LABEL = { dati: "Dati", vendite: "Vendite", formazione: "Formazione", persone: "Persone", controllo: "Controllo", direzione: "Direzione" };
-const AREE = { dati: "FONTI DEI DATI", vendite: "VENDITE E COACHING", formazione: "FORMAZIONE VENDITE", persone: "PERSONE", controllo: "CONTROLLO", direzione: "DIREZIONE" };
+const GO_LABEL = { dati: "Dati", vendite: "Vendite", formazione: "Formazione", contenuti: "Redazione", persone: "Persone", controllo: "Controllo", direzione: "Direzione" };
+const AREE = { dati: "FONTI DEI DATI", vendite: "VENDITE E COACHING", formazione: "FORMAZIONE VENDITE", contenuti: "REDAZIONE SOCIAL", persone: "PERSONE", controllo: "CONTROLLO", direzione: "DIREZIONE" };
 const TIPO = { persona: "persona", AI: "agente AI", codice: "programma", robot: "robot" };
 const TIPI = { persona: "persone", AI: "agenti AI", codice: "programmi", robot: "robot" };
 const FERMI = ["in_ritardo", "mai", "errore"];
@@ -509,7 +509,7 @@ function mountSala(root, D, theme, THREE, OrbitControls, CSS2DRenderer, CSS2DObj
   controls.screenSpacePanning = false; controls.minPolarAngle = .55; controls.maxPolarAngle = 1.1; controls.minZoom = .5; controls.maxZoom = 2.2;
   const clampTarget = () => { const t = controls.target, cx = Math.max(-20, Math.min(20, t.x)), cz = Math.max(-13, Math.min(13, t.z)); if (cx !== t.x || cz !== t.z) { const dx = cx - t.x, dz = cz - t.z; t.x = cx; t.z = cz; camera.position.x += dx; camera.position.z += dz; } };
   controls.addEventListener("change", clampTarget);
-  const STOPS = Object.entries(ISLE).filter(([p]) => OFF.some((o) => o.piano === p)).map(([p, at]) => ({ at, cap: { dati: "i dati entrano ogni notte", vendite: "vendite e coaching al lavoro", formazione: "la formazione vendite", persone: "persone e organizzazione", controllo: "il controllo verifica tutto", direzione: "il fascicolo arriva alla direzione" }[p] }));
+  const STOPS = Object.entries(ISLE).filter(([p]) => OFF.some((o) => o.piano === p)).map(([p, at]) => ({ at, cap: { dati: "i dati entrano ogni notte", vendite: "vendite e coaching al lavoro", formazione: "la formazione vendite", contenuti: "la redazione monta i reel", persone: "persone e organizzazione", controllo: "il controllo verifica tutto", direzione: "il fascicolo arriva alla direzione" }[p] }));
   if (fermi) STOPS.push({ at: LOUNGE, cap: fermi === 1 ? "chi è fermo è in pausa" : `${fermi} uffici fermi, in pausa` });
   let tour = true, stopI = 0, stopT = 0; const camTarget = new THREE.Vector3(STOPS[0].at[0], 0, STOPS[0].at[1]);
   controls.target.copy(camTarget); camera.position.copy(camTarget).add(ISO);

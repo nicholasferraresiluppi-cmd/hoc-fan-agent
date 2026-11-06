@@ -45,6 +45,22 @@ export async function GET() {
     feedback = { day, da_rivedere: fbs.filter((f) => f && ["in_revisione", "bloccato"].includes(f.status)).length };
   }
 
+  // coda della redazione: video del Banco ancora da guardare, su tutti i profili (dall'elenco già in cache, mai Drive)
+  let banco = null;
+  const folders = await safe(kv.keys("studio:banco:folder:*"));
+  if (folders?.length) {
+    const pids = folders.map((k) => k.slice("studio:banco:folder:".length));
+    const [files, marks] = await Promise.all([
+      safe(kv.mget(...pids.map((p) => `studio:banco:files:${p}`))),
+      Promise.all(pids.map((p) => safe(kv.hkeys(`studio:banco:marks:${p}`)))),
+    ]);
+    banco = pids.reduce((n, p, i) => {
+      const ids = (parse(files?.[i])?.files || []).map((f) => f.id);
+      const seen = new Set(marks[i] || []);
+      return n + ids.filter((id) => !seen.has(id)).length;
+    }, 0);
+  }
+
   const ctrlIds = OFFICES.filter((o) => o.ctrl).map((o) => o.id);
   const ctrlVals = ctrlIds.length ? await safe(kv.mget(...ctrlIds.map((id) => `sede:ctrl:${id}`))) : [];
   const ctrl = Object.fromEntries(ctrlIds.map((id, i) => [id, parse(ctrlVals?.[i])]));
@@ -54,7 +70,7 @@ export async function GET() {
     const status = statusOf(o, beat, now);
     const owner = own[o.id] || o.responsabile_default || null;
     const controllo = ctrl[o.id] ? { at: ctrl[o.id].at, ok: ctrl[o.id].ok, problemi: ctrl[o.id].problemi || [] } : null;
-    const coda = o.coda === "decisioni" ? { n: decisioni, label: "decisioni in attesa" } : o.coda === "feedback" && feedback ? { n: feedback.da_rivedere, label: `feedback da rivedere (${feedback.day})` } : null;
+    const coda = o.coda === "decisioni" ? { n: decisioni, label: "decisioni in attesa" } : o.coda === "feedback" && feedback ? { n: feedback.da_rivedere, label: `feedback da rivedere (${feedback.day})` } : o.coda === "banco" && banco != null ? { n: banco, label: "video del Banco da guardare" } : null;
     return {
       id: o.id, piano: o.piano, nome: o.nome, tipo: o.tipo, compito: o.compito, risultato: o.risultato,
       controllore: o.controllore, cadenza: CADENCE[o.cadenza]?.label, link: o.link, esterno: o.esterno || null,
