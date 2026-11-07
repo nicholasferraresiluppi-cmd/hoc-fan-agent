@@ -32,6 +32,7 @@ import { lbl, btnPrimary, btnGhost, SYNC_LABEL, displayValue, FieldInput, fmtDat
 import { RestoreButton, archivedSummary } from "@/components/hr-archive";
 import { ExitButton, ReactivateButton } from "@/components/hr-phase";
 import { PersonContractCard } from "@/components/hr-contracts-ui";
+import { OperatorCard } from "@/components/hr-operator";
 
 const ACTION_LABEL = {
   create: "Scheda creata", update: "Modifica", conflict: "Conflitto con ClickUp", cf_revealed: "Codice fiscale mostrato",
@@ -39,7 +40,7 @@ const ACTION_LABEL = {
   clickup_deleted: "Task cancellato su ClickUp", echo_ignored: "Eco di una nostra scrittura (ignorata)", cf_skipped: "Codice fiscale non importato",
   archived: "Scheda archiviata", restored: "Scheda ripristinata", task_trashed: "Task nel cestino di ClickUp",
   task_delete_queued: "Cancellazione del task in coda", mirror_unrecognized: "Testo di ClickUp non riconosciuto",
-  doc_opened: "Documento aperto", contract_attached: "Contratto allegato su ClickUp", contract_link: "Contratto collegato", contract_sent: "Contratto inviato in firma", id_document: "Dati del documento d\u2019identità",
+  operator_link: "Collegamento a Infloww", doc_opened: "Documento aperto", contract_attached: "Contratto allegato su ClickUp", contract_link: "Contratto collegato", contract_sent: "Contratto inviato in firma", id_document: "Dati del documento d\u2019identità",
 };
 const SOURCE_LABEL = { app: "HOC Pro", clickup: "ClickUp", modulo: "Modulo della persona", sistema: "Sistema" }; // le scritture da Dropbox Sign hanno source "sistema", chi = "Dropbox Sign"
 const who = (by) => (!by ? "—" : String(by).startsWith("user_") ? `utente …${String(by).slice(-6)}` : by);
@@ -174,6 +175,7 @@ export default function HrPersonPage() {
             <>
               {["cambiata", "mancante", "risolto"].includes(data.contracts?.status?.flag) && <PersonContractCard contracts={data.contracts} personId={p.id} />}
               <Overview p={p} onGo={setTab} />
+              <div style={{ marginTop: 14 }}><OperatorCard person={p} locked={Boolean(p.archived)} /></div>
               {f.notes && (
                 <section style={{ ...card, padding: "14px 16px", marginTop: 14 }}>
                   <h2 style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Note</h2>
