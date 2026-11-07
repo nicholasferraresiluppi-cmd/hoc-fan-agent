@@ -43,6 +43,7 @@
  * storico dei propri premi, che non deve cambiare sotto i piedi. I premi già
  * pagati restano congelati all'importo del pagamento.
  */
+import { PHASE_EXITED } from "./hr-fields.js";
 
 // ref-4 (29/10/2026): il programma è una PROVA e vale per chi scrive all'Area
 // Partner (Claudia) entro il 30 novembre 2026 (decisione di Nicholas). Conta il
@@ -185,7 +186,6 @@ export function validateRecruit(input = {}) {
     referrerId: s(input.referrerId),
     storyId: s(input.storyId) || null,
     hrPersonId: s(input.hrPersonId) || null,
-    inflowwName: s(input.inflowwName).slice(0, 120) || null,
     note: s(input.note).slice(0, 1000) || null,
   };
   for (const [k, label] of [["contactedAt", "Primo contatto"], ["interviewAt", "Colloquio"], ["trainingAt", "Formazione"], ["firstShiftAt", "Primo turno"], ["exitedAt", "Uscita"]]) {
@@ -240,6 +240,52 @@ export function findDuplicateRecruit(recruits = [], candidate = {}, selfId = nul
     (candidate.hrPersonId && r.hrPersonId === candidate.hrPersonId) ||
     (n && normName(r.name) === n)
   )) || null;
+}
+
+// ── Collegamento al CRM (07/11/2026) ────────────────────────────────────────
+//
+// Prima la persona portata aveva un nome Infloww suo, scelto dall'HR qui, e le
+// date di primo turno e uscita scritte a mano: un collegamento in più rispetto
+// al resto dell'app. Ora si lega alla SCHEDA del CRM (`hrPersonId`) e da lì
+// prende tutto: chi è su Infloww (collegamento persona→operatore della scheda,
+// person-operator.js), da cui i turni CreatorsPro e il venduto; l'uscita dalla
+// fase «Uscita» della scheda; il primo turno dai turni CreatorsPro. Una data
+// scritta dall'HR qui vince sempre (correzione dei casi strani). Le regole dei
+// premi non cambiano: cambia solo da dove arrivano i dati.
+
+/**
+ * Persona portata + la sua scheda CRM e il collegamento all'operatore:
+ * `inflowwName` dal collegamento, `exitedAt` dalla scheda in fase «Uscita»
+ * (giorno di fine collaborazione, altrimenti del cambio di fase, altrimenti oggi)
+ * se qui non è scritta. `exitSource`: "manual" | "crm" | null.
+ */
+export function withCrm(r, { person = null, link = null, today = null } = {}) {
+  const phase = person?.fields?.collaborationStatus || null;
+  const out = { ...r, inflowwName: link?.inflowwName || null, crmPhase: phase, exitSource: r.exitedAt ? "manual" : null };
+  if (!r.exitedAt && phase === PHASE_EXITED) {
+    const at = person.fieldUpdatedAt?.collaborationStatus;
+    out.exitedAt = person.fields.endDate || romeDay(at) || today;
+    out.exitSource = "crm";
+  }
+  return out;
+}
+
+/** Da che giorno si cerca il primo turno: formazione, altrimenti colloquio, altrimenti primo contatto. */
+export function firstShiftSearchFrom(r) {
+  return r.trainingAt || r.interviewAt || contactDay(r) || null;
+}
+
+/**
+ * Primo turno letto da CreatorsPro: il primo turno iniziato dal giorno della
+ * formazione in poi, solo a formazione superata. La data scritta dall'HR vince.
+ * `firstShiftSource`: "manual" | "cp" | null (non ancora visto).
+ */
+export function withFirstShift(r, shiftDates) {
+  if (r.firstShiftAt) return { ...r, firstShiftSource: "manual" };
+  if (r.trainingPassed !== true || !Array.isArray(shiftDates)) return { ...r, firstShiftSource: null };
+  const from = firstShiftSearchFrom(r);
+  const first = shiftDates.filter((d) => !from || d >= from).sort()[0] || null;
+  return first ? { ...r, firstShiftAt: first, firstShiftSource: "cp" } : { ...r, firstShiftSource: null };
 }
 
 // ── Maturazione dei premi ───────────────────────────────────────────────────

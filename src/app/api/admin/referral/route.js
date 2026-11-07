@@ -7,7 +7,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { internalOrigin } from "@/lib/cron-chain";
 import {
-  loadState, crmSuggestions, listInflowwNames, listAudit,
+  loadState, crmContext, listAudit,
   saveReferrer, deleteReferrer, saveRecruit, deleteRecruit, saveStory, deleteStory,
   markPaid, unmarkPaid, inviteReferrer, setFx,
 } from "@/lib/referral";
@@ -25,8 +25,8 @@ export async function GET() {
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   try {
     const state = await loadState();
-    const [suggestions, inflowwNames, auditLog] = await Promise.all([crmSuggestions(state.recruits), listInflowwNames(), listAudit(40)]);
-    return Response.json({ ...state, suggestions, inflowwNames, audit: auditLog });
+    const [crm, auditLog] = await Promise.all([crmContext(state.recruits), listAudit(40)]);
+    return Response.json({ ...state, suggestions: crm.suggestions, crmPeople: crm.people, crmMatches: crm.matches, audit: auditLog });
   } catch (e) {
     return Response.json({ error: String(e?.message || e) }, { status: 500 });
   }

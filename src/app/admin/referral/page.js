@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Plus, Send } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure, Tabs, BTN_PRIMARY } from "@/components/ds";
@@ -16,8 +17,10 @@ import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/referral — «Porta un amico», lato HR (permesso referral.manage).
- * L'HR registra chi ha portato chi, segna gli step (colloquio, formazione,
- * primo turno, uscita) e i pagamenti. Il venduto arriva da solo da Infloww.
+ * L'HR registra chi ha portato chi, segna gli step (colloquio, formazione) e i
+ * pagamenti. Ogni persona portata si lega alla sua scheda del CRM (07/11/2026):
+ * da lì arrivano chi è su Infloww, i turni CreatorsPro (e il primo turno), il
+ * venduto e l'uscita.
  * Regole e cifre: lib/referral-core.js (versionate).
  */
 const API = "/api/admin/referral";
@@ -101,16 +104,35 @@ function ReferrerModal({ initial, onClose, onDone }) {
 }
 
 // ── Persona portata ─────────────────────────────────────────────────────────
+// Etichetta di una scheda CRM nella tendina: nome e fase (con un pezzo d'id se due si chiamano uguale)
+function crmLabels(people = []) {
+  const count = {};
+  for (const p of people) count[`${p.name}|${p.phase || ""}`] = (count[`${p.name}|${p.phase || ""}`] || 0) + 1;
+  return people.map((p) => ({ ...p, label: [p.name, p.phase, count[`${p.name}|${p.phase || ""}`] > 1 ? p.id.slice(-4) : null].filter(Boolean).join(" · ") }));
+}
+
 function RecruitModal({ initial, data, onClose, onDone }) {
+  // primo turno e uscita: nel modulo solo quelli scritti a mano (gli altri arrivano da CreatorsPro e dal CRM)
   const [f, setF] = useState({
     name: initial?.name || "", referrerId: initial?.referrerId || "", storyId: initial?.storyId || "",
-    hrPersonId: initial?.hrPersonId || "", inflowwName: initial?.inflowwName || "",
+    hrPersonId: initial?.hrPersonId || "",
     contactedAt: initial?.contactedAt || "", interviewAt: initial?.interviewAt || "", trainingAt: initial?.trainingAt || "",
     trainingPassed: initial?.trainingPassed == null ? "" : String(initial.trainingPassed),
-    firstShiftAt: initial?.firstShiftAt || "", exitedAt: initial?.exitedAt || "",
+    firstShiftAt: initial?.firstShiftSource === "cp" ? "" : initial?.firstShiftAt || "",
+    exitedAt: initial?.exitSource === "crm" ? "" : initial?.exitedAt || "",
     note: initial?.note || "", shiftsManual: initial?.shiftsManual ?? "",
     bs1: initial?.blockSalesManual?.[0] ?? "", bs2: initial?.blockSalesManual?.[1] ?? "",
   });
+  const people = useMemo(() => crmLabels(data.crmPeople || []), [data.crmPeople]);
+  const takenCrm = useMemo(() => new Set(data.recruits.filter((r) => r.id !== initial?.id && r.hrPersonId).map((r) => r.hrPersonId)), [data.recruits, initial?.id]);
+  const [crmText, setCrmText] = useState(() => people.find((p) => p.id === initial?.hrPersonId)?.label || "");
+  const person = people.find((p) => p.id === f.hrPersonId) || null;
+  const match = !f.hrPersonId && initial?.id ? data.crmMatches?.[initial.id] : null;
+  const pickCrm = (text) => {
+    setCrmText(text);
+    const p = people.find((x) => x.label === text);
+    setF((x) => ({ ...x, hrPersonId: p?.id || "", name: x.name || p?.name || "" }));
+  };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const run = async (fn) => { setBusy(true); setErr(null); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
@@ -134,9 +156,9 @@ function RecruitModal({ initial, data, onClose, onDone }) {
             {stories.map((s) => <option key={s.id} value={s.id}>Storie del {fmtDay(s.agreedAt)}</option>)}
           </select>
         </Field>
-        <Field label="Nome su Infloww" hint="Serve per leggere da solo il venduto del mese.">
-          <input style={inp} list="ref-infloww" value={f.inflowwName} onChange={set("inflowwName")} placeholder="Scegli dall'elenco" />
-          <datalist id="ref-infloww">{data.inflowwNames.map((n) => <option key={n} value={n} />)}</datalist>
+        <Field label="Scheda nel CRM" hint="Da qui arrivano chi è su Infloww e CreatorsPro, turni, venduto e uscita.">
+          <input style={inp} list="ref-crm" value={crmText} onChange={(e) => pickCrm(e.target.value)} placeholder="Cerca per nome" />
+          <datalist id="ref-crm">{people.filter((p) => !takenCrm.has(p.id)).map((p) => <option key={p.id} value={p.label} />)}</datalist>
         </Field>
         <Field label="Ha scritto a Claudia il" hint={`La prova vale per chi scrive entro il ${fmtDay(data.rules?.campaignUntil)}. Vuoto = giorno in cui la inserisci.`}>
           <input style={inp} type="date" value={f.contactedAt} onChange={set("contactedAt")} />
@@ -148,10 +170,16 @@ function RecruitModal({ initial, data, onClose, onDone }) {
             <option value="">Non ancora</option><option value="true">Sì</option><option value="false">No</option>
           </select>
         </Field>
-        <Field label="Primo turno in chat" hint="Sblocca il premio del primo turno e fa partire il conteggio dei turni.">
+        <Field label="Primo turno in chat" hint={saved?.firstShiftSource === "cp" && !f.firstShiftAt
+          ? `Letto da CreatorsPro: ${fmtDay(saved.firstShiftAt)}. Scrivilo solo per correggere.`
+          : "Si legge da solo da CreatorsPro: il primo turno dopo la formazione superata. Scrivilo solo per correggere."}>
           <input style={inp} type="date" value={f.firstShiftAt} onChange={set("firstShiftAt")} disabled={f.trainingPassed !== "true"} />
         </Field>
-        <Field label="Uscita (se è andata via)"><input style={inp} type="date" value={f.exitedAt} onChange={set("exitedAt")} /></Field>
+        <Field label="Uscita" hint={saved?.exitSource === "crm" && !f.exitedAt
+          ? `Dal CRM: scheda in «Uscita» dal ${fmtDay(saved.exitedAt)}.`
+          : "Arriva dal CRM quando la scheda passa a «Uscita». Scrivila solo se serve."}>
+          <input style={inp} type="date" value={f.exitedAt} onChange={set("exitedAt")} />
+        </Field>
         <Field label="Turni fatti (a mano)" hint={saved ? `Da CreatorsPro: ${saved.milestones.find((m) => m.kind === "shifts")?.shiftsDone ?? "non letti"}. Lascia vuoto per il conteggio automatico.` : "Lascia vuoto: si contano da soli da CreatorsPro."}>
           <input style={inp} inputMode="numeric" value={f.shiftsManual} onChange={set("shiftsManual")} placeholder="automatico" />
         </Field>
@@ -161,6 +189,13 @@ function RecruitModal({ initial, data, onClose, onDone }) {
           </Field>
           <Field label="Venduto turni 26-50 ($, a mano)"><input style={inp} inputMode="decimal" value={f.bs2} onChange={set("bs2")} /></Field>
         </>}
+      </div>
+      <div className="vt-glass" style={{ ...box, padding: "10px 12px", marginTop: 14, fontSize: 13, color: CP.textSecondary, lineHeight: 1.5 }}>
+        {person ? (person.operator
+          ? <>Su Infloww è <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{person.operator}</b>: turni da CreatorsPro e venduto da Infloww arrivano da soli. <Link href={`/admin/hr/${person.id}`} style={{ color: CP.accentSoftText }}>Apri la scheda</Link></>
+          : <>La scheda di {person.name} non è ancora collegata a Infloww: turni e venduto non si leggono. <Link href={`/admin/hr/${person.id}`} style={{ color: CP.accentSoftText }}>Collegala dalla scheda</Link> (riquadro «Su Infloww e CreatorsPro»).</>)
+          : match ? <>Nel CRM c&apos;è la scheda di <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{match.name}</b>: è questa persona? <button type="button" style={{ ...btnQuiet, padding: 0, color: CP.accentSoftText }} onClick={() => pickCrm(people.find((p) => p.id === match.id)?.label || "")}>Sì, collega</button></>
+          : <>Senza scheda nel CRM turni, venduto e uscita non si leggono. Collegala appena la persona ha compilato il modulo.</>}
       </div>
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 56 }} value={f.note} onChange={set("note")} /></Field>
 
@@ -604,7 +639,11 @@ export default function ReferralAdminPage() {
                   const st = r.steps.steps.find((s) => s.key === r.steps.next);
                   return st ? <span>Prossimo: {st.label}</span> : <span style={{ color: CP.textMuted }}>{r.steps.closedWhy || "Percorso finito"}</span>;
                 } },
-                { key: "infloww", label: "Infloww", muted: true, render: (r) => r.inflowwName || (r.metrics?.started && !r.exitedAt ? <span style={{ color: CP.attn }}>da collegare</span> : "—"), sort: (r) => r.inflowwName || "" },
+                { key: "infloww", label: "Collegamento", muted: true, sort: (r) => r.inflowwName || (r.hrPersonId ? "~" : "~~"), render: (r) => r.inflowwName
+                  ? r.inflowwName
+                  : r.hrPersonId ? <span style={{ color: CP.attn }}>scheda senza Infloww</span>
+                  : data.crmMatches?.[r.id] ? <span style={{ color: CP.attn }}>scheda da confermare</span>
+                  : <span style={{ color: CP.attn }}>senza scheda CRM</span> },
                 { key: "earned", label: "Maturato", align: "right", render: (r) => fmtEur(r.totals.guadagnato), sort: (r) => r.totals.guadagnato },
                 { key: "running", label: "In corso", align: "right", render: (r) => fmtEur(r.totals.in_corso), sort: (r) => r.totals.in_corso },
                 { key: "createdAt", label: "Segnalata", align: "right", render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("it-IT") : "—", sort: (r) => r.createdAt || 0 },

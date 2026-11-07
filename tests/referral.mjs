@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
-  findDuplicateRecruit,
+  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom,
 } from "../src/lib/referral-core.js";
 
 let n = 0;
@@ -279,7 +279,15 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
 
   const giulia = await L.saveReferrer({ input: { name: "Giulia Bianchi", email: "Giulia@Example.com" }, actor: hr });
   await assert.rejects(L.saveReferrer({ input: { name: "Altra", email: "giulia@example.com" }, actor: hr }), /già un referente/);
-  const luca = await L.saveRecruit({ input: { name: "Luca Verdi", referrerId: giulia.id, inflowwName: "Luca Verdi", interviewAt: "2026-10-20", trainingAt: "2026-10-27", trainingPassed: true, firstShiftAt: "2026-11-03" }, actor: hr });
+  // la scheda CRM di Luca, collegata a Infloww dalla scheda (hr:operator-links): il programma prende il nome da lì
+  const P_LUCA = "p_0123456789abcdef";
+  store.set(`hr:person:${P_LUCA}`, { id: P_LUCA, fields: { firstName: "Luca", surname: "Verdi", collaborationStatus: "Attiva" }, fieldUpdatedAt: {} });
+  hash("hr:operator-links")[P_LUCA] = JSON.stringify({ inflowwName: "Luca Verdi", employeeId: "e1" });
+  await assert.rejects(L.saveRecruit({ input: { name: "Luca Verdi", referrerId: giulia.id, hrPersonId: "p_ffffffffffffffff" }, actor: hr }), /Scheda del CRM non trovata/);
+  n++;
+  // nessuna data di primo turno: si legge da CreatorsPro (primo turno dopo la formazione del 27/10)
+  const luca = await L.saveRecruit({ input: { name: "Luca Verdi", referrerId: giulia.id, hrPersonId: P_LUCA, inflowwName: "Altro Nome", interviewAt: "2026-10-20", trainingAt: "2026-10-27", trainingPassed: true }, actor: hr });
+  ok(!("inflowwName" in luca), "il nome Infloww non si scrive più sulla persona portata");
   await assert.rejects(L.saveRecruit({ input: { name: "luca verdi", referrerId: giulia.id }, actor: hr }), /un solo referente/, "doppione rifiutato");
   await assert.rejects(L.saveRecruit({ input: { name: "Giulia Bianchi", referrerId: giulia.id }, actor: hr }), /sé stessi/);
   n += 3;
@@ -291,6 +299,7 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   store.set("ops_kpi:monthly:2026-12", [{ employee: "luca verdi", sales: 6000 }]);
   // turni CreatorsPro già letti (mappa piccola fresca): 20 a novembre, 15 a dicembre
   const days = (m, k) => Array.from({ length: k }, (_, i) => `${m}-${String(i + 3).padStart(2, "0")}`);
+  store.set("referral:shifts:2026-10", { builtAt: NOW, map: { "luca verdi": ["2026-10-25"] } }); // prima della formazione: non conta
   store.set("referral:shifts:2026-11", { builtAt: NOW, map: { "luca verdi": days("2026-11", 20) } });
   store.set("referral:shifts:2026-12", { builtAt: NOW, map: { "luca verdi": days("2026-12", 15) } });
   store.set("referral:shifts:2027-01", { builtAt: NOW, map: {} });
@@ -298,6 +307,7 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
 
   let st = await L.loadState({ now: NOW });
   const r = st.recruits[0];
+  eq([r.inflowwName, r.firstShiftAt, r.firstShiftSource], ["Luca Verdi", "2026-11-03", "cp"], "nome dalla scheda CRM, primo turno da CreatorsPro");
   const m = Object.fromEntries(r.milestones.map((x) => [x.key.split(":").pop(), x]));
   eq([m.commission_1.salesUsd, m.commission_1.amountUsd, m.commission_1.month], [10000, 500, "2026-12"], "Infloww ripartito sui turni: nov intero + 5/15 di dic");
   eq([m.commission_2.status, m.commission_2.amountUsd], ["in_corso", 100], "35 turni su 50");
@@ -355,9 +365,53 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   await L.setFx("2027-01", "0,9", hr);
   ok(!store.has("referral:inbox"), "una modifica svuota la cache del badge");
   ok((await L.referrerDashboard(me, { now: NOW })).payslips.length >= 1, "il referente vede le sue buste");
+
+  // la scheda passa a «Uscita» nel CRM: il programma lo sa da solo, i premi non raggiunti si perdono
+  store.set(`hr:person:${P_LUCA}`, { id: P_LUCA, fields: { firstName: "Luca", surname: "Verdi", collaborationStatus: "Uscita", endDate: "2027-01-20" }, fieldUpdatedAt: {} });
+  st = await L.loadState({ now: NOW });
+  const ex = st.recruits[0];
+  eq([ex.exitedAt, ex.exitSource], ["2027-01-20", "crm"], "uscita letta dal CRM");
+  eq(ex.milestones.find((x) => x.key.endsWith("shifts_50")).status, "perso", "uscita a 35 turni: il premio dei 50 si perde");
+  eq(ex.milestones.find((x) => x.key.endsWith("first_shift")).status, "pagato", "il già pagato resta");
+  // scollegata da Infloww: turni e venduto non si leggono più (mai «zero» per un dato mancante)
+  delete store.get("hr:operator-links")[P_LUCA];
+  store.set(`hr:person:${P_LUCA}`, { id: P_LUCA, fields: { firstName: "Luca", surname: "Verdi", collaborationStatus: "Attiva" }, fieldUpdatedAt: {} });
+  st = await L.loadState({ now: NOW });
+  const un = st.recruits[0];
+  eq([un.inflowwName, un.firstShiftSource, un.milestones.find((x) => x.key.endsWith("shifts_25")).status], [null, null, "in_attesa"], "senza collegamento niente turni: in attesa, mai perso");
+  eq(un.milestones.find((x) => x.key.endsWith("first_shift")).status, "pagato", "pagato resta pagato");
 }
 
 ok(R.version === "ref-4");
+
+// ── collegamento al CRM (07/11/2026): Infloww, uscita e primo turno dalla scheda ──
+{
+  const base = { id: "rc9", name: "Ada Neri", referrerId: "r", trainingAt: "2026-11-10", trainingPassed: true, createdAt: Date.parse("2026-11-02T10:00:00Z") };
+  const person = { id: "p_1", fields: { firstName: "Ada", surname: "Neri", collaborationStatus: "Attiva" } };
+  eq(withCrm(base, { person, link: { inflowwName: "Ada N" } }).inflowwName, "Ada N", "nome Infloww dal collegamento della scheda");
+  eq(withCrm(base, { person, link: null }).inflowwName, null, "scheda non collegata: niente nome");
+  eq(withCrm({ ...base, inflowwName: "vecchio" }, {}).inflowwName, null, "un nome scritto sulla persona portata non conta");
+  const out = withCrm(base, { person: { ...person, fields: { ...person.fields, collaborationStatus: "Uscita", endDate: "2026-12-15" } }, today: "2027-01-02" });
+  eq([out.exitedAt, out.exitSource], ["2026-12-15", "crm"], "uscita = fine collaborazione della scheda");
+  const noEnd = withCrm(base, { person: { ...person, fields: { ...person.fields, collaborationStatus: "Uscita" }, fieldUpdatedAt: { collaborationStatus: Date.parse("2026-12-20T09:00:00Z") } }, today: "2027-01-02" });
+  eq(noEnd.exitedAt, "2026-12-20", "senza fine collaborazione: giorno del cambio di fase");
+  eq(withCrm(base, { person: { ...person, fields: { ...person.fields, collaborationStatus: "Uscita" } }, today: "2027-01-02" }).exitedAt, "2027-01-02", "senza nessuna data: oggi");
+  eq(withCrm({ ...base, exitedAt: "2026-12-01" }, { person: { ...person, fields: { ...person.fields, collaborationStatus: "Uscita", endDate: "2026-12-15" } } }).exitSource, "manual", "la data scritta dall'HR vince");
+  eq(withCrm(base, { person: { ...person, fields: { ...person.fields, collaborationStatus: "In uscita" } } }).exitedAt, undefined, "«In uscita» non è ancora uscita");
+
+  eq(firstShiftSearchFrom(base), "2026-11-10", "si cerca dalla formazione");
+  eq(firstShiftSearchFrom({ interviewAt: "2026-11-05" }), "2026-11-05", "poi dal colloquio");
+  eq(firstShiftSearchFrom({ createdAt: base.createdAt }), "2026-11-02", "poi dal primo contatto");
+  const days = ["2026-11-08", "2026-11-12", "2026-11-11"];
+  eq(withFirstShift(base, days).firstShiftAt, "2026-11-11", "primo turno dopo la formazione (quello prima no)");
+  eq(withFirstShift({ ...base, firstShiftAt: "2026-11-20" }, days).firstShiftSource, "manual", "la data scritta dall'HR vince");
+  eq(withFirstShift({ ...base, trainingPassed: null }, days).firstShiftAt, undefined, "formazione non ancora superata: niente primo turno");
+  eq(withFirstShift(base, null).firstShiftSource, null, "turni non letti");
+  eq(withFirstShift(base, ["2026-11-01"]).firstShiftSource, null, "nessun turno dopo la formazione");
+  const ms = recruitMilestones(withFirstShift(base, days), { today: "2026-11-20", shiftDates: days });
+  eq([ms[0].status, ms[0].unlockedAt], ["maturato", "2026-11-11"], "il premio del primo turno si sblocca da solo");
+  ok(!("inflowwName" in validateRecruit({ name: "X", referrerId: "r", inflowwName: "Y" }).value), "validazione: niente nome Infloww");
+}
 
 // ── prova: vale per chi scrive all'Area Partner entro il 30/11/2026 (ref-4) ──
 {

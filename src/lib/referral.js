@@ -21,9 +21,11 @@ import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
-  recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView,
-  salesMapFromKpiRows, salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
+  recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView, withCrm, withFirstShift, firstShiftSearchFrom,
+  salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
+import { getMonthSales } from "@/lib/infloww-month-sales";
+import { getOperatorLinks } from "@/lib/person-operator";
 
 const K = {
   referrers: "referral:referrers",
@@ -32,7 +34,6 @@ const K = {
   paid: "referral:paid",
   audit: "referral:audit",
   fx: "referral:fx",
-  sales: (m) => `referral:sales:${m}`,
   shifts: (m) => `referral:shifts:${m}`,
   inbox: "referral:inbox",
 };
@@ -72,33 +73,7 @@ export async function audit(actor, action, detail = {}) {
 }
 
 // ── Venduto Infloww per mese ────────────────────────────────────────────────
-
-/** {nome: venduto} del mese, o null se il mese non è stato importato. */
-export async function getMonthSales(month) {
-  const [cached, importedAt] = await Promise.all([
-    kv.get(K.sales(month)).catch(() => null),
-    kv.zscore("ops_kpi:imports", `monthly:${month}`).catch(() => null),
-  ]);
-  if (importedAt == null) return null;
-  const c = parse(cached);
-  if (c && c.builtAt >= Number(importedAt)) return c.map || {};
-  const rows = (await kv.get(`ops_kpi:monthly:${month}`).catch(() => null)) || [];
-  const map = salesMapFromKpiRows(Array.isArray(rows) ? rows : []);
-  await kv.set(K.sales(month), JSON.stringify({ builtAt: Date.now(), map }), { ex: 400 * 24 * 3600 }).catch(() => {});
-  return map;
-}
-
-/** Nomi Infloww dell'ultimo mese importato, per la tendina dell'HR. */
-export async function listInflowwNames() {
-  const periods = (await kv.zrange("ops_kpi:imports", 0, -1, { rev: true }).catch(() => [])) || [];
-  const months = periods.map(String).filter((p) => p.startsWith("monthly:")).map((p) => p.slice(8)).sort().reverse().slice(0, 2);
-  const names = new Set();
-  for (const m of months) {
-    const map = await getMonthSales(m);
-    for (const n of Object.keys(map || {})) names.add(n);
-  }
-  return [...names].sort((a, b) => a.localeCompare(b, "it"));
-}
+// La mappa {nome: venduto} del mese sta in infloww-month-sales.js (condivisa col CRM).
 
 /** Venduto per mese di ogni persona portata, dal mese del primo turno a oggi: { recruitId: { "YYYY-MM": venduto|null } }. */
 async function salesForRecruits(recruits, { now = Date.now() } = {}) {
@@ -134,9 +109,14 @@ async function getMonthShiftDates(month, { now = Date.now() } = {}) {
   return map;
 }
 
-/** Date dei turni di ogni persona portata dal primo turno a oggi: { recruitId: [date] | null }. */
+/**
+ * Date dei turni di ogni persona portata, dal primo turno (o, se il primo turno
+ * non è ancora scritto e la formazione è superata, dal giorno da cui lo si cerca)
+ * a oggi: { recruitId: [date] | null }.
+ */
 async function shiftsForRecruits(recruits, { now = Date.now() } = {}) {
-  const monthsOf = (r) => (!r.inflowwName || Number.isInteger(r.shiftsManual) ? [] : monthsSince(r.firstShiftAt, todayRome(now)));
+  const startOf = (r) => r.firstShiftAt || (r.trainingPassed === true ? firstShiftSearchFrom(r) : null);
+  const monthsOf = (r) => (!r.inflowwName || (Number.isInteger(r.shiftsManual) && r.firstShiftAt) ? [] : monthsSince(startOf(r), todayRome(now)));
   const need = new Set(recruits.flatMap(monthsOf));
   const maps = {};
   for (const m of need) maps[m] = await getMonthShiftDates(m, { now });
@@ -182,10 +162,24 @@ async function readPaid() {
   return out;
 }
 
+/** Le schede CRM delle persone portate (solo quelle collegate: niente elenco intero, lezione banda KV). */
+async function crmPeopleFor(recruits) {
+  const ids = [...new Set(recruits.map((r) => r.hrPersonId).filter(Boolean))];
+  if (!ids.length) return {};
+  const { getPerson } = await import("@/lib/hr-people");
+  const rows = await Promise.all(ids.map((id) => getPerson(id).catch(() => null)));
+  return Object.fromEntries(rows.filter(Boolean).map((p) => [p.id, p]));
+}
+
 export async function loadState({ now = Date.now() } = {}) {
-  const [referrers, recruits, stories, paid, fx] = await Promise.all([readHash(K.referrers), readHash(K.recruits), readHash(K.stories), readPaid(), getFx()]);
+  const [referrers, raw, stories, paid, fx, links] = await Promise.all([readHash(K.referrers), readHash(K.recruits), readHash(K.stories), readPaid(), getFx(), getOperatorLinks()]);
   const today = todayRome(now);
-  const [sales, shifts] = await Promise.all([salesForRecruits(recruits, { now }), shiftsForRecruits(recruits, { now })]);
+  // scheda CRM → chi è su Infloww e se è uscita; poi i turni CreatorsPro → primo turno; poi il venduto
+  const people = await crmPeopleFor(raw);
+  const linked = raw.map((r) => withCrm(r, { person: people[r.hrPersonId] || null, link: links[r.hrPersonId] || null, today }));
+  const shifts = await shiftsForRecruits(linked, { now });
+  const recruits = linked.map((r) => withFirstShift(r, shifts[r.id]));
+  const sales = await salesForRecruits(recruits, { now });
   const recruitRows = recruits.map((r) => {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
     return { ...r, contactDay: contactDay(r), outOfCampaign: !inCampaign(r), milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
@@ -222,20 +216,37 @@ export async function getInbox({ now = Date.now() } = {}) {
   return out;
 }
 
-/** Suggerimenti dal CRM persone: chi ha scritto «Me l'ha consigliato qualcuno» e non è ancora nel programma. */
-export async function crmSuggestions(recruits) {
+/**
+ * Il CRM visto da «Porta un amico» (HR):
+ *  - suggestions: chi nel modulo ha scelto «Me l'ha consigliato qualcuno» e non è ancora nel programma;
+ *  - people: le schede tra cui scegliere quella della persona portata (nome, fase, se è collegata a Infloww);
+ *  - matches: per le persone portate senza scheda, la scheda con lo stesso nome se è UNA sola.
+ */
+export async function crmContext(recruits) {
   try {
-    const { listPeople } = await import("@/lib/hr-people");
-    const { SOURCE_REFERRAL, fullName } = await import("@/lib/hr-people-core");
-    const people = await listPeople();
+    const [{ listPeople }, { SOURCE_REFERRAL, fullName }, { matchName }] = await Promise.all([import("@/lib/hr-people"), import("@/lib/hr-people-core"), import("@/lib/squadra-core")]);
+    const [list, opLinks] = await Promise.all([listPeople(), getOperatorLinks()]);
     const taken = new Set(recruits.map((r) => r.hrPersonId).filter(Boolean));
     const takenNames = new Set(recruits.map((r) => normName(r.name)));
-    return people
+    const suggestions = list
       .filter((p) => p?.fields?.source === SOURCE_REFERRAL && !taken.has(p.id) && !takenNames.has(normName(fullName(p.fields))))
       .map((p) => ({ hrPersonId: p.id, name: fullName(p.fields), referredBy: p.fields.referredBy || null, phase: p.fields.collaborationStatus || null, createdAt: p.createdAt || null }))
       .slice(0, 100);
+    const people = list
+      .map((p) => ({ id: p.id, name: p.name || fullName(p.fields), phase: p.fields?.collaborationStatus || null, operator: opLinks[p.id]?.inflowwName || null }))
+      .filter((p) => p.name)
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+    const free = people.filter((p) => !taken.has(p.id));
+    const matches = {};
+    for (const r of recruits) {
+      if (r.hrPersonId) continue;
+      const hit = matchName(r.name, free.map((p) => p.name));
+      const same = hit ? free.filter((p) => p.name === hit) : [];
+      if (same.length === 1) matches[r.id] = { id: same[0].id, name: same[0].name };
+    }
+    return { suggestions, people, matches };
   } catch {
-    return [];
+    return { suggestions: [], people: [], matches: {} };
   }
 }
 
@@ -276,6 +287,10 @@ export async function saveRecruit({ id = null, input, actor }) {
   // un referente non porta sé stesso
   const ref = refs.find((r) => r.id === v.value.referrerId);
   if (normName(ref.name) === normName(v.value.name)) throw new Error("Non si può portare sé stessi");
+  if (v.value.hrPersonId) {
+    const { getPerson } = await import("@/lib/hr-people");
+    if (!(await getPerson(v.value.hrPersonId))) throw new Error("Scheda del CRM non trovata");
+  }
   const prev = id ? recruits.find((r) => r.id === id) : null;
   if (id && !prev) throw new Error("Persona non trovata");
   if (prev && prev.referrerId !== v.value.referrerId) {
