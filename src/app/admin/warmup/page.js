@@ -276,7 +276,7 @@ function PublicCard({ a, wk, label }) {
 function LinkLine({ l, w }) {
   const box = { marginTop: 12, padding: "10px 12px", borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, fontSize: 14 };
   if (!l) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · non impostato: aggiungilo nei dati del profilo e da domani arrivano da soli clic, iscritti e ricavo di questo account.</div>;
-  if (l.missing) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · <span style={NUM}>{l.url}</span> non risulta tra i link delle creator HOC: controlla che sia giusto.</div>;
+  if (l.missing) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · <span style={NUM}>{l.url}</span> non risulta ancora tra i link delle creator HOC. Un link appena creato compare nei dati qualche ora dopo e si ricontrolla da solo; se resta così per più di un giorno, controlla che sia giusto.</div>;
   const t = l.total || {};
   const money = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
   return (
