@@ -1,6 +1,6 @@
 // Unit test — person-operator-core (collegamento scheda CRM → operatore). Esegui: node tests/person-operator.mjs
 import assert from "node:assert/strict";
-import { operatorCandidates, findCandidate, validateOperatorLink, suggestOperator, cpMembersFor } from "../src/lib/person-operator-core.js";
+import { operatorCandidates, findCandidate, validateOperatorLink, suggestOperator, cpMembersFor, suggestionKind, bulkSuggestions } from "../src/lib/person-operator-core.js";
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -39,5 +39,20 @@ eq(cpMembersFor("Sara Rossi", { b: "Sara Rossi" }, members), { mapped: ["Sara R.
 eq(cpMembersFor("Luca Neri", { b: "Sara Rossi" }, members), { mapped: [], sameName: ["Luca Neri"] }, "non abbinato ma con lo stesso nome su CP");
 eq(cpMembersFor("Marco Bianchi", {}, members), { mapped: [], sameName: [] }, "nessun membro");
 eq(cpMembersFor("", {}, members), { mapped: [], sameName: [] }, "nome vuoto");
+
+// ── quanto è sicuro un suggerimento ──
+eq(suggestionKind("Kevin Giuseppe corradino", "Kevin Giuseppe Corradino"), "esatto", "maiuscole non contano");
+eq(suggestionKind("Rossi Sara", "Sara Rossi"), "esatto", "ordine invertito = stesse parole");
+eq(suggestionKind("Niccolò Ferri", "Niccolo Ferri"), "esatto", "accenti non contano");
+eq(suggestionKind("Felice Alessandro Izzo", "Alessandro Izzo"), "simile", "secondo nome in più: da guardare");
+eq(suggestionKind("Pierriccardo Lampasona", "Pierricardo Lampasona"), "simile", "refuso: da guardare");
+
+// ── in blocco: mai lo stesso nome su due schede, salta chi è già collegato ──
+{
+  const c = operatorCandidates([{ employeeId: "1", employeeName: "Sara Rossi" }, { employeeId: "2", employeeName: "Luca Neri" }], []);
+  const people = [{ id: "p2", name: "Rossi Sara", phase: "Attiva" }, { id: "p1", name: "Sara Rossi" }, { id: "p3", name: "Luca Neri" }, { id: "p4", name: "Mario Bo" }];
+  const rows = bulkSuggestions(people, c, { p3: { inflowwName: "Luca Neri" } });
+  eq(rows.map((r) => [r.personId, r.suggestion.name, r.kind]), [["p2", "Sara Rossi", "esatto"]], "doppione: il nome va alla prima scheda, mai a due; p3 già collegata; p4 senza suggerimento");
+}
 
 console.log(`person-operator: ${n} verifiche ok`);
