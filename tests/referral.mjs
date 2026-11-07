@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
-  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom,
+  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason,
 } from "../src/lib/referral-core.js";
 
 let n = 0;
@@ -173,7 +173,8 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
     { id: "s2", referrerId: "m", agreedAt: "2026-10-01", publishedAt: ["2026-10-02"] },
   ].map((s) => ({ ...s, milestone: storyMilestone(s, { today }) }));
   const d = buildDashboard({ referrers: [{ id: "g", name: "Giulia" }, { id: "m", name: "Marco" }], recruits: recs, stories, fx: FX, today });
-  eq(d.funnel.map((f) => f.n), [5, 0, 4, 4, 2, 0, 0], "imbuto");
+  // chi ha superato la formazione ha passato il colloquio, anche senza la data scritta (07/11/2026)
+  eq(d.funnel.map((f) => f.n), [5, 4, 4, 4, 2, 0, 0], "imbuto");
   eq([d.storyStats.published, d.storyStats.expired, d.storyStats.publishers, d.storyStats.recruitsFromStories], [1, 1, 1, 1], "storie");
   eq(d.storyStats.byReferrer[0].name, "Giulia", "chi ha pubblicato in cima");
   const g = d.quality.find((q) => q.name === "Giulia"), m = d.quality.find((q) => q.name === "Marco");
@@ -366,6 +367,19 @@ const turni = (n, from = "2026-11-03") => Array.from({ length: n }, (_, i) => { 
   ok(!store.has("referral:inbox"), "una modifica svuota la cache del badge");
   ok((await L.referrerDashboard(me, { now: NOW })).payslips.length >= 1, "il referente vede le sue buste");
 
+  // la scheda nasce dopo la formazione: collegamento in un clic dall'avviso (linkCrm)
+  {
+    const ada = await L.saveRecruit({ input: { name: "Ada Neri", referrerId: giulia.id, interviewAt: "2027-01-10", interviewPassed: true }, actor: hr });
+    const bea = await L.saveRecruit({ input: { name: "Bea Neri", referrerId: giulia.id }, actor: hr });
+    const P_ADA = "p_00000000000000ad";
+    store.set(`hr:person:${P_ADA}`, { id: P_ADA, fields: { firstName: "Ada", surname: "Neri", collaborationStatus: "In ingresso" }, fieldUpdatedAt: {} });
+    const res = await L.linkRecruitsToCrm([{ recruitId: ada.id, hrPersonId: P_ADA }, { recruitId: bea.id, hrPersonId: P_ADA }, { recruitId: bea.id, hrPersonId: "p_ffffffffffffffff" }], hr);
+    eq([res.linked.length, res.skipped.map((s) => s.error)], [1, ["Questa scheda è già di un'altra persona portata", "Scheda del CRM non trovata"]], "collega solo schede vere e libere");
+    const again = await L.linkRecruitsToCrm([{ recruitId: ada.id, hrPersonId: P_ADA }], hr);
+    eq(again.skipped[0]?.error, "Ha già la sua scheda", "una persona collegata non si ricollega da qui");
+    await L.deleteRecruit(ada.id, hr); await L.deleteRecruit(bea.id, hr);
+  }
+
   // la scheda passa a «Uscita» nel CRM: il programma lo sa da solo, i premi non raggiunti si perdono
   store.set(`hr:person:${P_LUCA}`, { id: P_LUCA, fields: { firstName: "Luca", surname: "Verdi", collaborationStatus: "Uscita", endDate: "2027-01-20" }, fieldUpdatedAt: {} });
   st = await L.loadState({ now: NOW });
@@ -431,6 +445,22 @@ ok(R.version === "ref-4");
   eq(storyMilestone({ id: "s9", agreedAt: "2026-12-01", publishedAt: ["2026-12-02", "2026-12-03"] }, { today: "2026-12-05" }).status, "perso", "storie concordate dopo la prova");
   eq(storyMilestone({ id: "s9", agreedAt: "2026-11-30", publishedAt: ["2026-12-02", "2026-12-03"] }, { today: "2026-12-05" }).status, "maturato", "concordate il 30/11, pubblicate dopo: valgono");
   eq(validateRecruit({ name: "X", referrerId: "r", contactedAt: "30/11" }).error, "Primo contatto: data non valida");
+}
+
+// ── esito del colloquio (07/11/2026): «non passato» chiude il percorso ──
+{
+  const v = validateRecruit({ name: "X", referrerId: "r", interviewAt: "2026-11-05", interviewPassed: "false" });
+  eq([v.value.interviewPassed, v.value.trainingPassed], [false, null], "esito colloquio salvato");
+  eq(validateRecruit({ name: "X", referrerId: "r", interviewPassed: false, trainingPassed: true }).error, "Con il colloquio non passato non c'è formazione superata");
+  const r = { id: "rc5", name: "Ivo", referrerId: "r", interviewAt: "2026-11-05", interviewPassed: false, createdAt: Date.parse("2026-11-01T10:00:00Z") };
+  eq(stopReason(r), "Non presa al colloquio");
+  const ms = recruitMilestones(r, { today: "2026-11-20" });
+  ok(ms.every((m) => m.status === "perso" && m.why === "Non presa al colloquio"), "tutti i premi persi con il motivo");
+  const st = recruitSteps(r, ms, { today: "2026-11-20" });
+  eq([st.next, st.closedWhy, st.steps.find((s) => s.key === "interview").failed], [null, "Non presa al colloquio", true], "percorso chiuso al colloquio");
+  ok(recruitMetrics(r, {}).decided, "conta tra le persone «decise»");
+  const open = { ...r, interviewPassed: null };
+  eq(recruitSteps(open, recruitMilestones(open, { today: "2026-11-20" }), { today: "2026-11-20" }).next, "training", "senza esito: data del colloquio = fatto, prossima la formazione");
 }
 
 console.log(`referral: ${n} verifiche ok`);

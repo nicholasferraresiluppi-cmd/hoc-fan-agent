@@ -117,6 +117,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
     name: initial?.name || "", referrerId: initial?.referrerId || "", storyId: initial?.storyId || "",
     hrPersonId: initial?.hrPersonId || "",
     contactedAt: initial?.contactedAt || "", interviewAt: initial?.interviewAt || "", trainingAt: initial?.trainingAt || "",
+    interviewPassed: initial?.interviewPassed == null ? "" : String(initial.interviewPassed),
     trainingPassed: initial?.trainingPassed == null ? "" : String(initial.trainingPassed),
     firstShiftAt: initial?.firstShiftSource === "cp" ? "" : initial?.firstShiftAt || "",
     exitedAt: initial?.exitSource === "crm" ? "" : initial?.exitedAt || "",
@@ -139,7 +140,8 @@ function RecruitModal({ initial, data, onClose, onDone }) {
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const stories = data.stories.filter((s) => s.referrerId === f.referrerId);
   const saved = initial?.id ? data.recruits.find((r) => r.id === initial.id) : null;
-  const payload = { ...f, blockSalesManual: [f.bs1, f.bs2], trainingPassed: f.trainingPassed === "" ? null : f.trainingPassed === "true" };
+  const tri = (v) => (v === "" ? null : v === "true");
+  const payload = { ...f, blockSalesManual: [f.bs1, f.bs2], interviewPassed: tri(f.interviewPassed), trainingPassed: tri(f.trainingPassed) };
   return (
     <Modal open onClose={onClose} title={initial?.id ? initial.name : "Nuova persona portata"} maxWidth={620}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", columnGap: 14 }}>
@@ -164,9 +166,14 @@ function RecruitModal({ initial, data, onClose, onDone }) {
           <input style={inp} type="date" value={f.contactedAt} onChange={set("contactedAt")} />
         </Field>
         <Field label="Colloquio"><input style={inp} type="date" value={f.interviewAt} onChange={set("interviewAt")} /></Field>
-        <Field label="Formazione"><input style={inp} type="date" value={f.trainingAt} onChange={set("trainingAt")} /></Field>
+        <Field label="Esito del colloquio" hint={f.interviewPassed === "false" ? "Il percorso si chiude qui: i premi su questa persona non maturano." : null}>
+          <select style={inp} value={f.interviewPassed} onChange={set("interviewPassed")}>
+            <option value="">Non ancora</option><option value="true">Passato</option><option value="false">Non passato</option>
+          </select>
+        </Field>
+        <Field label="Formazione"><input style={inp} type="date" value={f.trainingAt} onChange={set("trainingAt")} disabled={f.interviewPassed === "false"} /></Field>
         <Field label="Formazione superata?">
-          <select style={inp} value={f.trainingPassed} onChange={set("trainingPassed")}>
+          <select style={inp} value={f.trainingPassed} onChange={set("trainingPassed")} disabled={f.interviewPassed === "false"}>
             <option value="">Non ancora</option><option value="true">Sì</option><option value="false">No</option>
           </select>
         </Field>
@@ -195,7 +202,9 @@ function RecruitModal({ initial, data, onClose, onDone }) {
           ? <>Su Infloww è <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{person.operator}</b>: turni da CreatorsPro e venduto da Infloww arrivano da soli. <Link href={`/admin/hr/${person.id}`} style={{ color: CP.accentSoftText }}>Apri la scheda</Link></>
           : <>La scheda di {person.name} non è ancora collegata a Infloww: turni e venduto non si leggono. <Link href={`/admin/hr/${person.id}`} style={{ color: CP.accentSoftText }}>Collegala dalla scheda</Link> (riquadro «Su Infloww e CreatorsPro»).</>)
           : match ? <>Nel CRM c&apos;è la scheda di <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{match.name}</b>: è questa persona? <button type="button" style={{ ...btnQuiet, padding: 0, color: CP.accentSoftText }} onClick={() => pickCrm(people.find((p) => p.id === match.id)?.label || "")}>Sì, collega</button></>
-          : <>Senza scheda nel CRM turni, venduto e uscita non si leggono. Collegala appena la persona ha compilato il modulo.</>}
+          : f.interviewPassed === "false" ? <>Non presa al colloquio: la scheda nel CRM non serve.</>
+          : f.trainingPassed === "true" ? <span style={{ color: CP.attn }}>Formazione superata: manda il modulo del CRM e collega la scheda appena c&apos;è. Senza, turni e venduto non si leggono.</span>
+          : <>La scheda nel CRM arriva dopo la formazione, quando mandi il modulo. Quando c&apos;è, la colleghi da qui o dall&apos;avviso in cima alla pagina.</>}
       </div>
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 56 }} value={f.note} onChange={set("note")} /></Field>
 
@@ -215,6 +224,33 @@ function RecruitModal({ initial, data, onClose, onDone }) {
         onSave={() => run(async () => { await post({ action: "saveRecruit", id: initial?.id, data: payload }); onDone(true); })}
         onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare questa persona dal programma?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteRecruit", id: initial.id }); onDone(true); }); } : null} />
     </Modal>
+  );
+}
+
+// ── La scheda del CRM è arrivata (07/11/2026) ─────────────────────────────────
+// La scheda nasce dopo la formazione, quando l'Area Partner manda il modulo: se nel
+// CRM c'è UNA scheda con il nome di una persona portata non ancora collegata, si
+// collega da qui con un clic (ognuna ricontrollata dal server).
+function CrmArrivedNotice({ data, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const rows = data.recruits.filter((r) => !r.hrPersonId && data.crmMatches?.[r.id] && !(r.steps.closedWhy && !r.metrics?.started));
+  if (!rows.length) return null;
+  const link = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const j = await post({ action: "linkCrm", items: rows.map((r) => ({ recruitId: r.id, hrPersonId: data.crmMatches[r.id].id })) });
+      if (j.result?.skipped?.length) setErr(j.result.skipped.map((s) => s.error).join(" · "));
+      onDone();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  const names = rows.slice(0, 3).map((r) => { const m = data.crmMatches[r.id]; return `${r.name} (scheda ${m.name}${m.phase ? ` · ${m.phase}` : ""})`; }).join(", ") + (rows.length > 3 ? ` e altre ${rows.length - 3}` : "");
+  return (
+    <Notice>
+      {rows.length === 1 ? "1 persona portata ha" : `${rows.length} persone portate hanno`} la scheda nel CRM: {names}. Collegala per leggere turni, venduto e uscita.{" "}
+      <button type="button" style={{ ...btnQuiet, padding: 0, color: CP.accentSoftText, fontSize: "inherit" }} disabled={busy} onClick={link}>{busy ? "Collego…" : "Collega →"}</button>
+      {err && <span style={{ color: CP.accentRed }}> {err}</span>}
+    </Notice>
   );
 }
 
@@ -568,6 +604,8 @@ export default function ReferralAdminPage() {
           </HeroMetric>
           )}
 
+          <CrmArrivedNotice data={data} onDone={() => mutate()} />
+
           <Tabs value={tab} onChange={setTab}
             items={TABS.map(([k, l]) => [k, l, k === "topay" ? data.toPay.length : k === "crm" ? data.suggestions.length : k === "fx" ? (data.fxMonths.filter((m) => data.fx[m] == null).length ? `${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : null) : null])} />
 
@@ -642,8 +680,10 @@ export default function ReferralAdminPage() {
                 { key: "infloww", label: "Collegamento", muted: true, sort: (r) => r.inflowwName || (r.hrPersonId ? "~" : "~~"), render: (r) => r.inflowwName
                   ? r.inflowwName
                   : r.hrPersonId ? <span style={{ color: CP.attn }}>scheda senza Infloww</span>
-                  : data.crmMatches?.[r.id] ? <span style={{ color: CP.attn }}>scheda da confermare</span>
-                  : <span style={{ color: CP.attn }}>senza scheda CRM</span> },
+                  : data.crmMatches?.[r.id] ? <span style={{ color: CP.attn }}>scheda da collegare</span>
+                  : r.steps.closedWhy && !r.metrics?.started ? "—"
+                  : r.trainingPassed === true ? <span style={{ color: CP.attn }}>manca la scheda CRM</span>
+                  : "scheda dopo la formazione" },
                 { key: "earned", label: "Maturato", align: "right", render: (r) => fmtEur(r.totals.guadagnato), sort: (r) => r.totals.guadagnato },
                 { key: "running", label: "In corso", align: "right", render: (r) => fmtEur(r.totals.in_corso), sort: (r) => r.totals.in_corso },
                 { key: "createdAt", label: "Segnalata", align: "right", render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString("it-IT") : "—", sort: (r) => r.createdAt || 0 },
