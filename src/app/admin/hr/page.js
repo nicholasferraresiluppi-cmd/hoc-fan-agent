@@ -32,6 +32,7 @@ import { SKILL_AREAS, SKILL_LEVELS, PAST_ROLES, normalizeSkillMap, normalizePast
 import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, CopyLink, fmtDateTime } from "@/components/hr-ui";
 import { RestoreButton } from "@/components/hr-archive";
 import { ContractPill } from "@/components/hr-contracts-ui";
+import { OperatorBulkNotice } from "@/components/hr-operator-bulk";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { Donut } from "@/components/VetroCharts";
@@ -243,6 +244,7 @@ export default function HrPeoplePage() {
           </Notice>
         );
       })()}
+      {data && items.length > 0 && <OperatorBulkNotice />}
       {!error && isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
 
       {data && items.length === 0 && archivedItems.length === 0 && (

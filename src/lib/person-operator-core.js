@@ -93,3 +93,34 @@ export function cpMembersFor(inflowwName, mapping = {}, members = {}) {
   const sameName = mapped.length ? [] : Object.keys(members || {}).filter((id) => !mappedIds.has(id) && opKey(cpName(id)) === k).map(cpName);
   return { mapped, sameName };
 }
+
+/**
+ * Quanto è sicuro un suggerimento: "esatto" se nome e cognome sono gli stessi
+ * (anche in un altro ordine, a meno di maiuscole e accenti), altrimenti "simile"
+ * (refuso, secondo nome, cognome in più) — da guardare prima di collegare.
+ */
+export function suggestionKind(personName, inflowwName) {
+  const words = (v) => opKey(v).replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean).sort().join(" ");
+  const a = words(personName), b = words(inflowwName);
+  return a && a === b ? "esatto" : "simile";
+}
+
+/**
+ * Collegamento in blocco: per ogni scheda senza collegamento, il suggerimento e
+ * quanto è sicuro. people: [{ id, name, phase }]. I suggerimenti si calcolano
+ * uno dopo l'altro tenendo conto di quelli già proposti, così lo stesso nome
+ * Infloww non finisce mai su due schede.
+ * → [{ personId, name, phase, suggestion: { name, employeeId }, kind }]
+ */
+export function bulkSuggestions(people = [], candidates = [], links = {}) {
+  const taken = { ...links };
+  const out = [];
+  const sorted = [...people].filter((p) => p?.id && !links[p.id]).sort((a, b) => String(a.name).localeCompare(String(b.name), "it"));
+  for (const p of sorted) {
+    const s = suggestOperator(p.name, candidates, taken);
+    if (!s) continue;
+    taken[`~${p.id}`] = { inflowwName: s.name };
+    out.push({ personId: p.id, name: p.name, phase: p.phase || null, suggestion: s, kind: suggestionKind(p.name, s.name) });
+  }
+  return out;
+}
