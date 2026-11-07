@@ -33,6 +33,7 @@ import { lbl, input, btnPrimary, btnGhost, chip, SYNC_LABEL, fetcher, postJson, 
 import { RestoreButton } from "@/components/hr-archive";
 import { ContractPill } from "@/components/hr-contracts-ui";
 import { OperatorBulkNotice } from "@/components/hr-operator-bulk";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 import { readiness, initials, avatarColor } from "@/lib/hr-readiness";
 import VetroScope, { useVetro, VetroSwitch, VetroNum, useInVetro } from "@/components/VetroScope";
 import { Donut } from "@/components/VetroCharts";
@@ -215,6 +216,7 @@ export default function HrPeoplePage() {
         actions={!error && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <VetroSwitch on={vetro} set={setVetro} />
+            <TutorialVideoButton id="collega-infloww" />
             <Link href="/admin/hr/contratti" style={btnGhost}><FileSignature size={15} /> Contratti</Link>
             <button type="button" onClick={() => setLinkOpen(true)} style={btnGhost}><Link2 size={15} /> Link del modulo</button>
             <button type="button" onClick={() => setNewOpen(true)} style={btnPrimary}><Plus size={15} /> Nuova persona</button>

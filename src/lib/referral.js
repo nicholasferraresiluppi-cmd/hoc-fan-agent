@@ -242,7 +242,7 @@ export async function crmContext(recruits) {
       if (r.hrPersonId) continue;
       const hit = matchName(r.name, free.map((p) => p.name));
       const same = hit ? free.filter((p) => p.name === hit) : [];
-      if (same.length === 1) matches[r.id] = { id: same[0].id, name: same[0].name };
+      if (same.length === 1) matches[r.id] = { id: same[0].id, name: same[0].name, phase: same[0].phase };
     }
     return { suggestions, people, matches };
   } catch {
@@ -303,6 +303,32 @@ export async function saveRecruit({ id = null, input, actor }) {
   await writeOne(K.recruits, rid, rec);
   await audit(actor, id ? "recruit.update" : "recruit.create", { id: rid, name: rec.name });
   return { ...rec, id: rid };
+}
+
+/**
+ * Collega persone portate alla loro scheda del CRM (07/11/2026): la scheda nasce
+ * dopo la formazione, quando l'Area Partner manda il modulo. Si collega dall'avviso
+ * «hanno la scheda nel CRM» con un clic. Ognuna ricontrollata: scheda esistente e
+ * non già legata a un'altra persona portata. items: [{ recruitId, hrPersonId }].
+ */
+export async function linkRecruitsToCrm(items = [], actor) {
+  const { getPerson } = await import("@/lib/hr-people");
+  const recruits = await readHash(K.recruits);
+  const out = { linked: [], skipped: [] };
+  for (const it of (Array.isArray(items) ? items : []).slice(0, 100)) {
+    const r = recruits.find((x) => x.id === it?.recruitId);
+    const pid = String(it?.hrPersonId || "");
+    if (!r) { out.skipped.push({ recruitId: it?.recruitId || null, error: "Persona portata non trovata" }); continue; }
+    if (r.hrPersonId) { out.skipped.push({ recruitId: r.id, error: "Ha già la sua scheda" }); continue; }
+    if (recruits.some((x) => x.id !== r.id && x.hrPersonId === pid)) { out.skipped.push({ recruitId: r.id, error: "Questa scheda è già di un'altra persona portata" }); continue; }
+    if (!(await getPerson(pid).catch(() => null))) { out.skipped.push({ recruitId: r.id, error: "Scheda del CRM non trovata" }); continue; }
+    const { id: _id, ...rest } = r;
+    await writeOne(K.recruits, r.id, { ...rest, hrPersonId: pid, updatedAt: Date.now() });
+    r.hrPersonId = pid;
+    out.linked.push({ recruitId: r.id, hrPersonId: pid });
+    await audit(actor, "recruit.crm_link", { id: r.id, name: r.name });
+  }
+  return out;
 }
 
 export async function deleteRecruit(id, actor) {

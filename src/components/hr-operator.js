@@ -52,7 +52,7 @@ export function OperatorCard({ person, locked = false }) {
               <span style={{ flex: 1, minWidth: 0 }}>
                 {cp?.mapped?.length ? <span>{cp.mapped.join(", ")}</span>
                   : cp?.sameName?.length ? <span>{cp.sameName.join(", ")} <span style={{ color: CP.textMuted, fontSize: 12.5 }}>· stesso nome, non abbinato a mano</span></span>
-                  : <span style={{ color: CP.attn }}>nessun membro abbinato: i turni non si leggono. <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Abbinalo in Sync CreatorsPro</Link></span>}
+                  : <span style={{ color: CP.attn }}>nessun membro abbinato: i turni non si leggono. Lo abbina un admin in <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CreatorsPro</Link>.</span>}
               </span>
             </div>
           )}

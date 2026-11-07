@@ -193,8 +193,11 @@ export function validateRecruit(input = {}) {
     if (r.error) return r;
     out[k] = r.value;
   }
-  const tp = input.trainingPassed;
-  out.trainingPassed = tp === true || tp === "true" ? true : tp === false || tp === "false" ? false : null;
+  const tri = (v) => (v === true || v === "true" ? true : v === false || v === "false" ? false : null);
+  // esito del colloquio (07/11/2026): l'Area Partner scrive se la persona è passata o no
+  out.interviewPassed = tri(input.interviewPassed);
+  out.trainingPassed = tri(input.trainingPassed);
+  if (out.interviewPassed === false && out.trainingPassed === true) return { error: "Con il colloquio non passato non c'è formazione superata" };
   if (out.firstShiftAt && out.trainingPassed !== true) return { error: "Il primo turno si segna solo dopo la formazione superata" };
   if (out.trainingAt && out.interviewAt && out.trainingAt < out.interviewAt) return { error: "La formazione non può essere prima del colloquio" };
   if (out.firstShiftAt && out.trainingAt && out.firstShiftAt < out.trainingAt) return { error: "Il primo turno non può essere prima della formazione" };
@@ -288,6 +291,16 @@ export function withFirstShift(r, shiftDates) {
   return first ? { ...r, firstShiftAt: first, firstShiftSource: "cp" } : { ...r, firstShiftSource: null };
 }
 
+/**
+ * Perché il percorso si è chiuso prima del primo turno: colloquio non passato
+ * (07/11/2026) o formazione non superata. null se è ancora aperto.
+ */
+export function stopReason(r) {
+  if (r?.interviewPassed === false) return "Non presa al colloquio";
+  if (r?.trainingPassed === false) return "Formazione non superata";
+  return null;
+}
+
 // ── Maturazione dei premi ───────────────────────────────────────────────────
 //
 // Stati di una voce: "pagato" (congelato), "maturato" (da pagare),
@@ -328,7 +341,7 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     const key = `${r.id}:first_shift`;
     let m = { key, kind: "first_shift", label: "Primo turno in chat", amountEur: rules.firstShiftEur };
     if (r.firstShiftAt && r.trainingPassed === true) m = { ...m, status: "maturato", unlockedAt: r.firstShiftAt };
-    else if (r.trainingPassed === false) m = { ...m, status: "perso", why: "Formazione non superata" };
+    else if (stopReason(r)) m = { ...m, status: "perso", why: stopReason(r) };
     else if (exited) m = { ...m, status: "perso", why: "Uscita prima del primo turno" };
     else m = { ...m, status: "in_attesa", why: r.trainingAt ? "Dopo la formazione, al primo turno" : "Dopo colloquio e formazione" };
     out.push(pay(key, m));
@@ -346,7 +359,7 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     const label = `${String(pct * 100).replace(".", ",")}% sul venduto dei turni ${from + 1}-${to}`;
     let m = { key, kind: "commission", block: i + 1, pct, label, amountEur: null, amountUsd: null, shiftsDone: done, shiftsTo: to };
     if (!started) {
-      m = { ...m, status: r.trainingPassed === false || exited ? "perso" : "in_attesa", why: r.trainingPassed === false ? "Formazione non superata" : exited ? "Uscita prima del primo turno" : "Parte dal primo turno" };
+      m = { ...m, status: stopReason(r) || exited ? "perso" : "in_attesa", why: stopReason(r) || (exited ? "Uscita prima del primo turno" : "Parte dal primo turno") };
       out.push(pay(key, m));
       return;
     }
@@ -382,7 +395,7 @@ export function recruitMilestones(recruit, { today, salesByMonth = {}, shiftDate
     const key = `${r.id}:shifts_${n}`;
     let m = { key, kind: "shifts", shifts: n, label: `${n} turni fatti`, amountEur: rules.shiftBonusEur, shiftsDone: done };
     if (!started) {
-      m = { ...m, status: r.trainingPassed === false || exited ? "perso" : "in_attesa", why: r.trainingPassed === false ? "Formazione non superata" : exited ? "Uscita prima del primo turno" : "Parte dal primo turno" };
+      m = { ...m, status: stopReason(r) || exited ? "perso" : "in_attesa", why: stopReason(r) || (exited ? "Uscita prima del primo turno" : "Parte dal primo turno") };
     } else if (done != null && done >= n) {
       // data del n-esimo turno quando la conosciamo (con il numero a mano no)
       m = { ...m, status: "maturato", unlockedAt: manual == null && dates?.[n - 1] ? dates[n - 1] : null };
@@ -408,15 +421,15 @@ export function recruitSteps(r, milestones = [], { today } = {}) {
   const ret = milestones.filter((m) => m.kind === "shifts");
   const steps = [
     { key: "referred", label: "Segnalata", done: true, at: contactDay(r) },
-    { key: "interview", label: "Colloquio", done: Boolean(r.interviewAt), at: r.interviewAt || null },
+    { key: "interview", label: "Colloquio", done: r.interviewPassed === true || (Boolean(r.interviewAt) && r.interviewPassed !== false), failed: r.interviewPassed === false, at: r.interviewAt || null },
     { key: "training", label: "Formazione", done: r.trainingPassed === true, failed: r.trainingPassed === false, at: r.trainingAt || null },
     { key: "first_shift", label: "Primo turno", done: Boolean(r.firstShiftAt && r.trainingPassed === true), at: r.firstShiftAt || null },
     ...ret.map((m) => ({ key: m.key, label: `${m.shifts} turni`, done: m.status === "maturato" || m.status === "pagato", failed: m.status === "perso", at: m.unlockedAt || null })),
   ];
   const next = steps.find((x) => !x.done && !x.failed);
   // formazione non superata o uscita: il percorso è chiuso, niente «prossima tappa»
-  const closed = r.trainingPassed === false || (r.exitedAt && r.exitedAt <= today);
-  return { steps, next: closed ? null : next?.key || null, closedWhy: r.trainingPassed === false ? "Formazione non superata" : closed ? "Uscita" : null };
+  const closed = Boolean(stopReason(r)) || (r.exitedAt && r.exitedAt <= today);
+  return { steps, next: closed ? null : next?.key || null, closedWhy: stopReason(r) || (closed ? "Uscita" : null) };
 }
 
 /**
@@ -533,7 +546,7 @@ export function recruitMetrics(r, { salesByMonth = {}, shiftDates = null, rules 
   const n25 = done == null ? 0 : Math.min(rules.pctBlock, done);
   const perShift = first25 != null && n25 >= MIN_SHIFTS_RATE ? round2(first25 / n25) : null;
   const reached25 = done != null && done >= rules.pctBlock;
-  return { started, shiftsDone: done, salesTotal, first25, perShift, reached25, decided: reached25 || (started && Boolean(r.exitedAt)) || (!started && (r.trainingPassed === false || Boolean(r.exitedAt))) };
+  return { started, shiftsDone: done, salesTotal, first25, perShift, reached25, decided: reached25 || (started && Boolean(r.exitedAt)) || (!started && (Boolean(stopReason(r)) || Boolean(r.exitedAt))) };
 }
 
 const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
@@ -547,7 +560,7 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
   const count = (f) => recruits.filter(f).length;
   const funnel = [
     { key: "referred", label: "Segnalate", n: N },
-    { key: "interview", label: "Colloquio fatto", n: count((r) => r.interviewAt) },
+    { key: "interview", label: "Colloquio passato", n: count((r) => r.interviewPassed === true || r.trainingPassed === true || (r.interviewAt && r.interviewPassed == null)) },
     { key: "training", label: "Formazione superata", n: count((r) => r.trainingPassed === true) },
     { key: "first_shift", label: "Primo turno", n: count((r) => r.metrics.started) },
     { key: "s25", label: "25 turni", n: count((r) => (r.metrics.shiftsDone ?? 0) >= 25) },
@@ -648,7 +661,7 @@ export function missionProgress(m, recruit = {}) {
   if (m.kind === "commission") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shiftsTo), target: m.shiftsTo, unit: "turni" };
   if (m.kind === "story") return { done: Math.min(m.published || 0, REFERRAL_RULES.storiesRequired), target: REFERRAL_RULES.storiesRequired, unit: "storie" };
   if (m.kind === "first_shift") {
-    const d = [recruit.interviewAt, recruit.trainingPassed === true, recruit.firstShiftAt && recruit.trainingPassed === true].filter(Boolean).length;
+    const d = [recruit.interviewPassed === true || (recruit.interviewAt && recruit.interviewPassed !== false), recruit.trainingPassed === true, recruit.firstShiftAt && recruit.trainingPassed === true].filter(Boolean).length;
     return { done: d, target: 3, unit: "tappe" };
   }
   return null;
