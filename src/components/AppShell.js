@@ -79,6 +79,8 @@ function RestrictedShell({ restriction, allowed, children, pathname }) {
   return (
     <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
       <NavProgress />
+      {/* «Vedi come» un account ristretto (08/11/2026): senza la barra l'admin restava chiuso dentro la vista */}
+      <ErrorBoundary silent label="ViewAsBanner"><ViewAsBanner /></ErrorBoundary>
       <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
         <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
         {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
