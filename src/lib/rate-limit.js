@@ -22,6 +22,7 @@ export const LIMITS = {
   candidate_eval:[{ window: 3600, max: 20 }],
   feedback:      [{ window: 86400, max: 30 }],
   thanks:        [{ window: 86400, max: 20 }],  // "grazie" tra colleghi
+  referral_shot: [{ window: 3600, max: 20 }, { window: 86400, max: 40 }], // screen delle storie dal referente (08/11/2026): ognuno passa dall'AI
   // Centro HR (29/09/2026): modulo pubblico da link, upload documenti, webhook ClickUp.
   // Rivisti il 03/10/2026 per 300 persone, anche tutte insieme (link mandato a tutti):
   //  - per IP: in ufficio molte persone escono dallo STESSO IP. Una persona fa ~3-5

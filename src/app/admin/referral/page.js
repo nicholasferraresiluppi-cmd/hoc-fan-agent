@@ -11,7 +11,7 @@ import { TutorialVideoButton } from "@/components/TutorialVideo";
 import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
 import { Donut, KpiCard } from "@/components/VetroCharts";
 import { Wallet, Hourglass, CircleCheck, Users, UserPlus, Repeat, Coins, Gift } from "lucide-react";
-import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM } from "@/components/referral-ui";
+import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM, shrinkImage, shotUrl, ShotButton } from "@/components/referral-ui";
 import { payslipsCsv } from "@/lib/referral-core";
 import { confirmDialog } from "@/components/AppDialogs";
 
@@ -71,7 +71,7 @@ function Actions({ busy, error, onSave, onDelete, saveLabel = "Salva", extra = n
 function ReferrerModal({ initial, onClose, onDone }) {
   // rec = il referente salvato (null finché è nuovo): «Salva e invita» lo crea e resta aperto sull'accesso
   const [rec, setRec] = useState(initial || null);
-  const [f, setF] = useState({ name: initial?.name || "", email: initial?.email || "", phone: initial?.phone || "", note: initial?.note || "" });
+  const [f, setF] = useState({ name: initial?.name || "", email: initial?.email || "", phone: initial?.phone || "", instagram: initial?.instagram || "", note: initial?.note || "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [inviteMsg, setInviteMsg] = useState(null);
@@ -98,6 +98,22 @@ function ReferrerModal({ initial, onClose, onDone }) {
       <Field label="Nome e cognome"><input style={inp} value={f.name} onChange={set("name")} autoFocus /></Field>
       <Field label="Email" hint="Quella con cui entra in HOC Pro: con questa vede solo i suoi guadagni. Se non ha ancora un account, l'invito arriva qui."><input style={inp} type="email" value={f.email} onChange={set("email")} /></Field>
       <Field label="Telefono"><input style={inp} value={f.phone} onChange={set("phone")} /></Field>
+      <Field label="Profilo Instagram" hint="Il nome (es. giulia.bianchi) o il link. Serve a sapere quanti follower ha e quanti di loro vedono le storie.">
+        <input style={inp} value={f.instagram} onChange={set("instagram")} placeholder="@" />
+      </Field>
+      {rec?.id && rec.instagram && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13, color: CP.textSecondary, marginTop: 6 }}>
+          <span style={{ flex: "1 1 240px" }}>
+            {!rec.ig || rec.ig.handle !== rec.instagram ? "Profilo non ancora controllato."
+              : rec.ig.exists ? <>@{rec.ig.handle}{rec.ig.fullName ? ` · ${rec.ig.fullName}` : ""} · <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{rec.ig.followers != null ? rec.ig.followers.toLocaleString("it-IT") : "?"} follower</b>{rec.ig.private ? " · privato" : ""} · controllato il {fmtDay(new Date(rec.ig.checkedAt).toISOString().slice(0, 10))}</>
+              : <span style={{ color: CP.attn }}>@{rec.ig.handle}: profilo non trovato. Controlla com&apos;è scritto.</span>}
+          </span>
+          <button type="button" style={btn} disabled={busy || f.instagram !== (rec.instagram || "")} title={f.instagram !== (rec.instagram || "") ? "Salva prima il profilo" : ""}
+            onClick={() => run(async () => { const j = await post({ action: "checkInstagram", id: rec.id }); setRec((x) => ({ ...x, ig: j.result })); onDone(false); })}>
+            {rec.ig?.handle === rec.instagram ? "Controlla di nuovo" : "Controlla il profilo"}
+          </button>
+        </div>
+      )}
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 60 }} value={f.note} onChange={set("note")} /></Field>
       {rec?.id && (
         <div className="vt-glass" style={{ ...box, padding: 12, marginTop: 14, fontSize: 13, color: CP.textSecondary }}>
@@ -123,7 +139,17 @@ function ReferrerModal({ initial, onClose, onDone }) {
       <Actions busy={busy} error={err}
         saveLabel={rec?.id ? "Salva" : "Salva senza invitare"}
         saveStyle={rec?.id ? null : btn}
-        onSave={() => run(async () => { await save(); onDone(true); })}
+        onSave={() => run(async () => {
+          const before = rec?.instagram || null;
+          const saved = await save();
+          // profilo Instagram nuovo o cambiato: si controlla subito e il modulo resta aperto sul risultato
+          if (saved.instagram && saved.instagram !== before) {
+            try { const j = await post({ action: "checkInstagram", id: saved.id }); setRec({ ...saved, ig: j.result }); } catch (e) { setErr(e.message); }
+            onDone(false);
+            return;
+          }
+          onDone(true);
+        })}
         extra={!rec?.id ? (
           <button type="button" style={{ ...btnPrimary, opacity: f.email.trim() ? 1 : 0.45, cursor: f.email.trim() ? "pointer" : "not-allowed" }} disabled={busy || !f.email.trim()} title={f.email.trim() ? "" : "Serve l'email per l'invito"}
             onClick={() => run(async () => { const r = await save(); onDone(false); await invite(r.id); })}><Send size={14} /> Salva e invita</button>
@@ -285,42 +311,124 @@ function CrmArrivedNotice({ data, onDone }) {
 }
 
 // ── Storie ──────────────────────────────────────────────────────────────────
+function storyCell(it) {
+  if (!it || (!it.publishedAt && !it.pubShot)) return <span style={{ color: CP.textMuted }}>—</span>;
+  if (it.verified === null) return <span style={{ color: CP.attn }}>da controllare</span>;
+  if (it.verified === false) return <span style={{ color: CP.textMuted }}>non valida</span>;
+  return <span>{fmtDay(it.publishedAt)}{it.views != null ? <span style={{ color: CP.textMuted }}> · {it.views.toLocaleString("it-IT")}</span> : null}</span>;
+}
+
 function StoryModal({ initial, data, onClose, onDone }) {
-  const pub = initial?.publishedAt || [];
   const today = new Date().toISOString().slice(0, 10);
+  const r = data.rules;
+  // rec = la scheda come sta sul server (screen e letture AI arrivano da lì, salvati subito)
+  const [rec, setRec] = useState(initial || null);
   const [f, setF] = useState({
     referrerId: initial?.referrerId || "", sentAt: initial?.sentAt || (initial?.id ? "" : today), chosen: initial?.chosen || "",
-    agreedAt: initial?.agreedAt || "", p1: pub[0] || "", p2: pub[1] || "", views: initial?.views != null ? String(initial.views) : "", note: initial?.note || "",
+    agreedAt: initial?.agreedAt || "", note: initial?.note || "",
   });
+  const toForm = (items = []) => Array.from({ length: r.storiesRequired }, (_, i) => {
+    const it = items.find((x) => x.n === i + 1) || {};
+    return { n: i + 1, proposal: it.proposal || "", publishedAt: it.publishedAt || "", views: it.views != null ? String(it.views) : "", verified: it.verified ?? null };
+  });
+  const [items, setItems] = useState(() => toForm(initial?.items));
   const [busy, setBusy] = useState(false);
+  const [upBusy, setUpBusy] = useState(null);
   const [err, setErr] = useState(null);
   const run = async (fn) => { setBusy(true); setErr(null); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const r = data.rules;
-  const published = [f.p1, f.p2].filter(Boolean).length;
+  const setItem = (n, k, v) => setItems((list) => list.map((it) => {
+    if (it.n !== n) return it;
+    const next = { ...it, [k]: v };
+    // una data scritta dall'Area Partner è già verificata (gli screen del referente si confermano a parte)
+    if (k === "publishedAt") next.verified = v ? (srvItem(n)?.by === "referente" && it.verified !== true ? it.verified : true) : null;
+    return next;
+  }));
+  const srvItem = (n) => { const it = rec?.items?.find((x) => x.n === n); return it ? { ...it, by: it.pubShot?.by || null } : null; };
+  const followers = data.referrers.find((x) => x.id === f.referrerId)?.ig;
+  const payload = () => ({ referrerId: f.referrerId, sentAt: f.sentAt, chosen: f.chosen, agreedAt: f.agreedAt, note: f.note, items });
+  const upload = (n, kind) => async (file) => {
+    setUpBusy(`${n}${kind}`); setErr(null);
+    try {
+      const img = await shrinkImage(file);
+      const j = await post({ action: "attachShot", id: rec.id, n, kind, ...img });
+      const story = j.result.story;
+      setRec(story);
+      // aggiorna solo la riga caricata: le modifiche non salvate alle altre restano
+      const fresh = toForm(story.items).find((x) => x.n === n);
+      setItems((list) => list.map((it) => (it.n === n ? { ...it, publishedAt: fresh.publishedAt, verified: fresh.verified, views: it.views || fresh.views } : it)));
+      onDone(false);
+    } catch (e) { setErr(e.message); } finally { setUpBusy(null); }
+  };
+  const verify = (n, ok) => run(async () => {
+    const j = await post({ action: "verifyStory", id: rec.id, n, ok });
+    setRec(j.result); setItems((list) => list.map((it) => (it.n === n ? { ...it, verified: ok } : it))); onDone(false);
+  });
   return (
-    <Modal open onClose={onClose} title={initial?.id ? "Storie Instagram" : "Nuove storie Instagram"}>
-      <div style={{ fontSize: 13, color: CP.textSecondary }}>{fmtEur(r.storyEur)} quando le {r.storiesRequired} storie sono pubblicate entro {r.storyWindowDays} giorni dall&apos;ok. Si segna un passaggio alla volta: il conto dei giorni parte dall&apos;ok.</div>
+    <Modal open onClose={onClose} title={rec?.id ? "Storie Instagram" : "Nuove storie Instagram"}>
+      <div style={{ fontSize: 13, color: CP.textSecondary }}>{fmtEur(r.storyEur)} quando le {r.storiesRequired} storie sono pubblicate e confermate entro {r.storyWindowDays} giorni dall&apos;ok. Un passaggio alla volta: ogni storia ha la sua riga.</div>
       <Field label="Chi le pubblica">
         <select style={inp} value={f.referrerId} onChange={set("referrerId")}>
           <option value="">Scegli…</option>
           {data.referrers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
       </Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <Field label="1 · Proposte inviate il"><input style={inp} type="date" value={f.sentAt} onChange={set("sentAt")} /></Field>
-        <Field label="2 · Storie scelte" hint="quali, es. «1 e 2»"><input style={inp} value={f.chosen} onChange={set("chosen")} placeholder="—" /></Field>
+        <Field label="2 · Storie scelte" hint="es. «1 e 2»"><input style={inp} value={f.chosen} onChange={set("chosen")} placeholder="—" /></Field>
+        <Field label="3 · Ok dato il" hint="da qui i 30 giorni"><input style={inp} type="date" value={f.agreedAt} onChange={set("agreedAt")} /></Field>
       </div>
-      <Field label="3 · Ok dato il" hint="da qui partono i 30 giorni"><input style={inp} type="date" value={f.agreedAt} onChange={set("agreedAt")} /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="4 · 1ª storia pubblicata il"><input style={inp} type="date" value={f.p1} onChange={set("p1")} disabled={!f.agreedAt} /></Field>
-        <Field label="2ª storia pubblicata il"><input style={inp} type="date" value={f.p2} onChange={set("p2")} disabled={!f.agreedAt} /></Field>
-      </div>
-      <Field label="5 · Visualizzazioni dopo 24 ore" hint="il totale delle storie, dallo screenshot"><input style={inp} inputMode="numeric" value={f.views} onChange={set("views")} disabled={!published} placeholder="—" /></Field>
+      {items.map((it) => {
+        const srv = srvItem(it.n) || {};
+        const pending = it.verified === null && (it.publishedAt || srv.pubShot);
+        const reach = followers?.exists && followers.followers && it.views ? Math.round((Number(String(it.views).replace(/\D/g, "")) / followers.followers) * 1000) / 10 : null;
+        const ai = srv.ai;
+        return (
+          <div key={it.n} style={{ border: `1px solid ${CP.border}`, borderRadius: 10, padding: "12px 14px", marginTop: 12, opacity: f.agreedAt ? 1 : 0.55 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+              <b style={{ fontSize: 14, fontWeight: 500 }}>Storia {it.n}</b>
+              <span style={{ fontSize: 12, color: it.verified === true ? CP.accentGreen : pending ? CP.attn : CP.textMuted }}>
+                {it.verified === true ? "confermata" : it.verified === false ? "screen non valido" : pending ? `caricata dal referente${srv.pubShot?.at ? ` il ${fmtDay(new Date(srv.pubShot.at).toISOString().slice(0, 10))}` : ""}: da controllare` : f.agreedAt ? "non ancora pubblicata" : "dopo l'ok"}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 1.4fr", gap: 12 }}>
+              <Field label="Proposta"><input style={inp} value={it.proposal} onChange={(e) => setItem(it.n, "proposal", e.target.value)} placeholder="es. 2" disabled={!f.agreedAt} /></Field>
+              <Field label="4 · Pubblicata il"><input style={inp} type="date" value={it.publishedAt} onChange={(e) => setItem(it.n, "publishedAt", e.target.value)} disabled={!f.agreedAt} /></Field>
+              <Field label="5 · Visualizzazioni" hint={reach != null ? `${String(reach).replace(".", ",")}% dei suoi follower` : "dallo screen dopo 24 ore"}>
+                <input style={inp} inputMode="numeric" value={it.views} onChange={(e) => setItem(it.n, "views", e.target.value)} disabled={!it.publishedAt} placeholder="—" />
+              </Field>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 8 }}>
+              {rec?.id ? (
+                <>
+                  {srv.pubShot && <a href={shotUrl(rec.id, it.n, "pub", srv.pubShot.at)} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: CP.accentSoftText }}>Vedi lo screen della storia</a>}
+                  <ShotButton label={srv.pubShot ? "Cambia screen" : "Carica lo screen della storia"} disabled={!f.agreedAt || !rec.agreedAt} busy={upBusy === `${it.n}pub`} onFile={upload(it.n, "pub")} />
+                  {srv.viewsShot && <a href={shotUrl(rec.id, it.n, "views", srv.viewsShot.at)} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: CP.accentSoftText }}>Vedi lo screen dopo 24 ore</a>}
+                  <ShotButton label={srv.viewsShot ? "Cambia screen 24 ore" : "Carica lo screen dopo 24 ore"} disabled={!it.publishedAt && !srv.pubShot} busy={upBusy === `${it.n}views`} onFile={upload(it.n, "views")} />
+                </>
+              ) : <span style={{ fontSize: 12, color: CP.textMuted }}>Salva per caricare gli screen.</span>}
+            </div>
+            {ai && (
+              <div style={{ fontSize: 12, color: CP.textSecondary, marginTop: 6 }}>
+                {ai.ok
+                  ? <>Letto dall&apos;AI: {[ai.views != null && `${ai.views.toLocaleString("it-IT")} visualizzazioni`, ai.accountsReached != null && `${ai.accountsReached.toLocaleString("it-IT")} account raggiunti`, ai.replies != null && `${ai.replies} risposte`, ai.linkClicks != null && `${ai.linkClicks} clic sul link`, ai.profileVisits != null && `${ai.profileVisits} visite al profilo`].filter(Boolean).join(" · ") || "nessun numero leggibile"}{ai.note ? ` — ${ai.note}` : ""}</>
+                  : <>{ai.error}</>}
+              </div>
+            )}
+            {pending && rec?.id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button type="button" style={btnPrimary} disabled={busy || !it.publishedAt} onClick={() => verify(it.n, true)}>Confermo la storia</button>
+                <button type="button" style={btn} disabled={busy} onClick={() => verify(it.n, false)}>Lo screen non va bene</button>
+              </div>
+            )}
+            {it.verified === false && rec?.id && <button type="button" style={{ ...btn, marginTop: 8 }} disabled={busy || !it.publishedAt} onClick={() => verify(it.n, true)}>Confermo comunque</button>}
+          </div>
+        );
+      })}
       <Field label="Note"><textarea style={{ ...inp, minHeight: 50 }} value={f.note} onChange={set("note")} /></Field>
       <Actions busy={busy} error={err}
-        onSave={() => run(async () => { await post({ action: "saveStory", id: initial?.id, data: { referrerId: f.referrerId, sentAt: f.sentAt, chosen: f.chosen, agreedAt: f.agreedAt, publishedAt: [f.p1, f.p2], views: f.views, note: f.note } }); onDone(true); })}
-        onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare queste storie?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteStory", id: initial.id }); onDone(true); }); } : null} />
+        onSave={() => run(async () => { const j = await post({ action: "saveStory", id: rec?.id, data: payload() }); if (!rec?.id) { setRec(j.result); onDone(false); } else onDone(true); })}
+        onDelete={rec?.id ? async () => { if (await confirmDialog({ title: "Eliminare queste storie?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteStory", id: rec.id }); onDone(true); }); } : null} />
     </Modal>
   );
 }
@@ -439,7 +547,7 @@ function Overview({ d, rules, onOpenReferrer, vetro }) {
             <Metric label="Pubblicate" value={`${d.storyStats.published} su ${d.storyStats.agreed}`} note={d.storyStats.publishers === 1 ? "da 1 persona" : `da ${d.storyStats.publishers} persone diverse`} />
             <Metric label="Scadute" value={String(d.storyStats.expired)} note={`${d.storyStats.open} ancora aperte`} />
             <Metric label="In attesa dell'ok" value={String(d.storyStats.pending)} note="proposte inviate" />
-            <Metric label="Visualizzazioni" value={d.storyStats.views != null ? d.storyStats.views.toLocaleString("it-IT") : "—"} note={d.storyStats.viewsReported ? `dopo 24 ore, da ${d.storyStats.viewsReported} ${d.storyStats.viewsReported === 1 ? "persona" : "persone"}` : "nessuna ancora segnata"} />
+            <Metric label="Visualizzazioni" value={d.storyStats.views != null ? d.storyStats.views.toLocaleString("it-IT") : "—"} note={d.storyStats.reachAvg != null ? `in media il ${String(d.storyStats.reachAvg).replace(".", ",")}% dei follower` : d.storyStats.viewsReported ? `dopo 24 ore, da ${d.storyStats.viewsReported} ${d.storyStats.viewsReported === 1 ? "persona" : "persone"}` : "nessuna ancora segnata"} />
             <Metric label="Persone arrivate da una storia" value={String(d.storyStats.recruitsFromStories)} note={d.storyStats.recruitsPerStory != null ? `${String(d.storyStats.recruitsPerStory).replace(".", ",")} per storia pubblicata` : null} />
           </div>
           {vetro && d.storyStats.agreed > 0 && (
@@ -731,6 +839,7 @@ export default function ReferralAdminPage() {
               columns={[
                 { key: "name", label: "Referente" },
                 { key: "access", label: "Accesso", muted: true, render: (r) => r.userId ? "Vede la sua pagina" : r.invitedAt ? "Invitato" : r.email ? "Non ancora" : "Manca l'email", sort: (r) => (r.userId ? 2 : r.invitedAt ? 1 : 0) },
+                { key: "ig", label: "Instagram", muted: true, render: (r) => (!r.instagram ? "—" : r.ig?.exists && r.ig.handle === r.instagram ? `@${r.instagram} · ${r.ig.followers != null ? r.ig.followers.toLocaleString("it-IT") : "?"}` : r.ig && !r.ig.exists && r.ig.handle === r.instagram ? `@${r.instagram} · non trovato` : `@${r.instagram}`), sort: (r) => r.ig?.followers ?? -1 },
                 { key: "recruitCount", label: "Persone", align: "right" },
                 { key: "storyCount", label: "Storie", align: "right" },
                 { key: "earned", label: "Maturato", align: "right", render: (r) => fmtEur(r.totals.guadagnato), sort: (r) => r.totals.guadagnato },
@@ -748,11 +857,10 @@ export default function ReferralAdminPage() {
               columns={[
                 { key: "ref", label: "Referente", render: (s) => refName[s.referrerId] || "—", sort: (s) => refName[s.referrerId] || "" },
                 { key: "stage", label: "A che punto", render: (s) => <span style={{ color: s.stage?.late ? CP.attn : CP.textPrimary }}>{s.stage?.label || "—"}</span>, sort: (s) => s.stage?.step ?? 0 },
-                { key: "sentAt", label: "Inviate", render: (s) => fmtDay(s.sentAt) || "—", sort: (s) => s.sentAt || "" },
-                { key: "chosen", label: "Scelte", render: (s) => s.chosen || "—" },
-                { key: "agreedAt", label: "Ok", render: (s) => fmtDay(s.agreedAt) || "—", sort: (s) => s.agreedAt || "" },
-                { key: "pub", label: "Pubblicate", render: (s) => `${s.publishedAt.length} su ${data.rules.storiesRequired}`, sort: (s) => s.publishedAt.length },
+                { key: "s1", label: "Storia 1", render: (s) => storyCell(s.items?.[0]), sort: (s) => s.items?.[0]?.publishedAt || "" },
+                { key: "s2", label: "Storia 2", render: (s) => storyCell(s.items?.[1]), sort: (s) => s.items?.[1]?.publishedAt || "" },
                 { key: "views", label: "Visualizzazioni", align: "right", render: (s) => (s.views != null ? s.views.toLocaleString("it-IT") : "—"), sort: (s) => s.views ?? -1 },
+                { key: "reach", label: "Dei follower", align: "right", render: (s) => (s.reach != null ? `${String(s.reach).replace(".", ",")}%` : "—"), sort: (s) => s.reach ?? -1 },
                 { key: "due", label: "Entro il", render: (s) => fmtDay(s.milestone.dueBy) || "—", sort: (s) => s.milestone.dueBy || "" },
                 { key: "status", label: "Premio", align: "right", render: (s) => <StatusPill status={s.milestone.status} />, sort: (s) => s.milestone.status },
               ]}

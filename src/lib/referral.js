@@ -20,7 +20,7 @@
 import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
-  REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit, otherCrmEmails,
+  REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit, otherCrmEmails, storyItems, countedDates, storyViews, reachPct, normIgHandle,
   recruitMilestones, storyMilestone, storyStage, recruitSteps, summarize, referrerView, withCrm, withFirstShift, firstShiftSearchFrom,
   salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
@@ -184,7 +184,11 @@ export async function loadState({ now = Date.now() } = {}) {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
     return { ...r, contactDay: contactDay(r), outOfCampaign: !inCampaign(r), milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
   });
-  const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }), stage: storyStage(st, { today }) }));
+  const followersOf = Object.fromEntries(referrers.map((r) => [r.id, r.ig?.exists ? r.ig.followers : null]));
+  const storyRows = stories.map((st) => ({
+    ...st, items: storyItems(st), milestone: storyMilestone(st, { today, paid }), stage: storyStage(st, { today }),
+    reach: reachPct(storyViews(st), followersOf[st.referrerId]),
+  }));
   const referrerRows = referrers.map((ref) => {
     const mine = recruitRows.filter((r) => r.referrerId === ref.id);
     const myStories = storyRows.filter((s) => s.referrerId === ref.id);
@@ -260,6 +264,8 @@ export async function saveReferrer({ id = null, input, actor }) {
   const rec = { ...(prev || { createdAt: Date.now(), createdBy: actor?.name || null }), ...v.value, updatedAt: Date.now() };
   // cambiando email si stacca l'account collegato: si ricollega al prossimo accesso con la nuova
   if (prev && prev.email !== v.value.email) rec.userId = null;
+  // cambiando profilo Instagram il controllo di prima non vale più
+  if (prev && prev.instagram !== v.value.instagram) rec.ig = null;
   await writeOne(K.referrers, rid, rec);
   await audit(actor, id ? "referrer.update" : "referrer.create", { id: rid, name: rec.name });
   return { ...rec, id: rid };
@@ -343,10 +349,146 @@ export async function saveStory({ id = null, input, actor }) {
   const prev = id ? await readOne(K.stories, id) : null;
   if (id && !prev) throw new Error("Storie non trovate");
   const sid = id || newId("st");
-  const rec = { ...(prev || { createdAt: Date.now(), createdBy: actor?.name || null }), ...v.value, updatedAt: Date.now() };
+  // per riga si tengono gli screen e la lettura dell'AI (si caricano a parte, non dal modulo)
+  const before = prev ? storyItems(prev) : [];
+  const items = v.value.items.map((it) => {
+    const p = before.find((x) => x.n === it.n) || {};
+    const viewsBy = it.views == null ? null : it.views === p.views ? (p.viewsBy || "hr") : "hr";
+    const verifiedChanged = it.verified !== (p.verified ?? null);
+    return {
+      ...p, ...it, viewsBy,
+      ...(verifiedChanged && it.verified != null ? { verifiedAt: Date.now(), verifiedBy: actor?.name || null } : {}),
+    };
+  });
+  const rec = withDerived({ ...(prev || { createdAt: Date.now(), createdBy: actor?.name || null }), ...v.value, items, updatedAt: Date.now() });
   await writeOne(K.stories, sid, rec);
   await audit(actor, id ? "story.update" : "story.create", { id: sid });
   return { ...rec, id: sid };
+}
+
+/** publishedAt (contate) e views (totali) ricalcolati dalle righe. */
+function withDerived(rec) {
+  return { ...rec, publishedAt: countedDates(rec), views: storyViews(rec) };
+}
+
+/** L'Area Partner conferma (o no) una storia caricata dal referente. */
+export async function verifyStoryItem({ id, n, ok, actor }) {
+  const prev = await readOne(K.stories, id);
+  if (!prev) throw new Error("Storie non trovate");
+  const items = storyItems(prev).map((it) => {
+    if (it.n !== Number(n)) return it;
+    if (ok && !it.publishedAt) throw new Error("Per confermarla serve la data di pubblicazione");
+    return { ...it, verified: Boolean(ok), verifiedAt: Date.now(), verifiedBy: actor?.name || null };
+  });
+  const rec = withDerived({ ...prev, items, updatedAt: Date.now() });
+  await writeOne(K.stories, id, rec);
+  await audit(actor, ok ? "story.verify" : "story.reject", { id, n: Number(n) });
+  return { ...rec, id };
+}
+
+// ── Screen delle storie (08/11/2026) ────────────────────────────────────────
+// Il browser riduce la foto (JPG, lato lungo 1600 px) e la manda in base64: qui si
+// controlla, si salva PRIVATA su Vercel Blob e si legge solo passando dall'app
+// (/api/referral/shot), mai con un link diretto. Lo screen dopo 24 ore lo legge l'AI
+// per proporre le visualizzazioni; l'Area Partner conferma o corregge.
+
+const SHOT_MAX_BYTES = 3 * 1024 * 1024;
+const SHOT_TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const SHOT_KINDS = ["pub", "views"];
+const blobSdk = async () => globalThis.__referralFakeBlob || (await import("@vercel/blob"));
+
+/**
+ * Salva uno screen su una storia. by: { type: "hr" | "referente", name }.
+ * Il referente carica solo dopo l'ok e non sostituisce una storia già confermata.
+ */
+export async function attachShot({ storyId, n, kind, data, contentType, by, referrerId = null }) {
+  if (!SHOT_KINDS.includes(kind)) throw new Error("Tipo di screen non valido");
+  const slot = Number(n);
+  if (!Number.isInteger(slot) || slot < 1 || slot > REFERRAL_RULES.storiesRequired) throw new Error("Storia non valida");
+  const ext = SHOT_TYPES[contentType];
+  if (!ext) throw new Error("Carica una foto (JPG, PNG o WebP)");
+  const bytes = Buffer.from(String(data || ""), "base64");
+  if (!bytes.length) throw new Error("Foto vuota");
+  if (bytes.length > SHOT_MAX_BYTES) throw new Error("Foto troppo grande (massimo 3 MB)");
+  if (!globalThis.__referralFakeBlob && !process.env.BLOB_READ_WRITE_TOKEN) throw new Error("Il caricamento delle foto non è attivo in questo ambiente");
+  const prev = await readOne(K.stories, storyId);
+  if (!prev) throw new Error("Storie non trovate");
+  if (referrerId && prev.referrerId !== referrerId) throw new Error("Storie non trovate");
+  if (by.type === "referente" && !prev.agreedAt) throw new Error("Prima serve l'ok dell'Area Partner sulle storie");
+  const item = storyItems(prev).find((i) => i.n === slot);
+  if (by.type === "referente" && kind === "pub" && item.verified === true) throw new Error("Questa storia è già confermata");
+  if (kind === "views" && !item.publishedAt && !item.pubShot) throw new Error("Prima carica lo screen della storia pubblicata");
+
+  const { put, del } = await blobSdk();
+  const path = `referral-shots/${randomBytes(16).toString("hex")}.${ext}`;
+  await put(path, bytes, { access: "private", contentType, addRandomSuffix: false });
+  const shot = { path, contentType, at: Date.now(), by: by.type, byName: by.name || null };
+  const today = todayRome();
+  let next = { ...item };
+  const old = next[kind === "pub" ? "pubShot" : "viewsShot"]?.path;
+  if (kind === "pub") {
+    next.pubShot = shot;
+    if (!next.publishedAt) next.publishedAt = today;
+    // l'HR è già la verifica; il referente va controllato
+    next.verified = by.type === "hr" ? true : null;
+  } else {
+    next.viewsShot = shot;
+    const ai = await readStoryInsights(bytes, contentType).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+    next.ai = { ...ai, at: Date.now() };
+    if (ai.ok && ai.views != null && next.viewsBy !== "hr") { next.views = ai.views; next.viewsBy = "ai"; }
+  }
+  const items = storyItems(prev).map((i) => (i.n === slot ? next : i));
+  const rec = withDerived({ ...prev, items, updatedAt: Date.now() });
+  await writeOne(K.stories, storyId, rec);
+  if (old) await del(old).catch(() => {});
+  await audit({ id: null, name: by.name || (by.type === "referente" ? "Referente" : "HR") }, `story.shot_${kind}`, { id: storyId, n: slot, by: by.type });
+  return { story: { ...rec, id: storyId }, item: next };
+}
+
+/** I byte di uno screen, per mostrarlo (la route controlla chi può vederlo). */
+export async function readShot({ storyId, n, kind }) {
+  const story = await readOne(K.stories, storyId);
+  if (!story) return null;
+  const it = storyItems(story).find((i) => i.n === Number(n));
+  const shot = it?.[kind === "pub" ? "pubShot" : "viewsShot"];
+  if (!shot?.path) return null;
+  const { get } = await blobSdk();
+  const r = await get(shot.path, { access: "private", useCache: false });
+  if (!r || r.statusCode !== 200 || !r.stream) return null;
+  const chunks = [];
+  const reader = r.stream.getReader();
+  for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(Buffer.from(value)); }
+  return { bytes: Buffer.concat(chunks), contentType: shot.contentType || "image/jpeg", referrerId: story.referrerId };
+}
+
+async function readStoryInsights(bytes, contentType) {
+  const { readStoryInsights: read } = await import("@/lib/referral-shot-ai");
+  return read(bytes, contentType);
+}
+
+// ── Profilo Instagram del referente (08/11/2026) ────────────────────────────
+// Si controlla che esista e si salvano i follower di quel giorno: servono a dire
+// quanta parte del suo pubblico ha visto le storie. apify~instagram-profile-scraper
+// (~0,3 centesimi a profilo, legge anche i privati: i profili personali spesso lo sono).
+
+export async function checkInstagram(referrerId, actor) {
+  const ref = await readOne(K.referrers, referrerId);
+  if (!ref) throw new Error("Referente non trovato");
+  const h = normIgHandle(ref.instagram);
+  if (!h) throw new Error("Scrivi prima il profilo Instagram e salva");
+  if (!process.env.APIFY_TOKEN) throw new Error("Il controllo dei profili Instagram non è attivo in questo ambiente");
+  const url = `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?timeout=90&maxTotalChargeUsd=0.03&token=${encodeURIComponent(process.env.APIFY_TOKEN)}`;
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ usernames: [h] }), cache: "no-store" });
+  const text = await r.text();
+  if (!r.ok) throw new Error(`Instagram non risponde ora (${r.status}): riprova tra poco`);
+  const rows = text ? JSON.parse(text) : [];
+  const row = (Array.isArray(rows) ? rows : []).find((x) => normIgHandle(x?.username) === h && !x?.error);
+  const ig = row
+    ? { handle: h, exists: true, followers: Number.isFinite(Number(row.followersCount)) ? Number(row.followersCount) : null, private: Boolean(row.private), fullName: row.fullName ? String(row.fullName).slice(0, 80) : null, checkedAt: Date.now() }
+    : { handle: h, exists: false, followers: null, private: null, fullName: null, checkedAt: Date.now() };
+  await writeOne(K.referrers, referrerId, { ...ref, ig });
+  await audit(actor, "referrer.instagram_check", { id: referrerId, handle: h, exists: ig.exists });
+  return ig;
 }
 
 export async function deleteStory(id, actor) {
@@ -405,6 +547,8 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
     .sort((a, b) => (b.totals.guadagnato + b.totals.in_corso) - (a.totals.guadagnato + a.totals.in_corso));
   const stories = state.stories.filter((s) => s.referrerId === referrer.id).map((s) => ({
     id: s.id, sentAt: s.sentAt || null, agreedAt: s.agreedAt, published: s.publishedAt.length, stage: s.stage, ...s.milestone,
+    // righe per il referente: niente percorsi dei file, solo cosa c'è e a che punto è
+    items: s.items.map((i) => ({ n: i.n, proposal: i.proposal, publishedAt: i.publishedAt, verified: i.verified, views: i.views, hasPub: Boolean(i.pubShot), hasViews: Boolean(i.viewsShot) })),
   }));
   const all = [...recruits.flatMap((r) => r.milestones), ...stories];
   const payslips = state.payslips.filter((b) => b.referrerId === referrer.id);

@@ -10,7 +10,10 @@ import {
   loadState, crmContext, listAudit,
   saveReferrer, deleteReferrer, saveRecruit, deleteRecruit, saveStory, deleteStory,
   markPaid, unmarkPaid, inviteReferrer, setFx, linkRecruitsToCrm,
+  verifyStoryItem, attachShot, checkInstagram,
 } from "@/lib/referral";
+
+export const maxDuration = 120; // controllo Instagram (Apify) e lettura AI dello screen
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +46,9 @@ const ACTIONS = {
   unmarkPaid: (b, actor) => unmarkPaid(String(b.key || ""), actor),
   setFx: (b, actor) => setFx(String(b.month || ""), b.rate, actor),
   linkCrm: (b, actor) => linkRecruitsToCrm(b.items || [], actor),
+  verifyStory: (b, actor) => verifyStoryItem({ id: b.id, n: b.n, ok: b.ok === true, actor }),
+  attachShot: (b, actor) => attachShot({ storyId: b.id, n: b.n, kind: b.kind, data: b.data, contentType: b.contentType, by: { type: "hr", name: actor.name } }),
+  checkInstagram: (b, actor) => checkInstagram(b.id, actor),
 };
 
 export async function POST(request) {

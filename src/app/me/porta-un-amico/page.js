@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { useState } from "react";
 import { CP } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, SectionTitle, Notice, Disclosure } from "@/components/ds";
-import { MissionRow, PayslipCard, Steps, RulesList, fmtEur, box, pageWrap } from "@/components/referral-ui";
+import { MissionRow, PayslipCard, Steps, RulesList, fmtEur, fmtDay, box, pageWrap, shrinkImage, ShotButton } from "@/components/referral-ui";
 import { missionProgress } from "@/lib/referral-core";
 import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
@@ -67,8 +67,49 @@ function RecruitCard({ r }) {
   );
 }
 
+/**
+ * Le storie del referente, una per riga (08/11/2026): carica lo screen quando la
+ * pubblica e quello dopo 24 ore con le visualizzazioni. Lo screen della storia conta
+ * per i 50 € quando l'Area Partner lo conferma; le visualizzazioni le legge l'AI.
+ */
+function StoryUploads({ story, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const upload = (n, kind) => async (file) => {
+    setBusy(`${n}${kind}`); setErr(null); setMsg(null);
+    try {
+      const img = await shrinkImage(file);
+      const r = await fetch("/api/me/referral", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attachShot", id: story.id, n, kind, ...img }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || "Caricamento non riuscito, riprova");
+      setMsg(kind === "pub" ? "Screen caricato: lo controlla l'Area Partner." : j.item?.views != null ? `Screen caricato: ${j.item.views.toLocaleString("it-IT")} visualizzazioni.` : "Screen caricato.");
+      onDone();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  return (
+    <div style={{ padding: "2px 0 10px 0" }}>
+      {(story.items || []).map((it) => {
+        const state = it.verified === true ? "confermata" : it.verified === false ? "lo screen non va bene: caricane un altro" : it.hasPub ? "da controllare dall'Area Partner" : "da pubblicare";
+        return (
+          <div key={it.n} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 0", fontSize: 13 }}>
+            <span style={{ minWidth: 70, color: CP.textPrimary }}>Storia {it.n}</span>
+            <span style={{ flex: "1 1 160px", color: it.verified === true ? CP.accentGreen : CP.textSecondary }}>
+              {state}{it.publishedAt ? ` · ${fmtDay(it.publishedAt)}` : ""}{it.views != null ? ` · ${it.views.toLocaleString("it-IT")} visualizzazioni` : ""}
+            </span>
+            {it.verified !== true && <ShotButton label={it.hasPub ? "Cambia screen" : "Carica lo screen"} busy={busy === `${it.n}pub`} onFile={upload(it.n, "pub")} />}
+            {(it.hasPub || it.publishedAt) && <ShotButton label={it.hasViews ? "Cambia screen 24 ore" : "Screen dopo 24 ore"} busy={busy === `${it.n}views`} onFile={upload(it.n, "views")} />}
+          </div>
+        );
+      })}
+      {msg && <div style={{ fontSize: 12, color: CP.textSecondary }}>{msg}</div>}
+      {err && <div style={{ fontSize: 12, color: CP.attn }}>{err}</div>}
+    </div>
+  );
+}
+
 export default function PortaUnCollegaPage() {
-  const { data, error, isLoading } = useSWR("/api/me/referral", fetcher, { revalidateOnFocus: false });
+  const { data, error, isLoading, mutate } = useSWR("/api/me/referral", fetcher, { revalidateOnFocus: false });
   const [rulesOpen, setRulesOpen] = useState(false);
   const [vetro, setVetro] = useVetro();
 
@@ -139,7 +180,12 @@ export default function PortaUnCollegaPage() {
           {data.stories.length > 0 && (
             <section className="vt-glass" style={{ ...box, padding: "14px 18px", marginBottom: 14 }}>
               <SectionTitle>Le tue storie Instagram</SectionTitle>
-              {data.stories.map((s) => <MissionRow key={s.id} m={s} progress={missionProgress(s)} />)}
+              {data.stories.map((s) => (
+                <div key={s.id}>
+                  <MissionRow m={s} progress={missionProgress(s)} />
+                  {s.agreedAt && <StoryUploads story={s} onDone={() => mutate()} />}
+                </div>
+              ))}
             </section>
           )}
 

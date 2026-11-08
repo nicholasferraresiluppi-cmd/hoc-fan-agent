@@ -177,3 +177,36 @@ export function MissionRow({ m, progress }) {
     </div>
   );
 }
+
+// ── Screen delle storie (08/11/2026) ───────────────────────────────────────
+// La foto si riduce nel browser (JPG, lato lungo 1600 px, ~200-400 KB) prima di
+// partire: passa nel limite delle funzioni, si carica anche da telefono con poca
+// rete e l'AI la legge a costo minimo. Gli screen di Instagram restano leggibili.
+
+/** File immagine → { data: base64, contentType } ridotto. */
+export async function shrinkImage(file, max = 1600) {
+  if (!file || !/^image\//.test(file.type || "")) throw new Error("Scegli una foto (lo screen dal telefono)");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error("Questa foto non si apre: prova a fare lo screen di nuovo")); i.src = url; });
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    const dataUrl = c.toDataURL("image/jpeg", 0.85);
+    return { data: dataUrl.slice(dataUrl.indexOf(",") + 1), contentType: "image/jpeg" };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+export const shotUrl = (storyId, n, kind, at) => `/api/referral/shot?id=${encodeURIComponent(storyId)}&n=${n}&kind=${kind}${at ? `&v=${at}` : ""}`;
+
+/** Pulsante «Carica lo screen»: sceglie la foto, la riduce e chiama onFile({ data, contentType }). */
+export function ShotButton({ label, onFile, disabled, busy }) {
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: `1px solid ${CP.border}`, background: CP.surface, color: disabled ? CP.textMuted : CP.textPrimary, fontSize: 13, fontWeight: 500, fontFamily: FONTS.body, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1 }}>
+      {busy ? "Carico…" : label}
+      <input type="file" accept="image/*" disabled={disabled || busy} style={{ display: "none" }}
+        onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) onFile(file); }} />
+    </label>
+  );
+}
