@@ -13,7 +13,7 @@ import { Donut, KpiCard } from "@/components/VetroCharts";
 import { Wallet, Hourglass, CircleCheck, Users, UserPlus, Repeat, Coins, Gift } from "lucide-react";
 import { MilestoneRow, Steps, RulesList, StatusPill, PayslipCard, fmtEur, fmtUsd, fmtDay, monthLabel, box, pageWrap, NUM, shrinkImage, shotUrl, ShotButton } from "@/components/referral-ui";
 import { payslipsCsv } from "@/lib/referral-core";
-import { confirmDialog, alertDialog } from "@/components/AppDialogs";
+import { confirmDialog } from "@/components/AppDialogs";
 
 /**
  * /admin/referral — «Porta un amico», lato HR (permesso referral.manage).
@@ -675,7 +675,7 @@ function Payslips({ data, onDone }) {
 
 // ── Pagina ──────────────────────────────────────────────────────────────────
 const TABS = [
-  ["overview", "Panoramica"], ["topay", "Da pagare"], ["slips", "Premi del mese"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["crm", "Dal CRM"], ["log", "Registro"],
+  ["overview", "Panoramica"], ["topay", "Da pagare"], ["slips", "Premi del mese"], ["recruits", "Persone portate"], ["referrers", "Referenti"], ["stories", "Storie"], ["fx", "Cambio"], ["log", "Registro"],
 ];
 
 export default function ReferralAdminPage() {
@@ -703,17 +703,6 @@ export default function ReferralAdminPage() {
   const pay = async (key) => {
     setBusyKey(key); setPayErr(null);
     try { await post({ action: "markPaid", key }); mutate(); } catch (e) { setPayErr(e.message); } finally { setBusyKey(null); }
-  };
-
-  const guessReferrer = (s) => data.referrers.find((r) => s.referredBy && r.name.toLowerCase().includes(s.referredBy.trim().toLowerCase()));
-  const addFromCrm = async (s) => {
-    let ref = guessReferrer(s);
-    // chi ha segnalato non è ancora referente: lo si crea con il nome scritto nel modulo
-    if (!ref && s.referredBy && (await confirmDialog(`«${s.referredBy}» non è ancora tra i referenti. Lo aggiungo?`))) {
-      try { const j = await post({ action: "saveReferrer", data: { name: s.referredBy } }); ref = j.result; await mutate(); }
-      catch (e) { alertDialog(e.message); return; }
-    }
-    setModal({ kind: "recruit", initial: { name: s.name, hrPersonId: s.hrPersonId, referrerId: ref?.id || "" } });
   };
 
   return (
@@ -757,7 +746,7 @@ export default function ReferralAdminPage() {
           <CrmArrivedNotice data={data} onDone={() => mutate()} />
 
           <Tabs value={tab} onChange={setTab}
-            items={TABS.map(([k, l]) => [k, l, k === "topay" ? data.toPay.length : k === "crm" ? data.suggestions.length : k === "fx" ? (data.fxMonths.filter((m) => data.fx[m] == null).length ? `${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : null) : null])} />
+            items={TABS.map(([k, l]) => [k, l, k === "topay" ? data.toPay.length : k === "fx" ? (data.fxMonths.filter((m) => data.fx[m] == null).length ? `${data.fxMonths.filter((m) => data.fx[m] == null).length} da inserire` : null) : null])} />
 
           {tab === "overview" && (
             <Overview vetro={vetro} d={data.dashboard} rules={data.rules} onOpenReferrer={(id) => { const r = data.referrers.find((x) => x.id === id); if (r) setModal({ kind: "referrer", initial: r }); }} />
@@ -816,7 +805,7 @@ export default function ReferralAdminPage() {
 
           {tab === "recruits" && (
             <DataTable
-              empty="Nessuna persona portata. Aggiungila con «Persona portata» o dal tab «Dal CRM»."
+              empty="Nessuna persona portata. Aggiungila con «Persona portata» quando qualcuno porta davvero una persona."
               rows={data.recruits}
               onRowClick={(r) => setModal({ kind: "recruit", initial: r })}
               defaultSort={{ key: "createdAt", dir: -1 }}
@@ -879,24 +868,6 @@ export default function ReferralAdminPage() {
           )}
 
           {tab === "fx" && <FxPanel key={JSON.stringify(data.fx) + data.fxMonths.join()} data={data} onDone={() => mutate()} />}
-
-          {tab === "crm" && (
-            <section className="vt-glass" style={{ ...box, padding: "14px 18px" }}>
-              <div style={{ fontSize: 13, color: CP.textSecondary, marginBottom: 8 }}>
-                Persone del CRM che nel modulo hanno scelto «Me l&apos;ha consigliato qualcuno» e non sono ancora nel programma. Chi le ha segnalate l&apos;hanno scritto loro: controlla prima di collegare.
-              </div>
-              {data.suggestions.length === 0 && <div style={{ fontSize: 14, color: CP.textMuted }}>Nessuna.</div>}
-              {data.suggestions.map((s) => (
-                <div key={s.hrPersonId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 12, color: CP.textMuted }}>Segnalata da: {s.referredBy || "non scritto"}{s.referredBy && (guessReferrer(s) ? " · già referente" : " · non ancora referente")}{s.phase && ` · ${s.phase}`}</div>
-                  </div>
-                  <button type="button" style={btn} onClick={() => addFromCrm(s)}><Plus size={14} /> Aggiungi</button>
-                </div>
-              ))}
-            </section>
-          )}
 
           {tab === "log" && (
             <section className="vt-glass" style={{ ...box, padding: "10px 18px" }}>

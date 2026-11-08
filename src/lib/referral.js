@@ -222,20 +222,17 @@ export async function getInbox({ now = Date.now() } = {}) {
 
 /**
  * Il CRM visto da «Porta un amico» (HR):
- *  - suggestions: chi nel modulo ha scelto «Me l'ha consigliato qualcuno» e non è ancora nel programma;
+ *  (08/11/2026, Nicholas: tolta la proposta «Dal CRM» di chi nel modulo ha scritto «Me l'ha consigliato
+ *  qualcuno». Le persone portate le aggiunge solo l'Area Partner, a mano, quando qualcuno le ha portate
+ *  davvero: una dichiarazione nel modulo non deve sembrare un premio dovuto. Il campo resta nel CRM.)
  *  - people: le schede tra cui scegliere quella della persona portata (nome, fase, se è collegata a Infloww);
  *  - matches: per le persone portate senza scheda, la scheda con lo stesso nome se è UNA sola.
  */
 export async function crmContext(recruits) {
   try {
-    const [{ listPeople }, { SOURCE_REFERRAL, fullName }, { matchName }] = await Promise.all([import("@/lib/hr-people"), import("@/lib/hr-people-core"), import("@/lib/squadra-core")]);
+    const [{ listPeople }, { fullName }, { matchName }] = await Promise.all([import("@/lib/hr-people"), import("@/lib/hr-people-core"), import("@/lib/squadra-core")]);
     const [list, opLinks] = await Promise.all([listPeople(), getOperatorLinks()]);
     const taken = new Set(recruits.map((r) => r.hrPersonId).filter(Boolean));
-    const takenNames = new Set(recruits.map((r) => normName(r.name)));
-    const suggestions = list
-      .filter((p) => p?.fields?.source === SOURCE_REFERRAL && !taken.has(p.id) && !takenNames.has(normName(fullName(p.fields))))
-      .map((p) => ({ hrPersonId: p.id, name: fullName(p.fields), referredBy: p.fields.referredBy || null, phase: p.fields.collaborationStatus || null, createdAt: p.createdAt || null }))
-      .slice(0, 100);
     const people = list
       .map((p) => ({ id: p.id, name: p.name || fullName(p.fields), phase: p.fields?.collaborationStatus || null, operator: opLinks[p.id]?.inflowwName || null }))
       .filter((p) => p.name)
@@ -248,9 +245,9 @@ export async function crmContext(recruits) {
       const same = hit ? free.filter((p) => p.name === hit) : [];
       if (same.length === 1) matches[r.id] = { id: same[0].id, name: same[0].name, phase: same[0].phase };
     }
-    return { suggestions, people, matches };
+    return { people, matches };
   } catch {
-    return { suggestions: [], people: [], matches: {} };
+    return { people: [], matches: {} };
   }
 }
 

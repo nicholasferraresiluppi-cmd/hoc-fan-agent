@@ -29,7 +29,7 @@ export async function GET() {
   try {
     const state = await loadState();
     const [crm, auditLog] = await Promise.all([crmContext(state.recruits), listAudit(40)]);
-    return Response.json({ ...state, suggestions: crm.suggestions, crmPeople: crm.people, crmMatches: crm.matches, audit: auditLog });
+    return Response.json({ ...state, crmPeople: crm.people, crmMatches: crm.matches, audit: auditLog });
   } catch (e) {
     return Response.json({ error: String(e?.message || e) }, { status: 500 });
   }
