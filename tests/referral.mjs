@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
-  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason,
+  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason, storyStage,
 } from "../src/lib/referral-core.js";
 
 let n = 0;
@@ -461,6 +461,43 @@ ok(R.version === "ref-4");
   ok(recruitMetrics(r, {}).decided, "conta tra le persone «decise»");
   const open = { ...r, interviewPassed: null };
   eq(recruitSteps(open, recruitMilestones(open, { today: "2026-11-20" }), { today: "2026-11-20" }).next, "training", "senza esito: data del colloquio = fatto, prossima la formazione");
+}
+
+// ── storie: i passaggi dell'Area Partner (08/11/2026) ──
+{
+  const vs = (x) => validateStory({ referrerId: "rf_1", ...x });
+  ok(vs({}).error, "serve almeno l'invio delle proposte o l'ok");
+  eq(vs({ sentAt: "2026-11-04" }).value, { referrerId: "rf_1", sentAt: "2026-11-04", agreedAt: null, chosen: null, publishedAt: [], views: null, note: null }, "solo proposte inviate");
+  eq(vs({ sentAt: "2026-11-04", chosen: " 2 e 4 " }).value.chosen, "2 e 4");
+  ok(vs({ sentAt: "2026-11-06", agreedAt: "2026-11-05" }).error, "ok prima dell'invio");
+  ok(vs({ sentAt: "2026-11-04", publishedAt: ["2026-11-05"] }).error, "pubblicata senza ok");
+  ok(vs({ agreedAt: "2026-11-05", views: "800" }).error, "visualizzazioni senza pubblicazione");
+  eq(vs({ agreedAt: "2026-11-05", publishedAt: ["2026-11-05"], views: "1.234" }).value.views, 1234, "punto delle migliaia");
+  ok(vs({ agreedAt: "2026-11-05", publishedAt: ["2026-11-05"], views: "tante" }).error, "visualizzazioni non numeriche");
+  eq(vs({ agreedAt: "2026-11-04" }).value.sentAt, null, "le storie già concordate restano valide senza invio (dati di prima)");
+
+  const sent = { id: "s20", referrerId: "rf_1", sentAt: "2026-11-04", publishedAt: [] };
+  const m0 = storyMilestone(sent, { today: "2026-11-08" });
+  eq([m0.status, m0.dueBy, m0.why], ["in_attesa", null, "Proposte inviate: storie da scegliere"], "prima dell'ok: nessun conto alla rovescia");
+  eq(storyMilestone({ ...sent, chosen: "1 e 2" }, { today: "2026-11-08" }).why, "Storie scelte: in attesa dell'ok dell'Area Partner");
+  eq(storyMilestone(sent, { today: "2026-12-01" }).status, "perso", "ok mai arrivato entro la fine della prova");
+  eq(missionProgress(m0), null, "niente barra 0/2 prima dell'ok: si legge il passaggio");
+
+  const st = (x) => storyStage({ ...sent, ...x }, { today: "2026-11-08" }).key;
+  eq([st({}), st({ chosen: "1" }), st({ agreedAt: "2026-11-05" }), st({ agreedAt: "2026-11-05", publishedAt: ["2026-11-06"] })], ["inviate", "scelte", "concordate", "concordate"]);
+  eq(storyStage({ ...sent, agreedAt: "2026-11-05", publishedAt: ["2026-11-07", "2026-11-07"] }, { today: "2026-11-08" }).label, "Visualizzazioni attese il 08/11/2026");
+  const late = storyStage({ ...sent, agreedAt: "2026-11-05", publishedAt: ["2026-11-05", "2026-11-05"] }, { today: "2026-11-08" });
+  eq([late.key, late.late], ["visualizzazioni", true], "visualizzazioni non arrivate dopo 24 ore");
+  eq(st({ agreedAt: "2026-11-05", publishedAt: ["2026-11-05", "2026-11-05"], views: 900 }), "complete");
+  // le visualizzazioni non condizionano il premio
+  eq(storyMilestone({ ...sent, agreedAt: "2026-11-05", publishedAt: ["2026-11-05", "2026-11-05"] }, { today: "2026-11-08" }).status, "maturato");
+
+  const rows = [
+    { ...sent, id: "a", milestone: storyMilestone(sent, { today: "2026-11-08" }) },
+    { ...sent, id: "b", referrerId: "rf_2", agreedAt: "2026-11-05", publishedAt: ["2026-11-05", "2026-11-05"], views: 1200 },
+  ].map((x) => ({ ...x, milestone: storyMilestone(x, { today: "2026-11-08" }) }));
+  const d = buildDashboard({ referrers: [{ id: "rf_1", name: "A" }, { id: "rf_2", name: "B" }], recruits: [], stories: rows, today: "2026-11-08" });
+  eq([d.storyStats.proposed, d.storyStats.pending, d.storyStats.agreed, d.storyStats.published, d.storyStats.open, d.storyStats.views], [2, 1, 1, 1, 0, 1200], "statistiche: le proposte non concordate non sono «aperte»");
 }
 
 console.log(`referral: ${n} verifiche ok`);

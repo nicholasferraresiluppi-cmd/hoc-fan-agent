@@ -155,7 +155,7 @@ function RecruitModal({ initial, data, onClose, onDone }) {
         <Field label="Arrivata da una storia?">
           <select style={inp} value={f.storyId} onChange={set("storyId")} disabled={!stories.length}>
             <option value="">{stories.length ? "No / non so" : "Nessuna storia di questo referente"}</option>
-            {stories.map((s) => <option key={s.id} value={s.id}>Storie del {fmtDay(s.agreedAt)}</option>)}
+            {stories.map((s) => <option key={s.id} value={s.id}>Storie {s.agreedAt ? `concordate il ${fmtDay(s.agreedAt)}` : `proposte il ${fmtDay(s.sentAt)}`}</option>)}
           </select>
         </Field>
         <Field label="Scheda nel CRM" hint="Da qui arrivano chi è su Infloww e CreatorsPro, turni, venduto e uscita.">
@@ -257,29 +257,39 @@ function CrmArrivedNotice({ data, onDone }) {
 // ── Storie ──────────────────────────────────────────────────────────────────
 function StoryModal({ initial, data, onClose, onDone }) {
   const pub = initial?.publishedAt || [];
-  const [f, setF] = useState({ referrerId: initial?.referrerId || "", agreedAt: initial?.agreedAt || new Date().toISOString().slice(0, 10), p1: pub[0] || "", p2: pub[1] || "", note: initial?.note || "" });
+  const today = new Date().toISOString().slice(0, 10);
+  const [f, setF] = useState({
+    referrerId: initial?.referrerId || "", sentAt: initial?.sentAt || (initial?.id ? "" : today), chosen: initial?.chosen || "",
+    agreedAt: initial?.agreedAt || "", p1: pub[0] || "", p2: pub[1] || "", views: initial?.views != null ? String(initial.views) : "", note: initial?.note || "",
+  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const run = async (fn) => { setBusy(true); setErr(null); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const r = data.rules;
+  const published = [f.p1, f.p2].filter(Boolean).length;
   return (
     <Modal open onClose={onClose} title={initial?.id ? "Storie Instagram" : "Nuove storie Instagram"}>
-      <div style={{ fontSize: 13, color: CP.textSecondary }}>{fmtEur(r.storyEur)} quando le {r.storiesRequired} storie sono pubblicate entro {r.storyWindowDays} giorni dall&apos;accordo.</div>
+      <div style={{ fontSize: 13, color: CP.textSecondary }}>{fmtEur(r.storyEur)} quando le {r.storiesRequired} storie sono pubblicate entro {r.storyWindowDays} giorni dall&apos;ok. Si segna un passaggio alla volta: il conto dei giorni parte dall&apos;ok.</div>
       <Field label="Chi le pubblica">
         <select style={inp} value={f.referrerId} onChange={set("referrerId")}>
           <option value="">Scegli…</option>
           {data.referrers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
       </Field>
-      <Field label="Accordo con l'HR"><input style={inp} type="date" value={f.agreedAt} onChange={set("agreedAt")} /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="1ª storia pubblicata il"><input style={inp} type="date" value={f.p1} onChange={set("p1")} /></Field>
-        <Field label="2ª storia pubblicata il"><input style={inp} type="date" value={f.p2} onChange={set("p2")} /></Field>
+        <Field label="1 · Proposte inviate il"><input style={inp} type="date" value={f.sentAt} onChange={set("sentAt")} /></Field>
+        <Field label="2 · Storie scelte" hint="quali, es. «1 e 2»"><input style={inp} value={f.chosen} onChange={set("chosen")} placeholder="—" /></Field>
       </div>
+      <Field label="3 · Ok dato il" hint="da qui partono i 30 giorni"><input style={inp} type="date" value={f.agreedAt} onChange={set("agreedAt")} /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="4 · 1ª storia pubblicata il"><input style={inp} type="date" value={f.p1} onChange={set("p1")} disabled={!f.agreedAt} /></Field>
+        <Field label="2ª storia pubblicata il"><input style={inp} type="date" value={f.p2} onChange={set("p2")} disabled={!f.agreedAt} /></Field>
+      </div>
+      <Field label="5 · Visualizzazioni dopo 24 ore" hint="il totale delle storie, dallo screenshot"><input style={inp} inputMode="numeric" value={f.views} onChange={set("views")} disabled={!published} placeholder="—" /></Field>
       <Field label="Note"><textarea style={{ ...inp, minHeight: 50 }} value={f.note} onChange={set("note")} /></Field>
       <Actions busy={busy} error={err}
-        onSave={() => run(async () => { await post({ action: "saveStory", id: initial?.id, data: { referrerId: f.referrerId, agreedAt: f.agreedAt, publishedAt: [f.p1, f.p2], note: f.note } }); onDone(true); })}
+        onSave={() => run(async () => { await post({ action: "saveStory", id: initial?.id, data: { referrerId: f.referrerId, sentAt: f.sentAt, chosen: f.chosen, agreedAt: f.agreedAt, publishedAt: [f.p1, f.p2], views: f.views, note: f.note } }); onDone(true); })}
         onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare queste storie?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteStory", id: initial.id }); onDone(true); }); } : null} />
     </Modal>
   );
@@ -335,7 +345,7 @@ function Overview({ d, rules, onOpenReferrer, vetro }) {
   const maxTrend = Math.max(1, ...d.trend.map((x) => x.referred));
   const firstTurns = d.funnel.find((f) => f.key === "first_shift").n;
   const at25 = d.funnel.find((f) => f.key === "s25").n;
-  if (top === 0 && d.storyStats.agreed === 0) {
+  if (top === 0 && d.storyStats.proposed === 0) {
     return <Notice>Il programma non ha ancora dati. Quando l&apos;HR registra le prime persone portate e le prime storie, qui si vede dove sta andando: chi porta persone che restano, quanto rendono le storie, quanto costa rispetto a quello che porta.</Notice>;
   }
   return (
@@ -398,6 +408,8 @@ function Overview({ d, rules, onOpenReferrer, vetro }) {
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
             <Metric label="Pubblicate" value={`${d.storyStats.published} su ${d.storyStats.agreed}`} note={d.storyStats.publishers === 1 ? "da 1 persona" : `da ${d.storyStats.publishers} persone diverse`} />
             <Metric label="Scadute" value={String(d.storyStats.expired)} note={`${d.storyStats.open} ancora aperte`} />
+            <Metric label="In attesa dell'ok" value={String(d.storyStats.pending)} note="proposte inviate" />
+            <Metric label="Visualizzazioni" value={d.storyStats.views != null ? d.storyStats.views.toLocaleString("it-IT") : "—"} note={d.storyStats.viewsReported ? `dopo 24 ore, da ${d.storyStats.viewsReported} ${d.storyStats.viewsReported === 1 ? "persona" : "persone"}` : "nessuna ancora segnata"} />
             <Metric label="Persone arrivate da una storia" value={String(d.storyStats.recruitsFromStories)} note={d.storyStats.recruitsPerStory != null ? `${String(d.storyStats.recruitsPerStory).replace(".", ",")} per storia pubblicata` : null} />
           </div>
           {vetro && d.storyStats.agreed > 0 && (
@@ -713,12 +725,16 @@ export default function ReferralAdminPage() {
               empty="Nessuna storia registrata."
               rows={data.stories}
               onRowClick={(s) => setModal({ kind: "story", initial: s })}
-              defaultSort={{ key: "agreedAt", dir: -1 }}
+              defaultSort={{ key: "stage", dir: 1 }}
               columns={[
                 { key: "ref", label: "Referente", render: (s) => refName[s.referrerId] || "—", sort: (s) => refName[s.referrerId] || "" },
-                { key: "agreedAt", label: "Accordo", render: (s) => fmtDay(s.agreedAt) },
+                { key: "stage", label: "A che punto", render: (s) => <span style={{ color: s.stage?.late ? CP.attn : CP.textPrimary }}>{s.stage?.label || "—"}</span>, sort: (s) => s.stage?.step ?? 0 },
+                { key: "sentAt", label: "Inviate", render: (s) => fmtDay(s.sentAt) || "—", sort: (s) => s.sentAt || "" },
+                { key: "chosen", label: "Scelte", render: (s) => s.chosen || "—" },
+                { key: "agreedAt", label: "Ok", render: (s) => fmtDay(s.agreedAt) || "—", sort: (s) => s.agreedAt || "" },
                 { key: "pub", label: "Pubblicate", render: (s) => `${s.publishedAt.length} su ${data.rules.storiesRequired}`, sort: (s) => s.publishedAt.length },
-                { key: "due", label: "Entro il", render: (s) => fmtDay(s.milestone.dueBy), sort: (s) => s.milestone.dueBy },
+                { key: "views", label: "Visualizzazioni", align: "right", render: (s) => (s.views != null ? s.views.toLocaleString("it-IT") : "—"), sort: (s) => s.views ?? -1 },
+                { key: "due", label: "Entro il", render: (s) => fmtDay(s.milestone.dueBy) || "—", sort: (s) => s.milestone.dueBy || "" },
                 { key: "status", label: "Premio", align: "right", render: (s) => <StatusPill status={s.milestone.status} />, sort: (s) => s.milestone.status },
               ]}
             />
