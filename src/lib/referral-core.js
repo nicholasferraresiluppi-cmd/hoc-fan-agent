@@ -217,20 +217,62 @@ export function validateRecruit(input = {}) {
   return { value: out };
 }
 
+// Storie: i passaggi che segue l'Area Partner (08/11/2026, dal suo tracciamento su
+// ClickUp): proposte inviate → storie scelte → ok → pubblicate (screen) →
+// visualizzazioni dopo 24 ore. Una scheda storie può nascere già alle proposte
+// inviate, prima dell'accordo: il premio e i 30 giorni partono solo dall'ok.
+// Le visualizzazioni si registrano ma NON condizionano il premio (regole ref-4).
 export function validateStory(input = {}) {
   if (!s(input.referrerId)) return { error: "Scegli chi pubblica le storie" };
-  const agreed = s(input.agreedAt);
-  if (!isIsoDate(agreed)) return { error: "Data di accordo non valida" };
+  const out = { referrerId: s(input.referrerId) };
+  for (const [k, label] of [["sentAt", "Proposte inviate"], ["agreedAt", "Ok"]]) {
+    const r = optDate(input[k], label);
+    if (r.error) return r;
+    out[k] = r.value;
+  }
+  if (!out.sentAt && !out.agreedAt) return { error: "Serve almeno il giorno in cui sono state inviate le proposte o quello dell'ok" };
+  if (out.sentAt && out.agreedAt && out.agreedAt < out.sentAt) return { error: "L'ok non può essere prima dell'invio delle proposte" };
+  out.chosen = s(input.chosen).slice(0, 80) || null;
   const pub = [];
   for (const d of Array.isArray(input.publishedAt) ? input.publishedAt : []) {
     const x = s(d);
     if (!x) continue;
     if (!isIsoDate(x)) return { error: "Data di pubblicazione non valida" };
-    if (x < agreed) return { error: "Una storia non può essere pubblicata prima dell'accordo" };
+    if (!out.agreedAt) return { error: "Prima della pubblicazione serve l'ok" };
+    if (x < out.agreedAt) return { error: "Una storia non può essere pubblicata prima dell'ok" };
     pub.push(x);
   }
   pub.sort();
-  return { value: { referrerId: s(input.referrerId), agreedAt: agreed, publishedAt: pub.slice(0, 5), note: s(input.note).slice(0, 1000) || null } };
+  out.publishedAt = pub.slice(0, 5);
+  const rawViews = s(input.views).replace(/[.\s]/g, "");
+  if (rawViews) {
+    const v = Number(rawViews);
+    if (!Number.isInteger(v) || v < 0 || v > 100000000) return { error: "Visualizzazioni: un numero intero" };
+    if (!out.publishedAt.length) return { error: "Le visualizzazioni si segnano dopo la pubblicazione" };
+    out.views = v;
+  } else out.views = null;
+  out.note = s(input.note).slice(0, 1000) || null;
+  return { value: out };
+}
+
+/**
+ * A che punto sono le storie (i passaggi dell'Area Partner), per la tabella e
+ * il «cosa manca». Le visualizzazioni si chiedono 24 ore dopo l'ultima storia.
+ */
+export function storyStage(story, { today, rules = REFERRAL_RULES } = {}) {
+  const pub = story?.publishedAt || [];
+  if (!story?.agreedAt) {
+    if (story?.chosen) return { key: "scelte", label: "Scelte, manca l'ok", step: 2 };
+    return { key: "inviate", label: "Proposte inviate, da scegliere", step: 1 };
+  }
+  if (pub.length < rules.storiesRequired) return { key: "concordate", label: pub.length ? `${pub.length} su ${rules.storiesRequired} pubblicate` : "Ok dato, da pubblicare", step: 3 };
+  if (story.views == null) {
+    const due = addDays(pub[pub.length - 1], 1);
+    return today && today > due
+      ? { key: "visualizzazioni", label: "Visualizzazioni non arrivate", step: 4, late: true, viewsDue: due }
+      : { key: "visualizzazioni", label: `Visualizzazioni attese il ${itDay(due)}`, step: 4, viewsDue: due };
+  }
+  return { key: "complete", label: "Complete", step: 5 };
 }
 
 /**
@@ -313,6 +355,12 @@ const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 /** Premio storie (€50 quando sono pubblicate 2 storie entro 30 giorni dall'accordo). */
 export function storyMilestone(story, { today, paid = {}, rules = REFERRAL_RULES } = {}) {
   const key = `story:${story.id}`;
+  if (!story.agreedAt) {
+    // proposte inviate, ok non ancora dato: il premio e i 30 giorni non sono partiti
+    const base0 = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy: null, published: 0, amountEur: rules.storyEur };
+    if (rules.campaignUntil && today > rules.campaignUntil) return { ...base0, status: "perso", outOfCampaign: true, why: `Ok non arrivato entro il ${itDay(rules.campaignUntil)}` };
+    return { ...base0, status: "in_attesa", why: story.chosen ? "Storie scelte: in attesa dell'ok dell'Area Partner" : "Proposte inviate: storie da scegliere" };
+  }
   const dueBy = addDays(story.agreedAt, rules.storyWindowDays);
   const inTime = (story.publishedAt || []).filter((d) => d <= dueBy);
   const base = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy, published: (story.publishedAt || []).length, amountEur: rules.storyEur };
@@ -571,11 +619,17 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
   // storie
   const storyOk = stories.filter((s) => s.milestone.status === "maturato" || s.milestone.status === "pagato");
   const fromStory = recruits.filter((r) => r.storyId);
+  const agreedList = stories.filter((s) => s.agreedAt);
+  const withViews = storyOk.filter((s) => s.views != null);
   const storyStats = {
-    agreed: stories.length,
+    proposed: stories.length,
+    pending: stories.length - agreedList.length, // proposte inviate, ok non ancora dato
+    agreed: agreedList.length,
     published: storyOk.length,
-    expired: stories.filter((s) => s.milestone.status === "perso").length,
-    open: stories.filter((s) => s.milestone.status === "in_attesa").length,
+    expired: agreedList.filter((s) => s.milestone.status === "perso").length,
+    open: agreedList.filter((s) => s.milestone.status === "in_attesa").length,
+    views: withViews.length ? withViews.reduce((a, s) => a + s.views, 0) : null,
+    viewsReported: withViews.length,
     publishers: new Set(storyOk.map((s) => s.referrerId)).size,
     recruitsFromStories: fromStory.length,
     recruitsPerStory: storyOk.length ? Math.round((fromStory.length / storyOk.length) * 100) / 100 : null,
@@ -583,10 +637,10 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
     byReferrer: [...new Set(stories.map((s) => s.referrerId))].map((id) => ({
       referrerId: id,
       name: referrers.find((x) => x.id === id)?.name || "—",
-      agreed: stories.filter((s) => s.referrerId === id).length,
+      agreed: agreedList.filter((s) => s.referrerId === id).length,
       published: storyOk.filter((s) => s.referrerId === id).length,
       recruits: fromStory.filter((r) => r.referrerId === id).length,
-    })).sort((a, b) => b.published - a.published || b.recruits - a.recruits),
+    })).filter((x) => x.agreed > 0).sort((a, b) => b.published - a.published || b.recruits - a.recruits),
   };
   // con storia vs senza: arrivano a 25 turni?
   const tenure = (list) => {
@@ -659,7 +713,8 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
 export function missionProgress(m, recruit = {}) {
   if (m.kind === "shifts") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shifts), target: m.shifts, unit: "turni" };
   if (m.kind === "commission") return m.shiftsDone == null ? null : { done: Math.min(m.shiftsDone, m.shiftsTo), target: m.shiftsTo, unit: "turni" };
-  if (m.kind === "story") return { done: Math.min(m.published || 0, REFERRAL_RULES.storiesRequired), target: REFERRAL_RULES.storiesRequired, unit: "storie" };
+  // storie non ancora concordate: niente barra, si legge il passaggio (why)
+  if (m.kind === "story") return m.dueBy == null ? null : { done: Math.min(m.published || 0, REFERRAL_RULES.storiesRequired), target: REFERRAL_RULES.storiesRequired, unit: "storie" };
   if (m.kind === "first_shift") {
     const d = [recruit.interviewPassed === true || (recruit.interviewAt && recruit.interviewPassed !== false), recruit.trainingPassed === true, recruit.firstShiftAt && recruit.trainingPassed === true].filter(Boolean).length;
     return { done: d, target: 3, unit: "tappe" };

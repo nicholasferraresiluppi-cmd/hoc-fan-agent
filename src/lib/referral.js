@@ -6,7 +6,7 @@
  * documento unico che due persone si sovrascrivono):
  *   referral:referrers  HASH id → referente {name, email, phone, note, userId?}
  *   referral:recruits   HASH id → persona portata {referrerId, name, date degli step…}
- *   referral:stories    HASH id → storie Instagram {referrerId, agreedAt, publishedAt[]}
+ *   referral:stories    HASH id → storie Instagram {referrerId, sentAt?, chosen?, agreedAt?, publishedAt[], views?}
  *   referral:paid       HASH chiave voce → pagamento congelato {amountEur, amountUsd, paidAt, by}
  *   referral:sales:{YYYY-MM}  venduto Infloww del mese per nome {builtAt, map} (piccolo)
  *   referral:shifts:{YYYY-MM} date dei turni iniziati per nome, da CreatorsPro {builtAt, map}
@@ -21,7 +21,7 @@ import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
-  recruitMilestones, storyMilestone, recruitSteps, summarize, referrerView, withCrm, withFirstShift, firstShiftSearchFrom,
+  recruitMilestones, storyMilestone, storyStage, recruitSteps, summarize, referrerView, withCrm, withFirstShift, firstShiftSearchFrom,
   salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
 import { getMonthSales } from "@/lib/infloww-month-sales";
@@ -184,7 +184,7 @@ export async function loadState({ now = Date.now() } = {}) {
     const milestones = recruitMilestones(r, { today, salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id], fx, paid });
     return { ...r, contactDay: contactDay(r), outOfCampaign: !inCampaign(r), milestones, steps: recruitSteps(r, milestones, { today }), totals: summarize(milestones), metrics: recruitMetrics(r, { salesByMonth: sales[r.id] || {}, shiftDates: shifts[r.id] }) };
   });
-  const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }) }));
+  const storyRows = stories.map((st) => ({ ...st, milestone: storyMilestone(st, { today, paid }), stage: storyStage(st, { today }) }));
   const referrerRows = referrers.map((ref) => {
     const mine = recruitRows.filter((r) => r.referrerId === ref.id);
     const myStories = storyRows.filter((s) => s.referrerId === ref.id);
@@ -407,7 +407,7 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
     .map((r) => referrerView(r, r.milestones, r.steps))
     .sort((a, b) => (b.totals.guadagnato + b.totals.in_corso) - (a.totals.guadagnato + a.totals.in_corso));
   const stories = state.stories.filter((s) => s.referrerId === referrer.id).map((s) => ({
-    id: s.id, agreedAt: s.agreedAt, published: s.publishedAt.length, ...s.milestone,
+    id: s.id, sentAt: s.sentAt || null, agreedAt: s.agreedAt, published: s.publishedAt.length, stage: s.stage, ...s.milestone,
   }));
   const all = [...recruits.flatMap((r) => r.milestones), ...stories];
   const payslips = state.payslips.filter((b) => b.referrerId === referrer.id);
