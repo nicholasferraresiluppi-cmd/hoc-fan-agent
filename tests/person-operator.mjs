@@ -1,6 +1,6 @@
 // Unit test — person-operator-core (collegamento scheda CRM → operatore). Esegui: node tests/person-operator.mjs
 import assert from "node:assert/strict";
-import { operatorCandidates, findCandidate, validateOperatorLink, suggestOperator, cpMembersFor, suggestionKind, bulkSuggestions } from "../src/lib/person-operator-core.js";
+import { operatorCandidates, findCandidate, validateOperatorLink, suggestOperator, cpMembersFor, suggestionKind, expectsCpShifts, bulkSuggestions } from "../src/lib/person-operator-core.js";
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -54,5 +54,15 @@ eq(suggestionKind("Pierriccardo Lampasona", "Pierricardo Lampasona"), "simile", 
   const rows = bulkSuggestions(people, c, { p3: { inflowwName: "Luca Neri" } });
   eq(rows.map((r) => [r.personId, r.suggestion.name, r.kind]), [["p2", "Sara Rossi", "esatto"]], "doppione: il nome va alla prima scheda, mai a due; p3 già collegata; p4 senza suggerimento");
 }
+
+// ── CreatorsPro: l'avviso «nessun membro» solo per chi fa turni di vendita ──
+eq(expectsCpShifts(["Chatter"]), true, "chatter: i turni si leggono da CP");
+eq(expectsCpShifts(["Social Media Manager", "Sales Manager"]), true, "più mansioni, una vende");
+eq(expectsCpShifts(["chatter"]), true, "maiuscole non contano");
+eq(expectsCpShifts(["Social Media Manager"]), false, "SMM: non è nell'elenco venditori di CP");
+eq(expectsCpShifts(["PO"]), false, "PO");
+eq(expectsCpShifts(["Board"]), false, "voce fuori elenco (da ClickUp)");
+eq(expectsCpShifts([]), true, "mansione vuota: non sappiamo, l'avviso resta");
+eq(expectsCpShifts(undefined), true, "campo assente");
 
 console.log(`person-operator: ${n} verifiche ok`);
