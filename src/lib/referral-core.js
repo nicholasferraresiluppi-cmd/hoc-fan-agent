@@ -168,7 +168,10 @@ export function validateReferrer(input = {}) {
   const rawEmail = s(input.email);
   const email = rawEmail ? normEmail(rawEmail) : null;
   if (rawEmail && !email) return { error: "Email non valida" };
-  return { value: { name, email, phone: s(input.phone).slice(0, 40) || null, note: s(input.note).slice(0, 1000) || null } };
+  const rawIg = s(input.instagram);
+  const instagram = rawIg ? normIgHandle(rawIg) : null;
+  if (rawIg && !instagram) return { error: "Profilo Instagram non valido: scrivi il nome (es. giulia.bianchi) o incolla il link" };
+  return { value: { name, email, phone: s(input.phone).slice(0, 40) || null, instagram, note: s(input.note).slice(0, 1000) || null } };
 }
 
 const optDate = (v, label) => {
@@ -222,6 +225,66 @@ export function validateRecruit(input = {}) {
 // visualizzazioni dopo 24 ore. Una scheda storie può nascere già alle proposte
 // inviate, prima dell'accordo: il premio e i 30 giorni partono solo dall'ok.
 // Le visualizzazioni si registrano ma NON condizionano il premio (regole ref-4).
+//
+// Storie riga per riga (08/11/2026, Nicholas): l'accordo resta uno (2 storie entro 30
+// giorni dall'ok), ma ogni storia ha la sua riga — quale proposta, quando è uscita, lo
+// screen della pubblicazione, lo screen dopo 24 ore e le visualizzazioni. Lo screen può
+// caricarlo il referente dalla sua pagina: entra «da controllare» (verified null) e conta
+// per il premio solo dopo l'ok dell'Area Partner (verified true). Quello che scrive l'HR
+// è già verificato. Le schede di prima (publishedAt[] + views) si leggono come righe.
+
+const emptyItem = (n) => ({ n, proposal: null, publishedAt: null, verified: null, views: null, viewsBy: null, pubShot: null, viewsShot: null, ai: null });
+const intOrNull = (v) => {
+  const raw = s(v).replace(/[.\s]/g, "");
+  if (!raw) return { value: null };
+  const x = Number(raw);
+  return Number.isInteger(x) && x >= 0 && x <= 100000000 ? { value: x } : { error: "Visualizzazioni: un numero intero" };
+};
+
+/** Le righe delle storie (una per storia richiesta), anche dalle schede di prima. */
+export function storyItems(story, rules = REFERRAL_RULES) {
+  const k = rules.storiesRequired;
+  if (Array.isArray(story?.items) && story.items.length) {
+    return Array.from({ length: k }, (_, i) => ({ ...emptyItem(i + 1), ...(story.items.find((x) => x?.n === i + 1) || {}) }));
+  }
+  const pub = [...(story?.publishedAt || [])].sort();
+  const legacyViews = story?.views ?? null;
+  return Array.from({ length: k }, (_, i) => ({
+    ...emptyItem(i + 1),
+    publishedAt: pub[i] || null,
+    verified: pub[i] ? true : null,
+    views: i === 0 ? legacyViews : null,
+    viewsBy: i === 0 && legacyViews != null ? "hr" : null,
+  }));
+}
+
+/** Le date delle storie che contano per il premio: pubblicate E verificate. */
+export function countedDates(story, rules = REFERRAL_RULES) {
+  return storyItems(story, rules).filter((i) => i.publishedAt && i.verified === true).map((i) => i.publishedAt).sort();
+}
+/** Storie caricate dal referente e non ancora controllate dall'Area Partner. */
+export function pendingItems(story, rules = REFERRAL_RULES) {
+  return storyItems(story, rules).filter((i) => i.verified === null && (i.publishedAt || i.pubShot));
+}
+/** Visualizzazioni totali delle storie che le hanno (null se nessuna). */
+export function storyViews(story, rules = REFERRAL_RULES) {
+  const v = storyItems(story, rules).filter((i) => i.views != null);
+  return v.length ? v.reduce((a, i) => a + i.views, 0) : null;
+}
+/** Quanta parte dei follower ha visto le storie, in % (una cifra decimale). */
+export function reachPct(views, followers) {
+  return views != null && followers > 0 ? Math.round((views / followers) * 1000) / 10 : null;
+}
+
+/** Profilo Instagram scritto a mano o incollato come link → handle, o null. */
+export function normIgHandle(v) {
+  let h = s(v).toLowerCase();
+  if (!h) return null;
+  if (/\s/.test(h)) return null; // uno spazio = refuso, non si indovina
+  h = h.replace(/^(https?:\/\/)?(www\.)?instagram\.com\//, "").replace(/^@/, "").split(/[/?#]/)[0];
+  return /^[a-z0-9._]{1,30}$/.test(h) && !/^\.|\.$|\.\./.test(h) ? h : null;
+}
+
 export function validateStory(input = {}) {
   if (!s(input.referrerId)) return { error: "Scegli chi pubblica le storie" };
   const out = { referrerId: s(input.referrerId) };
@@ -233,41 +296,63 @@ export function validateStory(input = {}) {
   if (!out.sentAt && !out.agreedAt) return { error: "Serve almeno il giorno in cui sono state inviate le proposte o quello dell'ok" };
   if (out.sentAt && out.agreedAt && out.agreedAt < out.sentAt) return { error: "L'ok non può essere prima dell'invio delle proposte" };
   out.chosen = s(input.chosen).slice(0, 80) || null;
-  const pub = [];
-  for (const d of Array.isArray(input.publishedAt) ? input.publishedAt : []) {
-    const x = s(d);
-    if (!x) continue;
-    if (!isIsoDate(x)) return { error: "Data di pubblicazione non valida" };
-    if (!out.agreedAt) return { error: "Prima della pubblicazione serve l'ok" };
-    if (x < out.agreedAt) return { error: "Una storia non può essere pubblicata prima dell'ok" };
-    pub.push(x);
+  let items;
+  if (Array.isArray(input.items)) {
+    items = [];
+    for (let n = 1; n <= REFERRAL_RULES.storiesRequired; n++) {
+      const it = input.items.find((x) => Number(x?.n) === n) || {};
+      const d = optDate(it.publishedAt, `Storia ${n}, pubblicata il`);
+      if (d.error) return d;
+      const v = intOrNull(it.views);
+      if (v.error) return { error: `Storia ${n}: ${v.error.toLowerCase()}` };
+      if (d.value && !out.agreedAt) return { error: "Prima della pubblicazione serve l'ok" };
+      if (d.value && d.value < out.agreedAt) return { error: "Una storia non può essere pubblicata prima dell'ok" };
+      if (v.value != null && !d.value) return { error: "Le visualizzazioni si segnano dopo la pubblicazione" };
+      const tri = it.verified === true || it.verified === "true" ? true : it.verified === false || it.verified === "false" ? false : null;
+      if (tri === true && !d.value) return { error: `Storia ${n}: per confermarla serve la data di pubblicazione` };
+      items.push({ n, proposal: s(it.proposal).slice(0, 40) || null, publishedAt: d.value, views: v.value, verified: tri });
+    }
+  } else {
+    // forma di prima: publishedAt[] (+ views totali) scritti dall'HR = già verificati
+    const pub = [];
+    for (const d of Array.isArray(input.publishedAt) ? input.publishedAt : []) {
+      const x = s(d);
+      if (!x) continue;
+      if (!isIsoDate(x)) return { error: "Data di pubblicazione non valida" };
+      if (!out.agreedAt) return { error: "Prima della pubblicazione serve l'ok" };
+      if (x < out.agreedAt) return { error: "Una storia non può essere pubblicata prima dell'ok" };
+      pub.push(x);
+    }
+    const v = intOrNull(input.views);
+    if (v.error) return v;
+    if (v.value != null && !pub.length) return { error: "Le visualizzazioni si segnano dopo la pubblicazione" };
+    items = storyItems({ publishedAt: pub.slice(0, 5), views: v.value }).map(({ n, proposal, publishedAt, views, verified }) => ({ n, proposal, publishedAt, views, verified }));
   }
-  pub.sort();
-  out.publishedAt = pub.slice(0, 5);
-  const rawViews = s(input.views).replace(/[.\s]/g, "");
-  if (rawViews) {
-    const v = Number(rawViews);
-    if (!Number.isInteger(v) || v < 0 || v > 100000000) return { error: "Visualizzazioni: un numero intero" };
-    if (!out.publishedAt.length) return { error: "Le visualizzazioni si segnano dopo la pubblicazione" };
-    out.views = v;
-  } else out.views = null;
+  out.items = items;
+  out.publishedAt = countedDates({ items });
+  out.views = storyViews({ items });
   out.note = s(input.note).slice(0, 1000) || null;
   return { value: out };
 }
 
 /**
  * A che punto sono le storie (i passaggi dell'Area Partner), per la tabella e
- * il «cosa manca». Le visualizzazioni si chiedono 24 ore dopo l'ultima storia.
+ * il «cosa manca». Le visualizzazioni si chiedono 24 ore dopo la storia.
  */
 export function storyStage(story, { today, rules = REFERRAL_RULES } = {}) {
-  const pub = story?.publishedAt || [];
   if (!story?.agreedAt) {
     if (story?.chosen) return { key: "scelte", label: "Scelte, manca l'ok", step: 2 };
     return { key: "inviate", label: "Proposte inviate, da scegliere", step: 1 };
   }
-  if (pub.length < rules.storiesRequired) return { key: "concordate", label: pub.length ? `${pub.length} su ${rules.storiesRequired} pubblicate` : "Ok dato, da pubblicare", step: 3 };
-  if (story.views == null) {
-    const due = addDays(pub[pub.length - 1], 1);
+  const items = storyItems(story, rules);
+  const pending = pendingItems(story, rules);
+  if (pending.length) return { key: "da_verificare", label: pending.length === 1 ? "Uno screen da controllare" : `${pending.length} screen da controllare`, step: 3, late: true };
+  const counted = items.filter((i) => i.publishedAt && i.verified === true);
+  if (counted.length < rules.storiesRequired) return { key: "concordate", label: counted.length ? `${counted.length} su ${rules.storiesRequired} pubblicate` : "Ok dato, da pubblicare", step: 3 };
+  // schede di prima: un totale unico di visualizzazioni vale per tutte le storie
+  const noViews = !Array.isArray(story.items) && story.views != null ? [] : counted.filter((i) => i.views == null);
+  if (noViews.length) {
+    const due = addDays(noViews.map((i) => i.publishedAt).sort().pop(), 1);
     return today && today > due
       ? { key: "visualizzazioni", label: "Visualizzazioni non arrivate", step: 4, late: true, viewsDue: due }
       : { key: "visualizzazioni", label: `Visualizzazioni attese il ${itDay(due)}`, step: 4, viewsDue: due };
@@ -378,13 +463,15 @@ export function storyMilestone(story, { today, paid = {}, rules = REFERRAL_RULES
     return { ...base0, status: "in_attesa", why: story.chosen ? "Storie scelte: in attesa dell'ok dell'Area Partner" : "Proposte inviate: storie da scegliere" };
   }
   const dueBy = addDays(story.agreedAt, rules.storyWindowDays);
-  const inTime = (story.publishedAt || []).filter((d) => d <= dueBy);
-  const base = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy, published: (story.publishedAt || []).length, amountEur: rules.storyEur };
+  const counted = countedDates(story, rules);
+  const inTime = counted.filter((d) => d <= dueBy);
+  const toCheck = pendingItems(story, rules).length;
+  const base = { key, kind: "story", label: `${rules.storiesRequired} storie Instagram`, storyId: story.id, dueBy, published: counted.length, toCheck, amountEur: rules.storyEur };
   if (paid[key]) return { ...base, status: "pagato", amountEur: paid[key].amountEur, paidAt: paid[key].paidAt };
   if (rules.campaignUntil && story.agreedAt > rules.campaignUntil) return { ...base, status: "perso", outOfCampaign: true, why: `Fuori dalla prova: storie concordate dopo il ${itDay(rules.campaignUntil)}` };
   if (inTime.length >= rules.storiesRequired) return { ...base, status: "maturato", unlockedAt: inTime[rules.storiesRequired - 1] };
-  if (today > dueBy) return { ...base, status: "perso", why: `Servivano ${rules.storiesRequired} storie entro il ${dueBy}` };
-  return { ...base, status: "in_attesa", why: `${inTime.length}/${rules.storiesRequired} storie, entro il ${dueBy}` };
+  if (today > dueBy) return { ...base, status: "perso", why: `Servivano ${rules.storiesRequired} storie entro il ${itDay(dueBy)}` };
+  return { ...base, status: "in_attesa", why: `${inTime.length}/${rules.storiesRequired} storie, entro il ${itDay(dueBy)}${toCheck ? ` · ${toCheck === 1 ? "uno screen" : `${toCheck} screen`} da controllare` : ""}` };
 }
 
 /**
@@ -646,6 +733,8 @@ export function buildDashboard({ referrers = [], recruits = [], stories = [], fx
     open: agreedList.filter((s) => s.milestone.status === "in_attesa").length,
     views: withViews.length ? withViews.reduce((a, s) => a + s.views, 0) : null,
     viewsReported: withViews.length,
+    // quanta parte dei follower vede le storie, in media (solo chi ha il profilo controllato)
+    reachAvg: (() => { const r = stories.map((x) => x.reach).filter((x) => x != null); return r.length ? Math.round((r.reduce((a, b) => a + b, 0) / r.length) * 10) / 10 : null; })(),
     publishers: new Set(storyOk.map((s) => s.referrerId)).size,
     recruitsFromStories: fromStory.length,
     recruitsPerStory: storyOk.length ? Math.round((fromStory.length / storyOk.length) * 100) / 100 : null,

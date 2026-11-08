@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
-  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason, storyStage, otherCrmEmails,
+  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason, storyStage, otherCrmEmails, storyItems, countedDates, pendingItems, storyViews, reachPct, normIgHandle,
 } from "../src/lib/referral-core.js";
 
 let n = 0;
@@ -467,7 +467,7 @@ ok(R.version === "ref-4");
 {
   const vs = (x) => validateStory({ referrerId: "rf_1", ...x });
   ok(vs({}).error, "serve almeno l'invio delle proposte o l'ok");
-  eq(vs({ sentAt: "2026-11-04" }).value, { referrerId: "rf_1", sentAt: "2026-11-04", agreedAt: null, chosen: null, publishedAt: [], views: null, note: null }, "solo proposte inviate");
+  { const v = vs({ sentAt: "2026-11-04" }).value; eq([v.sentAt, v.agreedAt, v.chosen, v.publishedAt, v.views, v.items.length, v.items[0].publishedAt], ["2026-11-04", null, null, [], null, 2, null], "solo proposte inviate"); }
   eq(vs({ sentAt: "2026-11-04", chosen: " 2 e 4 " }).value.chosen, "2 e 4");
   ok(vs({ sentAt: "2026-11-06", agreedAt: "2026-11-05" }).error, "ok prima dell'invio");
   ok(vs({ sentAt: "2026-11-04", publishedAt: ["2026-11-05"] }).error, "pubblicata senza ok");
@@ -507,6 +507,42 @@ ok(R.version === "ref-4");
   eq(otherCrmEmails(people, "Marco Rossi", "x@y.it"), [], "due schede con lo stesso nome: non si indovina");
   eq(otherCrmEmails(people, "Luca Neri", "l@y.it"), [], "nessuna scheda");
   eq(otherCrmEmails([{ name: "Sara", emails: [null, "non-email"] }], "Sara", ""), [], "email vuote o non valide ignorate");
+}
+
+// ── storie riga per riga, screen dal referente, profilo Instagram (08/11/2026) ──
+{
+  const base = { id: "s30", referrerId: "rf_1", sentAt: "2026-11-04", agreedAt: "2026-11-05" };
+  // schede di prima: publishedAt[] = righe già verificate
+  const legacy = storyItems({ ...base, publishedAt: ["2026-11-06", "2026-11-05"], views: 900 });
+  eq(legacy.map((i) => [i.n, i.publishedAt, i.verified, i.views]), [[1, "2026-11-05", true, 900], [2, "2026-11-06", true, null]], "le schede di prima si leggono come righe");
+  // una caricata dal referente (da controllare) non conta finché l'Area Partner non conferma
+  const mixed = { ...base, items: [{ n: 1, publishedAt: "2026-11-05", verified: true }, { n: 2, publishedAt: "2026-11-06", verified: null, pubShot: { path: "x" } }] };
+  eq(countedDates(mixed), ["2026-11-05"], "conta solo la verificata");
+  eq(pendingItems(mixed).map((i) => i.n), [2]);
+  const m = storyMilestone(mixed, { today: "2026-11-08" });
+  eq([m.status, m.published, m.toCheck], ["in_attesa", 1, 1]);
+  ok(m.why.includes("uno screen da controllare"), "il motivo dice cosa manca");
+  eq(storyStage(mixed, { today: "2026-11-08" }).key, "da_verificare", "prima di tutto gli screen da controllare");
+  const ok2 = { ...mixed, items: [mixed.items[0], { ...mixed.items[1], verified: true }] };
+  eq(storyMilestone(ok2, { today: "2026-11-08" }).status, "maturato", "confermata la seconda: maturato");
+  eq(storyMilestone({ ...mixed, items: [mixed.items[0], { ...mixed.items[1], verified: false }] }, { today: "2026-11-08" }).status, "in_attesa", "screen rifiutato: non conta");
+  // visualizzazioni per storia
+  eq(storyViews({ items: [{ n: 1, views: 800 }, { n: 2, views: 450 }] }), 1250);
+  eq(storyViews({ items: [{ n: 1 }, { n: 2 }] }), null);
+  eq(storyStage({ ...ok2, items: [{ ...ok2.items[0], views: 800 }, ok2.items[1]] }, { today: "2026-11-06" }).label, "Visualizzazioni attese il 07/11/2026", "manca la seconda");
+  eq(reachPct(1250, 2500), 50); eq(reachPct(33, 1000), 3.3); eq(reachPct(null, 1000), null); eq(reachPct(100, 0), null);
+  // validazione riga per riga
+  const vi = (items) => validateStory({ referrerId: "rf_1", sentAt: "2026-11-04", agreedAt: "2026-11-05", items });
+  const v1 = vi([{ n: 1, proposal: " 2 ", publishedAt: "2026-11-06", views: "1.240", verified: true }, { n: 2 }]).value;
+  eq([v1.items[0].proposal, v1.items[0].views, v1.items[0].verified, v1.items[1].publishedAt, v1.publishedAt, v1.views], ["2", 1240, true, null, ["2026-11-06"], 1240]);
+  ok(vi([{ n: 1, publishedAt: "2026-11-01" }]).error, "storia prima dell'ok");
+  ok(vi([{ n: 1, views: "100" }]).error, "visualizzazioni senza pubblicazione");
+  ok(vi([{ n: 1, verified: true }]).error, "confermata senza data");
+  ok(validateStory({ referrerId: "rf_1", sentAt: "2026-11-04", items: [{ n: 1, publishedAt: "2026-11-06" }] }).error, "pubblicata senza ok");
+  // profilo Instagram
+  eq([normIgHandle("@Giulia.Bianchi"), normIgHandle("https://www.instagram.com/giulia_b/?hl=it"), normIgHandle("instagram.com/x"), normIgHandle("giu lia"), normIgHandle(".giulia"), normIgHandle("")], ["giulia.bianchi", "giulia_b", "x", null, null, null]);
+  eq(validateReferrer({ name: "Giulia", instagram: "@Giulia.B" }).value.instagram, "giulia.b");
+  ok(validateReferrer({ name: "Giulia", instagram: "https://example.com" }).error, "profilo non valido");
 }
 
 console.log(`referral: ${n} verifiche ok`);
