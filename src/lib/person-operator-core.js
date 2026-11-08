@@ -95,6 +95,20 @@ export function cpMembersFor(inflowwName, mapping = {}, members = {}) {
 }
 
 /**
+ * Mansioni che fanno turni di vendita su CreatorsPro (08/11/2026). Da CP si legge
+ * solo l'elenco di chi ha un compenso da venditore (`/v1/sellers-wage/members`):
+ * chi ha un account CP con un'altra mansione (Social Media Manager, Publisher, PO…)
+ * lì non compare, e «nessun membro abbinato» sulla sua scheda sarebbe un falso
+ * allarme. Mansione vuota = non sappiamo: l'avviso resta.
+ */
+export const SELLING_MANSIONI = ["Chatter", "Sales Manager"];
+export function expectsCpShifts(mansioni) {
+  const list = (Array.isArray(mansioni) ? mansioni : [mansioni]).map((m) => s(m)).filter(Boolean);
+  if (!list.length) return true;
+  return list.some((m) => SELLING_MANSIONI.some((x) => x.toLowerCase() === m.toLowerCase()));
+}
+
+/**
  * Quanto è sicuro un suggerimento: "esatto" se nome e cognome sono gli stessi
  * (anche in un altro ordine, a meno di maiuscole e accenti), altrimenti "simile"
  * (refuso, secondo nome, cognome in più) — da guardare prima di collegare.

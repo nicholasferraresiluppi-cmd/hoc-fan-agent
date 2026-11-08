@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { CP } from "@/lib/brand";
 import { card } from "@/components/ds";
 import { lbl, input, btnPrimary, btnGhost, fetcher, postJson } from "@/components/hr-ui";
+import { expectsCpShifts } from "@/lib/person-operator-core";
 
 export function OperatorCard({ person, locked = false }) {
   const url = `/api/admin/hr/people/${person.id}/operator`;
@@ -52,6 +53,7 @@ export function OperatorCard({ person, locked = false }) {
               <span style={{ flex: 1, minWidth: 0 }}>
                 {cp?.mapped?.length ? <span>{cp.mapped.join(", ")}</span>
                   : cp?.sameName?.length ? <span>{cp.sameName.join(", ")} <span style={{ color: CP.textMuted, fontSize: 12.5 }}>· stesso nome, non abbinato a mano</span></span>
+                  : !expectsCpShifts(person.fields?.mansioni) ? <span style={{ color: CP.textMuted }}>nessun turno di vendita da leggere per questa mansione</span>
                   : <span style={{ color: CP.attn }}>nessun membro abbinato: i turni non si leggono. Lo abbina un admin in <Link href="/admin/creatorspro-sync" style={{ color: CP.accentSoftText }}>Sync CreatorsPro</Link>.</span>}
               </span>
             </div>
