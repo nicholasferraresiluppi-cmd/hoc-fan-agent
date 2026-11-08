@@ -54,12 +54,13 @@ function Field({ label, children, hint }) {
   );
 }
 
-function Actions({ busy, error, onSave, onDelete, saveLabel = "Salva" }) {
+function Actions({ busy, error, onSave, onDelete, saveLabel = "Salva", extra = null, saveStyle = null }) {
   return (
     <>
       {error && <div style={{ color: CP.accentRed, fontSize: 13, marginTop: 12 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-        <button type="button" style={btnPrimary} disabled={busy} onClick={onSave}>{busy ? "Salvo…" : saveLabel}</button>
+        {extra}
+        <button type="button" style={saveStyle || btnPrimary} disabled={busy} onClick={onSave}>{busy ? "Salvo…" : saveLabel}</button>
         {onDelete && <button type="button" style={{ ...btnQuiet, marginLeft: "auto" }} disabled={busy} onClick={onDelete}>Elimina</button>}
       </div>
     </>
@@ -68,37 +69,66 @@ function Actions({ busy, error, onSave, onDelete, saveLabel = "Salva" }) {
 
 // ── Referente ───────────────────────────────────────────────────────────────
 function ReferrerModal({ initial, onClose, onDone }) {
+  // rec = il referente salvato (null finché è nuovo): «Salva e invita» lo crea e resta aperto sull'accesso
+  const [rec, setRec] = useState(initial || null);
   const [f, setF] = useState({ name: initial?.name || "", email: initial?.email || "", phone: initial?.phone || "", note: initial?.note || "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [inviteMsg, setInviteMsg] = useState(null);
+  const [other, setOther] = useState(null); // altra email della persona con cui ha già un account
   const run = async (fn) => { setBusy(true); setErr(null); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  const save = async (data = f) => { const j = await post({ action: "saveReferrer", id: rec?.id, data }); setRec(j.result); return j.result; };
+  const invite = async (id, force = false) => {
+    const j = await post({ action: "invite", id, force });
+    if (j.otherAccount) { setOther(j.otherAccount); setInviteMsg(null); onDone(false); return; }
+    setOther(null);
+    setInviteMsg(j.exists ? "Ha già un account HOC Pro: entrando con questa email vede la pagina, nessun invito serve." : j.url ? `Invito mandato. Link da girare se la mail non arriva: ${j.url}` : "Invito mandato.");
+    if (!j.exists) setRec((r) => ({ ...r, invitedAt: Date.now() }));
+    onDone(false);
+  };
+  const useOther = () => run(async () => {
+    const data = { ...f, email: other };
+    setF(data); await save(data); setOther(null);
+    setInviteMsg(`Fatto: entrando in HOC Pro con ${other} vede la sua pagina. Nessun invito serve.`);
+    onDone(false);
+  });
   return (
-    <Modal open onClose={onClose} title={initial?.id ? initial.name : "Nuovo referente"}>
+    <Modal open onClose={onClose} title={rec?.id ? rec.name : "Nuovo referente"}>
       <Field label="Nome e cognome"><input style={inp} value={f.name} onChange={set("name")} autoFocus /></Field>
-      <Field label="Email" hint="Con questa email, entrando in HOC Pro, vede solo i suoi guadagni."><input style={inp} type="email" value={f.email} onChange={set("email")} /></Field>
+      <Field label="Email" hint="Quella con cui entra in HOC Pro: con questa vede solo i suoi guadagni. Se non ha ancora un account, l'invito arriva qui."><input style={inp} type="email" value={f.email} onChange={set("email")} /></Field>
       <Field label="Telefono"><input style={inp} value={f.phone} onChange={set("phone")} /></Field>
       <Field label="Note (le vede solo l'HR)"><textarea style={{ ...inp, minHeight: 60 }} value={f.note} onChange={set("note")} /></Field>
-      {initial?.id && (
+      {rec?.id && (
         <div className="vt-glass" style={{ ...box, padding: 12, marginTop: 14, fontSize: 13, color: CP.textSecondary }}>
-          {initial.userId ? "Account collegato: vede la sua pagina." : initial.invitedAt ? "Invito mandato, non ancora entrato." : "Non ha ancora accesso."}
-          {!initial.userId && (
+          {rec.userId ? "Account collegato: vede la sua pagina." : rec.invitedAt ? "Invito mandato, non ancora entrato." : "Non ha ancora accesso."}
+          {!rec.userId && !other && (
             <div style={{ marginTop: 8 }}>
-              <button type="button" style={btn} disabled={busy || !initial.email} onClick={() => run(async () => {
-                const j = await post({ action: "invite", id: initial.id });
-                setInviteMsg(j.exists ? "Ha già un account HOC Pro: entrando con questa email vede la pagina, nessun invito serve." : j.url ? `Invito mandato. Link da girare se la mail non arriva: ${j.url}` : "Invito mandato.");
-                onDone(false);
-              })}><Send size={14} /> Invita in HOC Pro</button>
+              <button type="button" style={btn} disabled={busy || !rec.email} onClick={() => run(() => invite(rec.id))}><Send size={14} /> {rec.invitedAt ? "Manda di nuovo l'invito" : "Invita in HOC Pro"}</button>
               <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Con il solo ruolo Referente: vede soltanto «Porta un amico».</div>
-              {inviteMsg && <div style={{ marginTop: 8, color: CP.textPrimary, wordBreak: "break-all" }}>{inviteMsg}</div>}
             </div>
           )}
+          {other && (
+            <div style={{ marginTop: 8, color: CP.textPrimary, lineHeight: 1.5 }}>
+              Nel CRM questa persona ha già un account HOC Pro con <b style={{ fontWeight: 500 }}>{other}</b>. Con l&apos;email scritta qui la sua pagina non la troverebbe, e l&apos;invito le creerebbe un secondo account.
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <button type="button" style={btnPrimary} disabled={busy} onClick={useOther}>Usa {other}</button>
+                <button type="button" style={btn} disabled={busy} onClick={() => run(() => invite(rec.id, true))}>Invita comunque</button>
+              </div>
+            </div>
+          )}
+          {inviteMsg && <div style={{ marginTop: 8, color: CP.textPrimary, wordBreak: "break-all" }}>{inviteMsg}</div>}
         </div>
       )}
       <Actions busy={busy} error={err}
-        onSave={() => run(async () => { await post({ action: "saveReferrer", id: initial?.id, data: f }); onDone(true); })}
-        onDelete={initial?.id ? async () => { if (await confirmDialog({ title: "Eliminare il referente?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteReferrer", id: initial.id }); onDone(true); }); } : null} />
+        saveLabel={rec?.id ? "Salva" : "Salva senza invitare"}
+        saveStyle={rec?.id ? null : btn}
+        onSave={() => run(async () => { await save(); onDone(true); })}
+        extra={!rec?.id ? (
+          <button type="button" style={{ ...btnPrimary, opacity: f.email.trim() ? 1 : 0.45, cursor: f.email.trim() ? "pointer" : "not-allowed" }} disabled={busy || !f.email.trim()} title={f.email.trim() ? "" : "Serve l'email per l'invito"}
+            onClick={() => run(async () => { const r = await save(); onDone(false); await invite(r.id); })}><Send size={14} /> Salva e invita</button>
+        ) : null}
+        onDelete={rec?.id ? async () => { if (await confirmDialog({ title: "Eliminare il referente?", ok: "Elimina", danger: true })) run(async () => { await post({ action: "deleteReferrer", id: rec.id }); onDone(true); }); } : null} />
     </Modal>
   );
 }

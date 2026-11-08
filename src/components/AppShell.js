@@ -106,8 +106,13 @@ export default function AppShell({ children }) {
   const pathname = usePathname() || "";
   const router = useRouter();
   // Ruolo ristretto: la stessa risposta di /api/whoami che usano già menu e banner (SWR la condivide)
-  const { data: me } = useSWR(isAuthRoute(pathname) || isBareRoute(pathname) ? null : "/api/whoami", whoFetcher, { revalidateOnFocus: false });
+  const { data: me, error: meError } = useSWR(isAuthRoute(pathname) || isBareRoute(pathname) ? null : "/api/whoami", whoFetcher, { revalidateOnFocus: false });
   const restriction = me?.restricted || null;
+  // Finché non si sa chi è (08/11/2026): niente menu. Prima, a pagina ricaricata, per una frazione di
+  // secondo si vedeva il menu completo anche da un account ristretto (es. Referente), poi spariva. I dati
+  // erano già difesi dalle API, ma il lampo dava l'idea del contrario. Con whoami in errore il menu si mostra
+  // (il comportamento di prima): meglio un menu che una pagina senza navigazione.
+  const meLoading = me === undefined && !meError; // il fetcher dà null se whoami fallisce: allora non si aspetta
   const allowedHere = pathAllowed(restriction, pathname);
   useEffect(() => {
     if (restriction && !allowedHere) router.replace(restriction.home);
@@ -180,7 +185,7 @@ export default function AppShell({ children }) {
       {/* Desktop: sidebar fissa — wrapped in silent ErrorBoundary */}
       <div className="hoc-desk">
         <ErrorBoundary silent label="Sidebar">
-          {v3 ? <SidebarCasa /> : <Sidebar />}
+          {meLoading ? null : v3 ? <SidebarCasa /> : <Sidebar />}
         </ErrorBoundary>
       </div>
 
@@ -207,7 +212,7 @@ export default function AppShell({ children }) {
 
           {v3 && <ErrorBoundary silent label="V3MobileHeader"><V3MobileHeader onSearch={openCmd} onMenu={() => setMobileOpen(true)} /></ErrorBoundary>}
 
-          {mobileOpen && (
+          {mobileOpen && !meLoading && (
             <>
               <div
                 onClick={() => setMobileOpen(false)}

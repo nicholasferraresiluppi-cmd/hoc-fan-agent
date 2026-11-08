@@ -20,7 +20,7 @@
 import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
-  REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit,
+  REFERRAL_RULES, inCampaign, contactDay, validateReferrer, validateRecruit, validateStory, findDuplicateRecruit, otherCrmEmails,
   recruitMilestones, storyMilestone, storyStage, recruitSteps, summarize, referrerView, withCrm, withFirstShift, firstShiftSearchFrom,
   salesFor, monthsSince, normEmail, normName, shiftDatesFromWages, parseFx, addMonths, recruitMetrics, buildDashboard, buildPayslips, hrInbox,
 } from "@/lib/referral-core";
@@ -414,11 +414,21 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
   return { rules: state.rules, today: state.today, name: referrer.name, recruits, stories, totals: summarize(all), payslips };
 }
 
-/** Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-amico). */
-export async function inviteReferrer(referrerId, actor, origin) {
+/**
+ * Invito in HOC Pro col solo ruolo «Referente» (vede solo /me/porta-un-amico).
+ * Prima di invitare (08/11/2026): se con l'email scritta non c'è un account ma la
+ * scheda CRM della persona ha un'altra email che un account ce l'ha, non si invita
+ * e si restituisce `otherAccount`: l'HR sceglie se usare quella (nessun invito
+ * serve) o invitare comunque (`force`). Evita il secondo account della stessa persona.
+ */
+export async function inviteReferrer(referrerId, actor, origin, { force = false } = {}) {
   const ref = await readOne(K.referrers, referrerId);
   if (!ref) throw new Error("Referente non trovato");
   if (!ref.email) throw new Error("Serve l'email del referente per invitarlo");
+  if (!force) {
+    const other = await otherAccountEmail(ref).catch(() => null);
+    if (other) return { ok: false, otherAccount: other };
+  }
   const { createInvitation } = await import("@/lib/invitations");
   try {
     const inv = await createInvitation({ email: ref.email, roles: ["referente"], inviterId: actor.id, inviterName: actor.name, origin });
@@ -430,4 +440,22 @@ export async function inviteReferrer(referrerId, actor, origin) {
     if (e.code === "exists") return { ok: true, exists: true };
     throw e;
   }
+}
+
+/** L'altra email (dal CRM) con cui la persona ha già un account, se con quella del referente non ne ha. */
+async function otherAccountEmail(ref) {
+  const [{ clerkClient }, { listPeople }, { fullName }] = await Promise.all([
+    import("@clerk/nextjs/server"), import("@/lib/hr-people"), import("@/lib/hr-people-core"),
+  ]);
+  const cc = await clerkClient();
+  const hasAccount = async (email) => {
+    const r = await cc.users.getUserList({ emailAddress: [email] });
+    return (Array.isArray(r) ? r : r?.data || []).length > 0;
+  };
+  if (await hasAccount(ref.email)) return null; // ha già l'account con questa: va bene così
+  const people = (await listPeople()).map((p) => ({ name: fullName(p.fields), emails: [p.fields?.companyEmail, p.fields?.personalEmail] }));
+  for (const e of otherCrmEmails(people, ref.name, ref.email)) {
+    if (await hasAccount(e)) return e;
+  }
+  return null;
 }

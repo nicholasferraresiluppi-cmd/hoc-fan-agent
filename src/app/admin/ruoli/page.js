@@ -525,7 +525,7 @@ function WorkspacePicker({ value, fallback, onChange, disabled }) {
       <button type="button" disabled={disabled} aria-pressed={!value} style={chip(!value)} onClick={() => onChange("")}
         title="La vista che il ruolo dà di partenza">{!value ? "✓ " : ""}Dal ruolo{fallback ? ` (${WORKSPACES[fallback].label})` : " (menu personale)"}</button>
       {WORKSPACE_IDS.map((id) => (
-        <button type="button" key={id} disabled={disabled} aria-pressed={value === id} style={chip(value === id)} onClick={() => onChange(id)} title={WORKSPACES[id].hint}>
+        <button type="button" key={id} disabled={disabled} aria-pressed={value === id} style={chip(value === id)} onClick={() => onChange(value === id ? "" : id)} title={value === id ? "Clic di nuovo per tornare alla vista del ruolo" : WORKSPACES[id].hint}>
           {value === id ? "✓ " : ""}{WORKSPACES[id].label}
         </button>
       ))}
