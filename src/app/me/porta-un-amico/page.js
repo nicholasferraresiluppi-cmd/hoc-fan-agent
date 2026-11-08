@@ -8,6 +8,7 @@ import { MissionRow, PayslipCard, Steps, RulesList, fmtEur, box, pageWrap } from
 import { missionProgress } from "@/lib/referral-core";
 import VetroScope, { useVetro, VetroSwitch, VetroNum } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 import { Wallet, Hourglass, CircleCheck, UserPlus } from "lucide-react";
 
 /**
@@ -77,7 +78,7 @@ export default function PortaUnCollegaPage() {
       <PageHead
         crumbs={[{ label: "Il mio quadro" }, { label: "Porta un amico" }]}
         title="Porta un amico"
-        actions={<VetroSwitch on={vetro} set={setVetro} />}
+        actions={<div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}><TutorialVideoButton id="porta-un-amico-referente" /><VetroSwitch on={vetro} set={setVetro} /></div>}
         subtitle="Chi porti in agenzia e quanto stai guadagnando su ognuno, passo per passo: dal colloquio al primo turno, fino ai 75 turni."
       />
 

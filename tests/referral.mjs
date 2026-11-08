@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   REFERRAL_RULES as R, missionProgress, buildPayslips, payslipsCsv, hrInbox, payslipMonth, recruitMetrics, buildDashboard, parseFx, shiftDatesFromWages, monthsSince, blockSales, addMonths, monthEnd, validateRecruit, validateStory, validateReferrer,
   recruitMilestones, storyMilestone, summarize, recruitSteps, referrerView, salesMapFromKpiRows, salesFor,
-  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason, storyStage,
+  findDuplicateRecruit, withCrm, withFirstShift, firstShiftSearchFrom, stopReason, storyStage, otherCrmEmails,
 } from "../src/lib/referral-core.js";
 
 let n = 0;
@@ -498,6 +498,15 @@ ok(R.version === "ref-4");
   ].map((x) => ({ ...x, milestone: storyMilestone(x, { today: "2026-11-08" }) }));
   const d = buildDashboard({ referrers: [{ id: "rf_1", name: "A" }, { id: "rf_2", name: "B" }], recruits: [], stories: rows, today: "2026-11-08" });
   eq([d.storyStats.proposed, d.storyStats.pending, d.storyStats.agreed, d.storyStats.published, d.storyStats.open, d.storyStats.views], [2, 1, 1, 1, 0, 1200], "statistiche: le proposte non concordate non sono «aperte»");
+}
+
+// ── prima di invitare: l'altra email della stessa persona nel CRM (08/11/2026) ──
+{
+  const people = [{ name: "Giulia Bianchi", emails: ["giulia.bianchi@houseofcreators.com", "Giulia.B@gmail.com"] }, { name: "Marco Rossi", emails: ["m@x.it"] }, { name: "Marco Rossi", emails: ["m2@x.it"] }];
+  eq(otherCrmEmails(people, "giulia bianchi", "giulia.b@gmail.com"), ["giulia.bianchi@houseofcreators.com"], "maiuscole e email del referente escluse");
+  eq(otherCrmEmails(people, "Marco Rossi", "x@y.it"), [], "due schede con lo stesso nome: non si indovina");
+  eq(otherCrmEmails(people, "Luca Neri", "l@y.it"), [], "nessuna scheda");
+  eq(otherCrmEmails([{ name: "Sara", emails: [null, "non-email"] }], "Sara", ""), [], "email vuote o non valide ignorate");
 }
 
 console.log(`referral: ${n} verifiche ok`);

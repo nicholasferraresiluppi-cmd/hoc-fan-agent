@@ -276,6 +276,22 @@ export function storyStage(story, { today, rules = REFERRAL_RULES } = {}) {
 }
 
 /**
+ * Le altre email della stessa persona nel CRM (08/11/2026): prima di invitare un
+ * referente si guarda se la sua scheda (stesso nome, UNA sola) ha un'email diversa
+ * da quella scritta qui. Se con quella ha già un account HOC Pro, invitare questa
+ * creerebbe un secondo account e la pagina non lo troverebbe.
+ * people: [{ name, emails: [] }] — restituisce le email diverse, normalizzate.
+ */
+export function otherCrmEmails(people = [], name, email) {
+  const n = normName(name);
+  if (!n) return [];
+  const same = people.filter((p) => normName(p.name) === n);
+  if (same.length !== 1) return [];
+  const mine = normEmail(email);
+  return [...new Set((same[0].emails || []).map(normEmail).filter((e) => e && e !== mine))];
+}
+
+/**
  * La persona è già stata portata da qualcun altro? (un solo referente per persona)
  * Confronto per scheda HR, poi per nome. Restituisce il recruit in conflitto o null.
  */
