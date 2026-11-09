@@ -215,4 +215,18 @@ t("Reel: tetto del giro dei reel", () => {
   assert.equal(M.reelBudget(2), Math.ceil(2 * 150 * 0.0014 * 1.2 * 100 + 5) / 100);
 });
 
+// 6/11/2026: c216 di Giulia creato alle 21:18, giro notturno alle 4 → «non risulta» fino alla notte dopo
+t("Link: nuovo, cambiato o non trovato si ricontrolla subito, con pausa", () => {
+  const want = { url: "onlyfans.com/giuliaottorini/c216", from: "profilo" };
+  const now = Date.parse("2026-11-06T10:00:00Z");
+  const miss = M.mergeLinkRows(null, want.url, [], "profilo", now - 6 * 3600000);
+  assert.equal(M.linkNeedsCheck(miss, want, now), true); // mancava 6 ore fa
+  assert.equal(M.linkNeedsCheck(M.mergeLinkRows(null, want.url, [], "profilo", now - 5 * 60000), want, now), false); // appena cercato
+  assert.equal(M.linkNeedsCheck({ v: 1, days: {} }, want, now), true); // mai cercato
+  assert.equal(M.linkNeedsCheck(null, null, now), false); // nessun link
+  const found = M.mergeLinkRows(null, want.url, [{ day: "2026-11-05", url: want.url, name: "IG: aboutjuli", created: "2026-11-05 20:18:06+00", clicks: 4, subs: 0, revenue: 0 }], "profilo", now - 86400000);
+  assert.equal(M.linkNeedsCheck(found, want, now), false); // trovato: basta la notte
+  assert.equal(M.linkNeedsCheck(found, { url: "onlyfans.com/giuliaottorini/c217", from: "profilo" }, now), true); // link cambiato
+});
+
 console.log(`warmup-metrics: ${n} gruppi di asserzioni ok`);
