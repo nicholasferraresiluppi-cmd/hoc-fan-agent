@@ -43,6 +43,7 @@ import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
 import { workspaceSections } from "@/lib/workspaces";
+import { restrictedMenu } from "@/lib/restricted-roles";
 
 
 
@@ -378,6 +379,12 @@ export default function Sidebar() {
   const toneOf = (href) => (href === "/admin/s4s" || href === "/admin/referral" ? "todo" : undefined);
 
   const allowed = (href) => (!me?.authenticated && !isPrivateHref(href)) || canSee(href, me?.capabilities, me?.admin);
+  // Ruolo ristretto (9/11/2026, Nicholas: «per ogni ruolo dovrebbero avere la tendina a lato»): lo stesso
+  // menu di tutti, con dentro solo le sue pagine. Prima era un guscio a parte con le schede in alto.
+  const restr = me?.restricted || null;
+  const restrItems = restrictedMenu(restr);
+  // voce accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
+  const restrOn = restrItems.filter((i) => pathname === i.href || pathname.startsWith(i.href + "/")).reduce((a, b) => (!a || b.href.length > a.href.length ? b : a), null)?.href;
   const [theme, setTheme] = useTheme();
 
   // Map { label: isOpen } per i gruppi collassabili
@@ -443,7 +450,7 @@ export default function Sidebar() {
     >
       {/* Top: brand */}
       <div style={{ padding: "18px 20px 14px 20px", borderBottom: `1px solid ${CP.border}` }}>
-        <Link href="/welcome" style={{ textDecoration: "none", display: "block" }}>
+        <Link href={restr ? restr.home : "/welcome"} style={{ textDecoration: "none", display: "block" }}>
           <BrandLockup size="sm" />
         </Link>
       </div>
@@ -473,12 +480,12 @@ export default function Sidebar() {
       </div>
 
       {/* Mansione: "La mia vista" (solo chi ne ha una; gli operatori restano sul menu personale) */}
-      <WorkspaceSwitch me={me} style={{ margin: "10px 16px 0 16px" }} />
+      {!restr && <WorkspaceSwitch me={me} style={{ margin: "10px 16px 0 16px" }} />}
 
       {/* 30/10/2026: un solo controllo del menu, «La mia vista» (tolto Essential/Advanced: due comandi per la stessa cosa) */}
 
       {/* Welcome link (always visible, both modes) — con una mansione resta solo la Guida */}
-      {wsSections ? (
+      {wsSections || restr ? (
         null
       ) : (
       <div style={{ padding: "10px 0 4px 0", borderBottom: `1px solid ${CP.border}` }}>
@@ -489,6 +496,15 @@ export default function Sidebar() {
       )}
 
       {/* Nav groups */}
+      {restr ? (
+        <nav data-restricted-tabs="" style={{ flex: 1, overflowY: "auto", padding: "10px 0 16px 0", scrollbarWidth: "thin" }}>
+          <div style={{ margin: "6px 8px 4px 8px", padding: "0 12px", color: CP.textMuted, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>{String(restr.label || "Il tuo lavoro").toUpperCase()}</div>
+          {restrItems.map((item) => (
+            <NavItem key={item.href} href={item.href} label={item.label} icon={iconFor(item.href)} isActive={restrOn === item.href}
+              badge={badgeOf(item.href)} badgeTone={toneOf(item.href)} />
+          ))}
+        </nav>
+      ) : (
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 0 16px 0", scrollbarWidth: "thin" }}>
         {wsSections && wsSections.map((sec, si) => (
           <div key={`ws-${si}`}>
@@ -553,6 +569,7 @@ export default function Sidebar() {
           </div>
         )}
       </nav>
+      )}
 
       {/* Bottom: UserButton */}
       <div style={{ padding: "12px 16px", borderTop: `1px solid ${CP.border}`, background: CP.bgSunken }}>

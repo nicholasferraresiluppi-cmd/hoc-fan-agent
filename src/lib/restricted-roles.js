@@ -19,6 +19,21 @@ export const RESTRICTED_ROLES = {
   smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/editing", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
 };
 
+// Nome di ogni pagina nel menu di chi è ristretto (9/11/2026: il menu laterale vale anche per loro).
+// Le pagine che sono solo un rimando (/admin/editoriale → Social › Contenuti) non hanno una voce.
+export const RESTRICTED_LABELS = {
+  "/admin/warmup": "Social", "/admin/scouting": "Radar creator", "/admin/studio-social": "Regia social", "/admin/editing": "Editing",
+  "/admin/supervisor": "Account social", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico",
+  "/admin/publisher-x": "Publisher X", "/contabilita": "Contabilità", "/me/porta-un-amico": "Porta un amico", "/me/publisher": "I miei fan",
+};
+const MENU_SKIP = new Set(["/admin/editoriale"]);
+
+/** Voci del menu di chi è ristretto: le sue pagine, coi loro nomi. */
+export function restrictedMenu(restriction) {
+  if (!restriction) return [];
+  return restriction.paths.filter((p) => !MENU_SKIP.has(p)).map((href) => ({ href, label: RESTRICTED_LABELS[href] || href }));
+}
+
 /** { home, paths, label } se la persona è ristretta, altrimenti null. */
 export function restrictionFor({ admin, roles, capabilities = null } = {}) {
   if (admin) return null;

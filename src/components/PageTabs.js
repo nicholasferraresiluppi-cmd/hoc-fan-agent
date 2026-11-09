@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { CP, FONTS } from "@/lib/brand";
 import { groupMatch } from "@/lib/page-groups";
 import { canSee } from "@/lib/nav-access";
+import { pathAllowed } from "@/lib/restricted-roles";
 import { tabStyle } from "@/components/ds";
 import { useShownPath } from "@/lib/nav-pending";
 
@@ -23,7 +24,7 @@ export default function PageTabs({ pathname }) {
   const cur = String(shown).replace(/\/$/, "");
   const tabs = m.group.tabs
     .map(([href, label]) => [href.replace(":e", m.param || ""), label, href.replace("/:e", "")])
-    .filter(([, , base]) => !who || canSee(base, who.capabilities, who.admin));
+    .filter(([, , base]) => !who || (canSee(base, who.capabilities, who.admin) && pathAllowed(who.restricted, base)));
   if (tabs.length < 2) return null;
   return (
     // schede = testo sottolineato (regole d'uso 29/10): non pillole, che nell'app sono i filtri
