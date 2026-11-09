@@ -173,8 +173,8 @@ export function Delta({ d }) {
 export function ModalBox({ title, sub, children, foot, onClose }) {
   return (
     <div role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, background: alpha(CP.bgSunken, "cc"), display: "grid", placeItems: "center", padding: 16 }}>
-      <div style={{ background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 16, padding: "20px 20px 16px", width: "100%", maxWidth: 520, maxHeight: "86vh", overflowY: "auto", boxShadow: `0 20px 50px ${alpha(CP.bgSunken, "99")}` }}>
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, background: CP.scrim, backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "grid", placeItems: "center", padding: 16 }}>
+      <div style={{ background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 16, padding: "20px 20px 16px", width: "100%", maxWidth: 520, maxHeight: "86vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(10,14,30,.28)" }}>
         <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 500 }}>{title}</h3>
         {sub && <p style={{ ...hint, margin: "0 0 14px", fontSize: 13.5 }}>{sub}</p>}
         {children}
