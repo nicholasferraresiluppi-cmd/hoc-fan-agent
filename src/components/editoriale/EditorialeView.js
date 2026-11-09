@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Film, FolderOpen,
-  Image as ImageIcon, Lock, Maximize2, Plus, RefreshCw, Trash2, X,
+  Image as ImageIcon, Lock, Maximize2, Plus, RefreshCw, Search, Trash2, X,
 } from "lucide-react";
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import HeroHead, { BigNum } from "@/components/HeroHead";
@@ -231,6 +231,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   // filtro d'uso (29/10, Nicholas): Libere / Usate / Tutte — prima era un solo tasto «Anche gli usati», poco chiaro
   const [useF, setUseF] = useState("liberi");
   const [path, setPath] = useState("*");          // "*" = tutte, "" = cartella principale
+  const [q, setQ] = useState("");                 // ricerca per nome nel drive: si somma ai filtri, non tocca i contatori
   const [shown, setShown] = useState(PAGE);
   const [addTo, setAddTo] = useState(null);         // id del contenuto a cui si aggiungono file
   const [edit, setEdit] = useState(null);           // bozza del contenuto aperto
@@ -254,7 +255,7 @@ export default function EditorialeView({ embedded = false } = {}) {
   const addItem = addTo ? itemById.get(addTo) : null;
   const pickKind = addItem ? TYPES[addItem.type].kind : kind;
 
-  useEffect(() => { setShown(PAGE); }, [kind, useF, path, creator]);
+  useEffect(() => { setShown(PAGE); }, [kind, useF, path, creator, q]);
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 4500); return () => clearTimeout(t); }, [msg]);
 
   // Dopo un'azione la pagina si aggiorna SUBITO con il contenuto che il server restituisce
@@ -286,7 +287,9 @@ export default function EditorialeView({ embedded = false } = {}) {
   // «libero» = mai usato; i video grezzi già usati restano sceglibili (si riusano), le foto no
   const isFree = (f) => !f.usedBy && !f.uses;
   const inUse = (f) => useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f));
-  const visible = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id))))));
+  const visibleAll = files.filter((f) => f.kind === pickKind && (path === "*" || f.path === path) && (useF === "tutti" || (useF === "usati" ? !isFree(f) : isFree(f) || (addTo && (f.usedBy === addTo || items.find((it) => it.id === addTo)?.files?.includes(f.id))))));
+  const qn = q.trim().toLocaleLowerCase("it-IT");
+  const visible = qn ? visibleAll.filter((f) => String(f.name || "").toLocaleLowerCase("it-IT").includes(qn)) : visibleAll;
   const toggle = (f) => {
     if (f.usedBy) return;
     setSel((s) => (s.includes(f.id) ? s.filter((x) => x !== f.id) : [...s, f.id]));
@@ -339,6 +342,12 @@ export default function EditorialeView({ embedded = false } = {}) {
           <span style={{ flex: 1 }} />
           <span style={hint}>{data?.filesAt ? `letto ${new Date(data.filesAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
           <button type="button" style={btnSm} disabled={isValidating} onClick={() => mutate(fetcher(`${key}&refresh=1`), { revalidate: false })}><RefreshCw size={13} />Rileggi il drive</button>
+          <label style={{ ...btnSm, cursor: "text", flex: "0 1 210px", minWidth: 150, justifyContent: "flex-start", paddingRight: q ? 4 : 10 }}>
+            <Search size={13} color={CP.textMuted} style={{ flex: "0 0 auto" }} />
+            <input type="text" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} placeholder="Cerca per nome…" aria-label="Cerca per nome"
+              style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "inherit", font: "inherit", padding: 0, WebkitAppearance: "none", appearance: "none" }} />
+            {q && <button type="button" aria-label="Cancella la ricerca" onClick={() => setQ("")} style={{ flex: "0 0 auto", width: 24, height: 24, border: "none", borderRadius: 6, background: "transparent", color: CP.textMuted, cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}><X size={13} /></button>}
+          </label>
           {data?.folder && <a href={`https://drive.google.com/drive/folders/${data.folder.folderId}`} target="_blank" rel="noreferrer" style={{ ...btnSm, textDecoration: "none" }}><FolderOpen size={13} />{data.folder.folderName}</a>}
         </div>
         {paths.length > 1 && (
@@ -350,7 +359,7 @@ export default function EditorialeView({ embedded = false } = {}) {
         )}
         {data?.filesError && <Notice danger>{data.filesError}{data.filesAt ? " — sto mostrando l'ultimo elenco letto." : ""}</Notice>}
         {data?.truncated && <Notice>La cartella ha più di 6.000 file: ne mostro una parte. Conviene collegare una sottocartella.</Notice>}
-        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (useF === "liberi" ? "Tutti usati: niente di libero qui." : useF === "usati" ? "Niente di già usato qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
+        {!visible.length && !data?.filesError && <div style={{ ...cardBox, textAlign: "center", ...hint, fontSize: 14 }}>{qn && visibleAll.length ? "Nessun contenuto trovato con questo nome" : path !== "*" && !files.some((f) => f.path === path) ? `La cartella «${path || "principale"}» è vuota: carica i file in Drive e premi «Rileggi il drive».` : files.length ? (useF === "liberi" ? "Tutti usati: niente di libero qui." : useF === "usati" ? "Niente di già usato qui." : `Niente ${pickKind === "photo" ? "foto" : "video"} qui.`) : "La cartella è vuota, o non ci sono foto e video."}</div>}
         {visible.length > 0 && <p style={{ ...hint, margin: "0 0 8px" }}>Tocca la foto per ingrandirla, il cerchio in alto a sinistra per sceglierla.</p>}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(31%, 150px), 1fr))", gap: 12 }}>
           {visible.slice(0, shown).map((f, fi) => {
