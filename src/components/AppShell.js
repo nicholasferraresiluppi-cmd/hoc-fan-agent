@@ -17,7 +17,6 @@ import NavProgress from "@/components/NavProgress";
 import { usePendingHref } from "@/lib/nav-pending";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
-import { UserButton } from "@clerk/nextjs";
 import { pathAllowed } from "@/lib/restricted-roles";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -64,45 +63,6 @@ function mobileTitle(pathname) {
 }
 
 const whoFetcher = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-
-/**
- * Guscio di chi ha un ruolo ristretto (lib/restricted-roles, es. "Social"): niente menu, niente
- * hub, solo il nome dell'app, la pagina e l'account. Le altre pagine riportano alla sua.
- */
-const RESTRICTED_PAGE_LABEL = { "/admin/scouting": "Radar creator", "/admin/studio-social": "Regia social", "/admin/editing": "Editing", "/admin/supervisor": "Account social", "/admin/warmup": "Clipping", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico", "/me/porta-un-amico": "Porta un amico", "/contabilita": "Contabilità" };
-
-function RestrictedShell({ restriction, allowed, children, pathname }) {
-  // badge sulle schede (27/10/2026): l'HR col menu ridotto vede qui i premi di «Porta un amico» da pagare
-  const hasRef = restriction.paths.includes("/admin/referral");
-  const { data: refInbox } = useSWR(hasRef ? "/api/admin/referral/inbox" : null, (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null), { revalidateOnFocus: false, refreshInterval: 10 * 60 * 1000 });
-  const badge = { "/admin/referral": refInbox?.count || 0 };
-  return (
-    <div className="hoc-root" style={{ minHeight: "100vh", background: CP.bg }}>
-      <NavProgress />
-      {/* «Vedi come» un account ristretto (08/11/2026): senza la barra l'admin restava chiuso dentro la vista */}
-      <ErrorBoundary silent label="ViewAsBanner"><ViewAsBanner /></ErrorBoundary>
-      <header style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", background: CP.bgSunken, borderBottom: `1px solid ${CP.border}` }}>
-        <a href={restriction.home} style={{ color: CP.textPrimary, textDecoration: "none", fontSize: 15, fontWeight: 500, whiteSpace: "nowrap" }}>House of Creators</a>
-        {/* più pagine (es. SMM: Radar + Account social) → una scheda per pagina; una sola → solo il nome */}
-        {restriction.paths.length > 1 ? (
-          <nav data-restricted-tabs="" style={{ display: "flex", gap: 18, overflowX: "auto", minWidth: 0, alignSelf: "stretch", alignItems: "flex-end" }}>
-            {restriction.paths.map((p, _i, all) => {
-              // scheda accesa = la pagina più specifica che contiene l'indirizzo (/admin/hr/contratti non accende anche «Persone»)
-              const hits = all.filter((x) => pathname === x || pathname.startsWith(x + "/"));
-              const on = hits.length > 0 && hits.reduce((a, b) => (b.length > a.length ? b : a)) === p;
-              return <a key={p} href={p} aria-current={on ? "page" : undefined} style={{ fontSize: 14, padding: "6px 0 8px", textDecoration: "none", whiteSpace: "nowrap", borderBottom: `2px solid ${on ? CP.accent : "transparent"}`, fontWeight: on ? 500 : 400, color: on ? CP.textPrimary : CP.textSecondary }}>{RESTRICTED_PAGE_LABEL[p] || p}{badge[p] > 0 && <span aria-label={`${badge[p]} cose da fare`} style={{ marginLeft: 6, minWidth: 18, padding: "0 6px", borderRadius: 9, background: CP.accent, color: CP.accentInk, fontSize: 11, fontWeight: 600, display: "inline-block", textAlign: "center", lineHeight: "18px" }}>{badge[p]}</span>}</a>;
-            })}
-          </nav>
-        ) : <span style={{ color: CP.textMuted, fontSize: 15 }}>· {restriction.label}</span>}
-        <span style={{ flex: 1 }} />
-        <UserButton afterSignOutUrl="/sign-in" />
-      </header>
-      <main>
-        <ErrorBoundary label="Pagina">{allowed ? children : null}</ErrorBoundary>
-      </main>
-    </div>
-  );
-}
 
 export default function AppShell({ children }) {
   const pathname = usePathname() || "";
@@ -174,10 +134,6 @@ export default function AppShell({ children }) {
 
   if (isAuthRoute(pathname) || isBareRoute(pathname)) {
     return <>{children}</>;
-  }
-
-  if (restriction) {
-    return <RestrictedShell restriction={restriction} allowed={allowedHere} pathname={pathname}>{children}</RestrictedShell>;
   }
 
   return (
@@ -258,7 +214,8 @@ export default function AppShell({ children }) {
         </ErrorBoundary>
         <ErrorBoundary label="Pagina">
           {/* Stile Casa: la chiave per pagina fa ripartire l'entrata in scena a ogni navigazione */}
-          {v3 ? <div className="casa-page" key={pathname}>{children}</div> : children}
+          {/* ruolo ristretto (9/11/2026): stesso guscio di tutti, ma una pagina non sua non si disegna (si torna alla sua) */}
+          {!allowedHere ? null : v3 ? <div className="casa-page" key={pathname}>{children}</div> : children}
         </ErrorBoundary>
       </main>
 
