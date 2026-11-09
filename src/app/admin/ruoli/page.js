@@ -567,9 +567,9 @@ function AddMemberModal({ assignable, creatorList = [], onClose, onDone }) {
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: alpha(CP.bgSunken, "BF"), display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: CP.scrim, backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 }}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={send} role="dialog" aria-modal="true" aria-label="Aggiungi membro"
-        style={{ width: "100%", maxWidth: 460, background: CP.panel, border: `1px solid ${CP.border}`, borderRadius: 12, padding: 22, fontFamily: FONTS.body }}>
+        style={{ width: "100%", maxWidth: 460, background: CP.panel, border: `1px solid ${CP.borderStrong}`, borderRadius: 16, padding: 22, boxShadow: "0 24px 60px rgba(10,14,30,.28)", fontFamily: FONTS.body }}>
         <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 500, color: CP.textPrimary }}>Aggiungi membro</h3>
         <p style={{ margin: "0 0 18px", fontSize: 13, color: CP.textMuted, lineHeight: 1.5 }}>
           La persona riceve un&apos;email da HOC Pro con il link per registrarsi. Entra già con i ruoli che scegli qui.

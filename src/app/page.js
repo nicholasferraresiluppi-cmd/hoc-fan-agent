@@ -987,7 +987,7 @@ export default function Home() {
             style={{
               position: "fixed",
               inset: 0,
-              background: alpha(CP.bgSunken, "cc"),
+              background: CP.scrim,
               zIndex: 1000,
               display: "flex",
               alignItems: "center",

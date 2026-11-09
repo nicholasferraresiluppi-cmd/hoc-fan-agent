@@ -84,9 +84,9 @@ export default function AppDialogHost() {
   const btn = { font: "inherit", fontSize: 14.5, minHeight: 42, padding: "0 18px", borderRadius: 12, cursor: "pointer", border: `1px solid ${CP.border}` };
   return (
     <div role="presentation" onClick={(e) => e.target === e.currentTarget && close(cancelValue())}
-      style={{ position: "fixed", inset: 0, zIndex: 300, display: "grid", placeItems: "center", padding: 16, background: alpha(CP.bgSunken, "99"), backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", fontFamily: FONTS.body }}>
+      style={{ position: "fixed", inset: 0, zIndex: 300, display: "grid", placeItems: "center", padding: 16, background: CP.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", fontFamily: FONTS.body }}>
       <div role={cur.kind === "alert" ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby="app-dialog-msg"
-        style={{ width: "100%", maxWidth: 440, background: CP.panel, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 20, padding: "22px 22px 18px", boxShadow: `0 24px 60px ${alpha(CP.bgSunken, "66")}` }}>
+        style={{ width: "100%", maxWidth: 440, background: CP.panel, color: CP.textPrimary, border: `1px solid ${CP.border}`, borderRadius: 20, padding: "22px 22px 18px", boxShadow: "0 24px 60px rgba(10,14,30,.28)" }}>
         {cur.title && <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 6 }}>{cur.title}</div>}
         <div id="app-dialog-msg" style={{ fontSize: cur.title ? 14.5 : 16, lineHeight: 1.5, color: cur.title ? CP.textSecondary : CP.textPrimary, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{String(cur.message ?? "")}</div>
         {cur.kind === "prompt" && (
