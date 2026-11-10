@@ -183,10 +183,10 @@ function Accessi({ names, people, onEmail, dirty, onInvite, busyName }) {
           <div key={n} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
             <span style={{ minWidth: 140, fontWeight: 500, color: CP.textPrimary }}>{n}</span>
             <input type="email" placeholder="email del publisher" value={p.email || ""} onChange={(e) => onEmail(n, e.target.value)} style={{ ...input, width: 260 }} aria-label={`Email di ${n}`} />
-            <button style={{ ...btn, padding: "6px 12px" }} disabled={!p.email || dirty || busyName === n} onClick={() => onInvite(n)} title={dirty ? "Salva prima le modifiche" : undefined}>
-              {busyName === n ? <Loader2 size={13} /> : <Send size={13} />}{p.invitedAt ? "Invita di nuovo" : "Invita"}
+            <button style={{ ...btn, padding: "6px 12px" }} disabled={!p.email || busyName === n} onClick={() => onInvite(n)} title={dirty ? "Salva le modifiche e manda l'invito" : undefined}>
+              {busyName === n ? <Loader2 size={13} /> : <Send size={13} />}{p.invitedAt ? "Invita di nuovo" : dirty ? "Salva e invita" : "Invita"}
             </button>
-            <span style={muted}>{p.invitedAt ? `invitato il ${new Date(p.invitedAt).toLocaleDateString("it-IT")}` : p.email ? "non ancora invitato" : "scrivi l'email e salva"}</span>
+            <span style={muted}>{p.invitedAt ? `invitato il ${new Date(p.invitedAt).toLocaleDateString("it-IT")}` : p.email ? "non ancora invitato" : "scrivi l'email"}</span>
           </div>
         );
       })}
@@ -227,9 +227,17 @@ export default function PublisherXPage() {
   });
   const setEmail = (name, email) => setDraft((d) => ({ ...d, people: { ...(d.people || {}), [name]: { ...(d.people?.[name] || {}), email } } }));
   const [inviting, setInviting] = useState(null);
+  // 10/11: «Salva» stava solo in cima alla pagina e l'invito restava spento finché non lo trovavi.
+  // Ora «Invita» salva da solo le modifiche in sospeso, e quando ce ne sono compare una barra fissa in basso.
+  const persist = async () => {
+    const r = await fetch(API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: draft, rev: data.config.rev }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Salvataggio non riuscito");
+  };
   const invite = async (name) => {
     setInviting(name);
     try {
+      if (dirty) await persist();
       const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invite", publisher: name }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Invito non riuscito");
@@ -250,9 +258,7 @@ export default function PublisherXPage() {
   const save = async () => {
     setBusy(true);
     try {
-      const r = await fetch(API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: draft, rev: data.config.rev }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || "Salvataggio non riuscito");
+      await persist();
       // prima i dati nuovi, poi via la bozza: al contrario la bozza si ricaricava dalla config VECCHIA
       // (10/11: dopo «Salva» la tabella tornava a «nessuno» e il pulsante restava acceso)
       await mutate();
@@ -463,6 +469,13 @@ export default function PublisherXPage() {
       <Modal open={Boolean(open)} onClose={() => setOpen(null)} title={open ? `${open} · ${meseLungo(month)}` : ""} maxWidth={760}>
         {open && <PublisherFans month={month} name={open} />}
       </Modal>
+      {dirty && !hr && (
+        <div role="region" aria-label="Modifiche non salvate" style={{ position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", zIndex: 50, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px 10px 18px", borderRadius: 14, background: CP.bg, border: `1px solid ${CP.borderSoft}`, boxShadow: "0 10px 30px rgba(0,0,0,.18)", maxWidth: "calc(100vw - 32px)", flexWrap: "wrap" }}>
+          <span style={{ color: CP.textPrimary, fontSize: 14 }}>Hai modifiche non salvate</span>
+          <button style={btn} onClick={() => setDraft(null)} disabled={busy}>Annulla</button>
+          <button style={btnMain} onClick={save} disabled={busy}>{busy ? <Loader2 size={14} /> : <Save size={14} />}Salva</button>
+        </div>
+      )}
     </div>
     </VetroScope>
   );
