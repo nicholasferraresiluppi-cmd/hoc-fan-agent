@@ -48,10 +48,12 @@ export async function getConfig() {
   return raw ? { rev: raw.rev || 0, at: raw.at || null, by: raw.by || null, ...sanitizeConfig(raw) } : { rev: 0, at: null, by: null, ...sanitizeConfig({}) };
 }
 
-export async function saveConfig(input, { by, expectRev = null }) {
+export async function saveConfig(input, { by, expectRev = null, keepPrivate = false }) {
   const cur = await getConfig();
   if (expectRev !== null && Number(expectRev) !== Number(cur.rev || 0)) throw new ConflictError("Qualcun altro ha salvato nel frattempo: ricarica la pagina.");
-  const doc = { rev: (cur.rev || 0) + 1, at: Date.now(), by: by || null, ...sanitizeConfig(input) };
+  // chi non vede fee e provvigione chatter non le può nemmeno cambiare: restano quelle salvate
+  const src = keepPrivate ? { ...input, fees: cur.fees, settings: { ...(input.settings || {}), chatterPct: cur.settings.chatterPct } } : input;
+  const doc = { rev: (cur.rev || 0) + 1, at: Date.now(), by: by || null, ...sanitizeConfig(src) };
   await kv.set(CONFIG_KEY, doc);
   return doc;
 }
@@ -133,10 +135,18 @@ export async function getOverview(month, { force = false, view = "full" } = {}) 
       links.push({ key: linkKey(l.creatorId, l.linkName), creatorId: l.creatorId, creatorName: String(l.creatorId), linkName: l.linkName, linkUrl: null, isX: isXLink(l.linkName), publisher: l.publisher, from: l.from, subsMonth: 0, subs6m: 0, mature6m: 0, avgD7: null, avgD30: null, firstDay: null, lastDay: null, fee: feeFor(config, l.creatorId), rate: rateFor(config, l.creatorId), perSubToPublisher: null, perSubToAgency: null, missing: true });
     }
   }
-  return {
+  const out = {
     ...base, current, links,
     publishers: publishers.map(({ fans, ...p }) => ({ ...p, creators: [...new Set(fans.map((x) => x.creatorName))] })),
     config,
+  };
+  if (view !== "admin") return out;
+  // admin non titolare della contabilità: via fee, provvigione chatter e quanto resta all'agenzia
+  return {
+    ...out,
+    links: out.links.map(({ fee, perSubToAgency, ...l }) => l),
+    publishers: out.publishers.map(({ margin, ...p }) => p),
+    config: { ...config, fees: {}, settings: { ...config.settings, chatterPct: null } },
   };
 }
 

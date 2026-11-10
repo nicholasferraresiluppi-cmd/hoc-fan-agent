@@ -270,6 +270,7 @@ export default function PublisherXPage() {
   const pubs = data?.publishers || [];
   const T = pubs.reduce((s, p) => ({ total: s.total + p.totalEur, subs: s.subs + p.subs, bonus: s.bonus + p.bonusEur, base: s.base + p.baseEur, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonusEur }), { total: 0, subs: 0, bonus: 0, base: 0, margin: 0, openCount: 0, openBonus: 0 });
   const hr = data?.view === "payout";
+  const priv = data?.view === "full"; // fee, provvigione chatter e margine: solo chi tiene la contabilità
   const [vetro] = useVetro();
   const shownLinks = links.filter((l) => !onlyX || l.isX || l.publisher);
   const settings = cfg?.settings;
@@ -307,7 +308,7 @@ export default function PublisherXPage() {
             sub={pubs.length ? `${int(pubs.length)} publisher · compensi ${eur(T.bonus, 0)} + basi ${eur(T.base, 0)}${data.current ? " · il mese è in corso: altre buste si chiuderanno" : ""}` : "Nessun publisher ancora"} />
           <KpiCard i={1} icon={Mail} tone={0} label="Buste chiuse nel mese" value={int(T.subs)} sub="fan arrivati al 30° giorno in questo mese" />
           <KpiCard i={2} icon={Hourglass} tone={1} label="Buste ancora aperte" value={int(T.openCount)} sub={`stanno maturando ${eur(T.openBonus, 0)} di compensi`} />
-          {!hr && <KpiCard i={3} icon={Landmark} tone={T.margin < 0 ? 4 : 3} label="Resta all'agenzia" value={usd(T.margin)} sub="sulle buste chiuse, dopo creator, chatter, publisher e basi" />}
+          {priv && <KpiCard i={3} icon={Landmark} tone={T.margin < 0 ? 4 : 3} label="Resta all'agenzia" value={usd(T.margin)} sub="sulle buste chiuse, dopo creator, chatter, publisher e basi" />}
         </div>
 
         <div style={{ ...muted, marginTop: -8, marginBottom: 16 }}>
@@ -332,7 +333,7 @@ export default function PublisherXPage() {
                 { key: "baseEur", label: "Base", align: "right", render: (p) => <span>{eur(p.baseEur, 0)}<br /><span style={muted}>{int(p.profiles)} {p.profiles === 1 ? "profilo" : "profili"}</span></span> },
                 { key: "totalEur", label: "Da pagare", align: "right", render: (p) => <b>{eur(p.totalEur)}</b> },
                 { key: "openCount", label: "Aperte", align: "right", render: (p) => <span style={muted}>{int(p.openCount)} · {eur(p.openBonusEur, 0)}</span> },
-                ...(hr ? [] : [{ key: "margin", label: "Resta all'agenzia", align: "right", render: (p) => <span style={{ color: p.margin < 0 ? CP.accentRed : CP.textPrimary }}>{usd(p.margin)}</span> }]),
+                ...(!priv ? [] : [{ key: "margin", label: "Resta all'agenzia", align: "right", render: (p) => <span style={{ color: p.margin < 0 ? CP.accentRed : CP.textPrimary }}>{usd(p.margin)}</span> }]),
               ]}
             />
           </section>
@@ -364,7 +365,7 @@ export default function PublisherXPage() {
               { key: "avgD7", label: "Spesa media 7 gg", align: "right", render: (l) => usd2(l.avgD7) },
               { key: "avgD30", label: "Spesa media 30 gg", align: "right", render: (l) => <span>{usd2(l.avgD30)}<br /><span style={muted}>su {int(l.mature6m)} fan</span></span> },
               { key: "perSubToPublisher", label: "Al publisher per fan", align: "right", render: (l) => usd2(l.perSubToPublisher) },
-              { key: "perSubToAgency", label: "All'agenzia per fan", align: "right", render: (l) => <span style={{ color: l.perSubToAgency < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(l.perSubToAgency)}</span> },
+              ...(priv ? [{ key: "perSubToAgency", label: "All'agenzia per fan", align: "right", render: (l) => <span style={{ color: l.perSubToAgency < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(l.perSubToAgency)}</span> }] : []),
             ]}
           />
           <datalist id="pubx-names">{pubNames.map((n) => <option key={n} value={n} />)}</datalist>
@@ -385,8 +386,28 @@ export default function PublisherXPage() {
 
         {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} fx={data.fx || 0.86} />}
 
+        {!priv && (
+          <section style={{ ...card, padding: 18, display: "grid", gap: 10 }}>
+            <SectionTitle aside="vuoto = vale la percentuale di tutti">Percentuale del publisher per profilo</SectionTitle>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+              {creators.map((c) => {
+                const own = cfg.rates?.[c.id];
+                return (
+                  <label key={c.id} style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "8px 10px", border: `1px solid ${CP.borderSoft}`, borderRadius: 8 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center", ...muted }}>
+                      <input type="number" min="0" max="100" step="0.5" placeholder={String(Math.round(settings.pubRate * 1000) / 10)} value={own === undefined ? "" : Math.round(own * 1000) / 10}
+                        onChange={(e) => setRate(c.id, e.target.value === "" ? null : (Number(e.target.value) || 0) / 100)} style={{ ...input, width: 60 }} aria-label={`Percentuale publisher su ${c.name}`} />%
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        )}
+        {priv && (
         <section style={{ ...card, padding: 18, display: "grid", gap: 16 }}>
-          <SectionTitle aside="solo per voi, non da mostrare al publisher">Controllo interno: quanto resta all'agenzia</SectionTitle>
+          <SectionTitle aside="solo per chi tiene la contabilità: gli altri admin non lo vedono">Controllo interno: quanto resta all'agenzia</SectionTitle>
           {settings && <Torta fee={DEFAULT_FEE} rate={settings.pubRate} settings={settings} />}
           <label style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary, width: "fit-content" }}>
             Provvigione chatter
@@ -433,6 +454,7 @@ export default function PublisherXPage() {
             {data.config.at ? ` Regole salvate il ${new Date(data.config.at).toLocaleDateString("it-IT")}.` : ""}
           </div>
         </section>
+        )}
         </>)}
       </>)}
 

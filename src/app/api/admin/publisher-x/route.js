@@ -2,6 +2,8 @@
  * /api/admin/publisher-x — conto dei publisher su X (lib/publisher-x).
  * GET ?month=YYYY-MM[&refresh=1] → conto del mese (buste CHIUSE nel mese).
  *   Admin (SEED): tutto — link X, regole, fee, margine, persone.
+ *   Admin non titolare della contabilità: come sopra ma SENZA fee, provvigione chatter e margine
+ *   (10/11, Nicholas: «sono dati sensibili dell'agenzia») — vista "admin".
  *   HR (people.manage): solo quanto si deve a ogni publisher — niente fee, margine, nomi dei fan.
  * PUT { config, rev } → salva abbinamenti, regole, persone (SEED).
  * POST { action: "invite", publisher } → invita il publisher col solo ruolo «Publisher» (SEED).
@@ -10,6 +12,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { logAuditAction } from "@/lib/audit-log";
+import { isAccountingOwner } from "@/lib/compensi-access";
 import { internalOrigin } from "@/lib/cron-chain";
 import { getOverview, saveConfig, invitePublisher, ConflictError } from "@/lib/publisher-x";
 
@@ -19,6 +22,7 @@ export const maxDuration = 60;
 export async function GET(request) {
   let view = "full";
   let az = await authorize(CAPABILITIES.SEED);
+  if (az.ok && !isAccountingOwner(az.userId)) view = "admin";
   if (!az.ok) {
     const hr = await authorize(CAPABILITIES.PEOPLE_MANAGE);
     if (!hr.ok || hr.scope !== "all") return Response.json({ error: az.message }, { status: az.status });
@@ -42,7 +46,7 @@ export async function PUT(request) {
   const body = await request.json().catch(() => null);
   if (!body?.config) return Response.json({ error: "config mancante" }, { status: 400 });
   try {
-    const doc = await saveConfig(body.config, { by: az.userId, expectRev: body.rev ?? null });
+    const doc = await saveConfig(body.config, { by: az.userId, expectRev: body.rev ?? null, keepPrivate: !isAccountingOwner(az.userId) });
     await logAuditAction({ action: "publisher-x.config", target: "pubx:config", by: az.userId, meta: { rev: doc.rev, links: doc.links.length } }).catch(() => {});
     return Response.json({ ok: true, config: doc });
   } catch (e) {

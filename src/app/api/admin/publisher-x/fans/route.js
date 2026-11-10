@@ -7,6 +7,10 @@ import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { logAuditAction } from "@/lib/audit-log";
 import { getPublisherFans } from "@/lib/publisher-x";
+import { isAccountingOwner } from "@/lib/compensi-access";
+
+// fee e quanto resta all'agenzia: solo per chi tiene la contabilità (10/11)
+const strip = ({ fee, value, margin, ...o }) => o;
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,7 +26,9 @@ export async function GET(request) {
   try {
     const data = await getPublisherFans(month, publisher);
     await logAuditAction({ action: "publisher-x.fans.view", target: publisher, by: az.userId, meta: { month, closed: data.publisher?.fans.length || 0, open: data.open.length } }).catch(() => {});
-    return Response.json(data, { headers: { "Cache-Control": "no-store" } });
+    const out = isAccountingOwner(az.userId) ? data
+      : { ...data, open: data.open.map(strip), publisher: data.publisher && { ...strip(data.publisher), fans: (data.publisher.fans || []).map(strip) } };
+    return Response.json(out, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return Response.json({ error: e.message || "Lettura non riuscita" }, { status: /mese|Nessun link/.test(e.message || "") ? 400 : 500 });
   }
