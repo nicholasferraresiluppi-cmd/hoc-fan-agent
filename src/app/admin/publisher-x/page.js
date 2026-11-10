@@ -171,30 +171,6 @@ function PublisherFans({ month, name }) {
   );
 }
 
-/** Chi è ogni publisher in HOC Pro: email e invito col solo ruolo «Publisher». */
-function Accessi({ names, people, onEmail, dirty, onInvite, busyName }) {
-  if (!names.length) return null;
-  return (
-    <section className="vt-glass" style={{ ...card, borderRadius: 22, padding: 18, display: "grid", gap: 10, marginBottom: 16 }}>
-      <SectionTitle aside="il publisher entra e vede solo /me/publisher: le sue buste, i fan in codice, niente fee">Accesso dei publisher</SectionTitle>
-      {names.map((n) => {
-        const p = people?.[n] || {};
-        return (
-          <div key={n} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "6px 0", borderTop: `1px solid ${CP.borderSoft}` }}>
-            <span style={{ minWidth: 140, fontWeight: 500, color: CP.textPrimary }}>{n}</span>
-            <input type="email" placeholder="email del publisher" value={p.email || ""} onChange={(e) => onEmail(n, e.target.value)} style={{ ...input, width: 260 }} aria-label={`Email di ${n}`} />
-            <button style={{ ...btn, padding: "6px 12px" }} disabled={!p.email || busyName === n} onClick={() => onInvite(n)} title={dirty ? "Salva le modifiche e manda l'invito" : undefined}>
-              {busyName === n ? <Loader2 size={13} /> : <Send size={13} />}{p.invitedAt ? "Invita di nuovo" : dirty ? "Salva e invita" : "Invita"}
-            </button>
-            <span style={muted}>{p.invitedAt ? `invitato il ${new Date(p.invitedAt).toLocaleDateString("it-IT")}` : p.email ? "non ancora invitato" : "scrivi l'email"}</span>
-          </div>
-        );
-      })}
-      <div style={muted}>Il publisher viene riconosciuto dall'email verificata del suo account: se ha già un account con quell'email, gli basta entrare.</div>
-    </section>
-  );
-}
-
 export default function PublisherXPage() {
   const months = useMemo(() => lastMonths(6), []);
   const [month, setMonth] = useState(months[1]); // il mese scorso: il primo che si può pagare
@@ -275,9 +251,15 @@ export default function PublisherXPage() {
     setAdding({ creatorId: "", linkName: "", publisher: "" });
   };
 
-  const pubs = data?.publishers || [];
-  const T = pubs.reduce((s, p) => ({ total: s.total + p.totalEur, subs: s.subs + p.subs, bonus: s.bonus + p.bonusEur, base: s.base + p.baseEur, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonusEur }), { total: 0, subs: 0, bonus: 0, base: 0, margin: 0, openCount: 0, openBonus: 0 });
   const hr = data?.view === "payout";
+  const pubs = data?.publishers || [];
+  // 10/11: una sola tabella per i publisher (conti + accesso). Chi è assegnato ma non ha ancora buste compare a zero.
+  const pubRows = useMemo(() => {
+    const rows = pubs.map((p) => ({ ...p, id: p.name }));
+    if (!hr) for (const n of pubNames) if (!rows.some((r) => r.name === n)) rows.push({ id: n, name: n, creators: [], topShare: null, subs: 0, spend30: 0, bonusEur: 0, bonusUsd: 0, baseEur: 0, profiles: 0, totalEur: 0, openCount: 0, openBonusEur: 0, margin: 0 });
+    return rows;
+  }, [pubs, pubNames, hr]);
+  const T = pubs.reduce((s, p) => ({ total: s.total + p.totalEur, subs: s.subs + p.subs, bonus: s.bonus + p.bonusEur, base: s.base + p.baseEur, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonusEur }), { total: 0, subs: 0, bonus: 0, base: 0, margin: 0, openCount: 0, openBonus: 0 });
   const priv = data?.view === "full"; // fee, provvigione chatter e margine: solo chi tiene la contabilità
   const [vetro] = useVetro();
   const shownLinks = links.filter((l) => !onlyX || l.isX || l.publisher);
@@ -326,11 +308,11 @@ export default function PublisherXPage() {
             : ` Cambio di ${meseLungo(month)}: ${fxTxt(data.fx)} € per 1 $ (lo stesso di «Porta un collega»).`}
         </div>
 
-        {pubs.length > 0 && (
+        {pubRows.length > 0 && (
           <section style={{ marginBottom: 24 }}>
-            <SectionTitle aside={hr ? "solo buste chiuse: sono definitive" : "clicca un publisher per vedere le sue buste una per una"}>Publisher del mese</SectionTitle>
+            <SectionTitle aside={hr ? "solo buste chiuse: sono definitive" : "conti del mese e accesso: email e invito sulla riga. Clicca un publisher per vedere le sue buste"}>Publisher</SectionTitle>
             <DataTable
-              rows={pubs.map((p) => ({ ...p, id: p.name }))}
+              rows={pubRows}
               onRowClick={hr ? undefined : (p) => setOpen(p.name)}
               defaultSort={{ key: "totalEur", dir: -1 }}
               columns={[
@@ -342,6 +324,18 @@ export default function PublisherXPage() {
                 { key: "totalEur", label: "Da pagare", align: "right", render: (p) => <b>{eur(p.totalEur)}</b> },
                 { key: "openCount", label: "Aperte", align: "right", render: (p) => <span style={muted}>{int(p.openCount)} · {eur(p.openBonusEur, 0)}</span> },
                 ...(!priv ? [] : [{ key: "margin", label: "Resta all'agenzia", align: "right", render: (p) => <span style={{ color: p.margin < 0 ? CP.accentRed : CP.textPrimary }}>{usd(p.margin)}</span> }]),
+                ...(hr || !cfg ? [] : [{ key: "access", label: "Accesso", sortable: false, render: (p) => {
+                  const who = cfg.people?.[p.name] || {};
+                  return (
+                    <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <input type="email" placeholder="email" value={who.email || ""} onChange={(e) => setEmail(p.name, e.target.value)} style={{ ...input, width: 200 }} aria-label={`Email di ${p.name}`} />
+                      <button style={{ ...btn, padding: "6px 10px" }} disabled={!who.email || inviting === p.name} onClick={() => invite(p.name)}>
+                        {inviting === p.name ? <Loader2 size={13} /> : <Send size={13} />}{who.invitedAt ? "Invita di nuovo" : dirty ? "Salva e invita" : "Invita"}
+                      </button>
+                      <span style={muted}>{who.invitedAt ? `invitato il ${new Date(who.invitedAt).toLocaleDateString("it-IT")}` : who.email ? "non invitato" : ""}</span>
+                    </span>
+                  );
+                } }]),
               ]}
             />
           </section>
@@ -389,8 +383,6 @@ export default function PublisherXPage() {
           </div>
           <div style={{ ...muted, marginTop: 6 }}>Per i profili che non sono in elenco serve almeno un link X con fan. Dopo aver aggiunto, salva e ricalcola: il link compare con i suoi numeri.</div>
         </section>
-
-        <Accessi names={pubNames} people={cfg.people} onEmail={setEmail} dirty={dirty} onInvite={invite} busyName={inviting} />
 
         {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} fx={data.fx || 0.86} />}
 
