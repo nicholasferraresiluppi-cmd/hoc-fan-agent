@@ -3,7 +3,8 @@
  * Il publisher si riconosce dal server per email VERIFICATA dell'account, mai da un parametro
  * del client. I fan escono in codice (niente nome, username o id), niente fee, niente altri.
  */
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
+import { viewAsFor } from "@/lib/view-as";
 import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { getMyPublisher } from "@/lib/publisher-x";
 
@@ -16,7 +17,12 @@ export async function GET() {
   if (!userId) return Response.json({ error: "Non autenticato." }, { status: 401 });
   if (!bigQueryConfigured()) return Response.json({ error: "Dati non disponibili" }, { status: 503 });
   try {
-    const me = await currentUser().catch(() => null);
+    // 10/11: con «Vedi come» su un publisher l'admin vede la pagina con i dati di QUELLA persona
+    // (prima vedeva i propri e risultava «non collegato»). Solo admin veri, sola lettura: lib/view-as.
+    const va = await viewAsFor(userId);
+    const me = va?.target
+      ? await (await clerkClient()).users.getUser(va.target).catch(() => null)
+      : await currentUser().catch(() => null);
     const verifiedEmails = (me?.emailAddresses || []).filter((e) => e?.verification?.status === "verified").map((e) => e.emailAddress);
     return Response.json(await getMyPublisher(verifiedEmails), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
