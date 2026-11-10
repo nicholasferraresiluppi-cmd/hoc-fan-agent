@@ -16,8 +16,9 @@ import useSWR from "swr";
 import { ExternalLink } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
-import { PageHead, Metric, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
+import { PageHead, Notice, Disclosure, DataTable, SectionTitle, card } from "@/components/ds";
 import { useInVetro } from "@/components/VetroScope";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 import { RankBars } from "@/components/VetroCharts";
 
 const fetcher = (url) =>
@@ -73,18 +74,19 @@ export default function AdsPage() {
             Da leggere come giudizio esperto, non come misura: {data.meta.caveat} Prima di cambiare le landing delle nostre creator, conviene provare la modifica su una creator con un test A/B.
           </Notice>
 
-          <section style={{ ...card, padding: "18px 20px", marginBottom: 14 }}>
-            <div style={{ fontSize: 13, color: CP.textSecondary }}>La conclusione principale</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: CP.textPrimary, lineHeight: 1.35, margin: "4px 0 14px", maxWidth: 820 }}>
-              {keyFinding || data.meta.summary}
-            </div>
-            <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
-              <Metric label="Landing analizzate" value={fmtInt(data.meta.count)} note={data.meta.capturedAt ? `raccolte il ${data.meta.capturedAt.split("-").reverse().join("/")}` : null} />
-              <Metric label="Piattaforme confrontate" value={fmtInt(data.platforms.length)} note="con almeno 3 landing" />
-              <Metric label="Punteggio migliore" value={`${n1(scored[0]?.weighted ?? 0)} / 100`} />
-              {median != null && <Metric label="Punteggio a metà classifica" value={`${n1(median)} / 100`} />}
-            </div>
-          </section>
+          {/* Intestazione «stile reel» (10/11/2026): la conclusione dello studio è il titolo, i numeri grandi accanto */}
+          <HeroHead
+            eyebrow="La conclusione principale"
+            title={keyFinding || data.meta.summary}
+            sub={data.meta.capturedAt ? `Landing raccolte il ${data.meta.capturedAt.split("-").reverse().join("/")}.` : null}
+            numbers={<>
+              <BigNum label="Landing analizzate" value={data.meta.count} />
+              <BigNum label="Piattaforme" value={data.platforms.length} title="con almeno 3 landing" />
+              <BigNum label="Punteggio migliore" value={scored[0]?.weighted ?? 0} strong title="su 100" />
+              {median != null && <BigNum label="A metà classifica" value={median} title="su 100" />}
+            </>}
+            style={{ marginBottom: 14 }}
+          />
 
           <section style={{ ...card, padding: "16px 18px", marginBottom: 14 }}>
             <SectionTitle aside="per le creator HOC, in ordine dall’alto della pagina">Il modello da seguire</SectionTitle>
