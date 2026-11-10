@@ -234,7 +234,7 @@ export default function PresenzeDiscordPage() {
     { key: "deaf", label: "Cuffie disattivate", align: "right", render: (p) => dur(p.deaf) },
     { key: "first", label: "Dalle · alle", render: (p) => `${hm(p.first)} · ${p.live ? "dentro ora" : hm(p.last)}` },
     { key: "channels", label: "Stanze", sortable: false, render: (p) => <span style={{ color: CP.textSecondary }}>{p.channels.join(", ")}</span> },
-    { key: "play", label: "Attività in vocale", sort: (p) => playMs(p.activities), render: (p) => <Attivita list={p.activities} recorded={actRec} /> },
+    { key: "play", label: "Attività in vocale", sort: (p) => playMs(p.activities), render: (p) => <Attivita list={p.activities} recorded={actRec && (p.live || p.last > data.activitiesSince)} /> },
   ];
   const outByGroup = groupsPresent.map((g) => [g, notSeen.filter((p) => p.mansione === g)]).filter(([, l]) => l.length);
 
@@ -262,6 +262,7 @@ export default function PresenzeDiscordPage() {
       {data && (
         <>
           {partial && <Notice>Dati parziali per questa giornata: il bot ha iniziato a contare alle {hm(data.trackingSince)}.</Notice>}
+          {actRec && data.activitiesSince > data.from && <Notice>Attività in vocale registrate da questa giornata, a partire dalle {hm(data.activitiesSince)}: chi è uscito prima risulta «non registrata».</Notice>}
           <div style={grid}>
             <Metric label="Entrati" value={fmtInt(people.length)} />
             <Metric label="Non entrati" value={fmtInt(notSeen.length)} attn={notSeen.length > 0} />
