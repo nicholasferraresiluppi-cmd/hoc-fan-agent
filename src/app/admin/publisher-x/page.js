@@ -233,8 +233,8 @@ export default function PublisherXPage() {
       const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invite", publisher: name }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Invito non riuscito");
-      setDraft(null);
       await mutate();
+      setDraft(null);
       alertDialog(j.exists ? `${name} ha già un account: entrando con quell'email vede la sua pagina.` : `Invito mandato a ${name}.`);
     } catch (e) { alertDialog(e.message); } finally { setInviting(null); }
   };
@@ -253,8 +253,10 @@ export default function PublisherXPage() {
       const r = await fetch(API, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config: draft, rev: data.config.rev }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Salvataggio non riuscito");
-      setDraft(null);
+      // prima i dati nuovi, poi via la bozza: al contrario la bozza si ricaricava dalla config VECCHIA
+      // (10/11: dopo «Salva» la tabella tornava a «nessuno» e il pulsante restava acceso)
       await mutate();
+      setDraft(null);
     } catch (e) { alertDialog(e.message); } finally { setBusy(false); }
   };
   const refresh = async () => { setBusy(true); try { await mutate(await fetcher(`${API}?month=${month}&refresh=1`), { revalidate: false }); } catch (e) { alertDialog(e.message); } finally { setBusy(false); } };
