@@ -25,11 +25,11 @@ const c = sanitizeConfig({
     { creatorId: 12, linkName: "tw", publisher: "Lia", from: "ottobre" },
   ],
 });
-eq(c.settings, { chatterPct: 0.15, pubRate: 0.1, baseEurPerProfile: 150 }, "tariffa fuori scala → predefinita 10%, base per profilo arrotondata");
+eq(c.settings, { chatterPct: 0.15, pubRate: 0.05, baseEurPerProfile: 150 }, "tariffa fuori scala → predefinita 5%, base per profilo arrotondata");
 eq(sanitizeConfig({}).settings.baseEurPerProfile, 150, "base per profilo predefinita 150 €");
 eq(c.rates, { 10: 0.05 }, "tariffa per profilo: vuota o id non numerico scartati");
 eq(rateFor(c, 10), 0.05, "tariffa del profilo");
-eq(rateFor(c, 99), 0.1, "senza tariffa del profilo vale quella di tutti");
+eq(rateFor(c, 99), 0.05, "senza tariffa del profilo vale quella di tutti");
 eq(c.fees, { 10: 0.23, 11: DEFAULT_FEE }, "fee: id non numerico scartato, fee >1 → predefinita");
 eq(c.links.length, 3, "doppione e righe vuote scartati");
 eq(c.links[0].publisher, "Mario Rossi", "spazi del nome normalizzati");

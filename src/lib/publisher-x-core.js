@@ -3,7 +3,7 @@
  *
  * Il publisher su X porta fan con un link tracciato OnlyFans. Il deal che VEDE lui:
  *
- *   tariffa publisher (es. 10%) × spesa dei suoi fan nei loro primi 30 giorni + base fissa
+ *   tariffa publisher (5%) × spesa dei suoi fan nei loro primi 30 giorni + base fissa
  *
  * La tariffa NON deriva dalla fee: Nicholas (27/10) non vuole che il publisher possa
  * risalire a quanto l'agenzia prende dalla creator. Fee e provvigione chatter servono
@@ -17,10 +17,11 @@
  * Si contano solo i fan NUOVI sulla pagina (is_first_sub): chi si riabbona non è merito del link.
  */
 
-// Base (27/10, Nicholas): 150 € al mese per OGNI profilo che il publisher gestisce. Il compenso
+// Base (27/10, Nicholas): 150 € al mese per OGNI profilo che il publisher gestisce. Percentuale: 5% (10/11, Nicholas;
+// prima default 10%) sulla spesa dei fan nei primi 30 giorni, in dollari, convertita in euro. Il compenso
 // variabile si calcola sui dollari spesi dai fan (OnlyFans è in dollari) e si paga in euro al
 // cambio del mese inserito dall'HR (lo stesso di «Porta un collega», KV referral:fx).
-export const DEFAULT_SETTINGS = { chatterPct: 0.15, pubRate: 0.1, baseEurPerProfile: 150 };
+export const DEFAULT_SETTINGS = { chatterPct: 0.15, pubRate: 0.05, baseEurPerProfile: 150 };
 export const FALLBACK_FX = 0.86; // euro per 1 dollaro, SOLO se l'HR non ha ancora inserito il cambio del mese (dichiarato «stimato»)
 export const DEFAULT_FEE = 0.45;
 export const WINDOW_DAYS = 30;
