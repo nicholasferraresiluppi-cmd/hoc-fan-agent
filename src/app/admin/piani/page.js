@@ -13,6 +13,7 @@ import { PageHead, Tabs, EmptyState, Notice, Spiega, BTN, BTN_PRIMARY } from "@/
 import { usePlans, PlanFull, AREA_HOME, planStatus } from "@/components/piani/PlanView";
 import { PlanEditor } from "@/components/piani/PlanEditor";
 import { CP } from "@/lib/brand";
+import HeroHead, { BigNum } from "@/components/HeroHead";
 
 export default function PianiPage() {
   const { data, error, isLoading, mutate } = usePlans();
@@ -60,6 +61,21 @@ export default function PianiPage() {
           {isLoading && <div style={{ color: CP.textMuted, fontSize: 14 }}>Caricamento…</div>}
           {data && !plan && <EmptyState title="Nessun piano in corso">Quando c&apos;è un piano di lavoro per la tua area lo trovi qui.</EmptyState>}
           {plan?.archived && <Notice>Questo piano è archiviato: non compare più in cima alla pagina di lavoro.</Notice>}
+          {/* Intestazione «stile reel» (10/11/2026): a che punto è il piano, in pochi numeri */}
+          {plan && (
+            <HeroHead
+              eyebrow={plan.archived ? "Piano archiviato" : "Il piano"}
+              title="Fatte"
+              accent={`${plan.progress.done} ${plan.progress.done === 1 ? "voce" : "voci"} su ${plan.progress.total}`}
+              sub="Le voci che l'app può verificare si spuntano da sole."
+              numbers={<>
+                <BigNum label="Fatte" value={plan.progress.done} strong />
+                <BigNum label="Da fare" value={plan.progress.total - plan.progress.done} />
+                {plan.progress.late > 0 && <BigNum label="In ritardo" value={plan.progress.late} />}
+                <BigNum label="% fatto" value={plan.progress.pct} />
+              </>}
+            />
+          )}
           {plan?.goal && <Spiega label="Perché questo piano" style={{ margin: "-8px 0 14px" }}><p style={{ margin: 0 }}>{plan.goal}</p></Spiega>}
           {plan && <PlanFull key={plan.id} plan={plan} onChange={onChange} />}
         </>
