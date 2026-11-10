@@ -3,6 +3,8 @@
 // Presenze Discord (03/11/2026) — chi è stato nelle stanze vocali del server «HOC House of Creators»,
 // quanto, con il microfono aperto o chiuso e con chi. Dati dal bot presenze (lib/presenze-discord),
 // giornata dalle 05:00 alle 05:00. Sezione riservata (lib/presenze-access): il file non contiene dati.
+// Attività (10/11/2026): lo stato Discord «Sta giocando a…/Ascolta…/Guarda…» registrato dal bot SOLO mentre la
+// persona è in vocale. Prima di `activitiesSince` il dato non esiste (≠ «non giocava»).
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
@@ -34,6 +36,26 @@ const hm = (t) => new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digi
 const dayLabel = (day, opts = { weekday: "long", day: "numeric", month: "long" }) =>
   new Intl.DateTimeFormat("it-IT", { timeZone: TZ, ...opts }).format(new Date(`${day}T12:00:00Z`));
 const shortDay = (day) => dayLabel(day, { weekday: "short", day: "2-digit", month: "2-digit" });
+
+const VERBO = { gioca: "Gioca a", ascolta: "Ascolta", guarda: "Guarda", "in diretta": "In diretta:", compete: "Compete in" };
+const actLabel = (a) => `${VERBO[a.type] || a.type} ${a.name}`;
+/** null = attività non ancora registrate per quella giornata (il bot non le leggeva). */
+const actRecorded = (since, dayTo) => Boolean(since) && since < dayTo;
+function Attivita({ list, recorded }) {
+  if (!recorded) return <span style={muted} title="Prima del 10 novembre il bot non registrava le attività">non registrata</span>;
+  if (!list?.length) return <span style={muted}>nessuna</span>;
+  return (
+    <span>
+      {list.slice(0, 3).map((a, i) => (
+        <span key={i} style={{ color: a.type === "gioca" ? CP.textPrimary : CP.textSecondary }}>
+          {i > 0 && ", "}{actLabel(a)} <span style={muted}>{dur(a.ms)}</span>
+        </span>
+      ))}
+      {list.length > 3 && <span style={muted}> +{list.length - 3}</span>}
+    </span>
+  );
+}
+const playMs = (list) => (list || []).filter((a) => a.type === "gioca").reduce((x, a) => x + a.ms, 0);
 
 /** Barra della giornata 05→05: un blocco per segmento, pieno con microfono aperto, tenue con microfono chiuso. */
 function Giornata({ from, to, segments }) {
@@ -94,6 +116,21 @@ function SchedaGiorno({ id, day }) {
       <div style={{ margin: "0 0 18px" }}>
         <DataTable columns={tlCols} rows={data.timeline.map((t, i) => ({ ...t, id: i }))} minWidth={720} density="compact" />
       </div>
+      <SectionTitle>Attività mentre era in vocale</SectionTitle>
+      <div style={{ margin: "0 0 18px" }}>
+        {!actRecorded(data.activitiesSince, data.to) ? (
+          <p style={muted}>Per questa giornata le attività non sono registrate: il bot le legge dal {data.activitiesSince ? `${dayLabel(new Date(data.activitiesSince).toISOString().slice(0, 10))} alle ${hm(data.activitiesSince)}` : "10 novembre"}.</p>
+        ) : (
+          <DataTable
+            columns={[
+              { key: "start", label: "Orario", render: (t) => `${hm(t.start)}–${t.live ? "ora" : hm(t.end)}` },
+              { key: "name", label: "Attività", render: (t) => actLabel(t) },
+              { key: "ms", label: "Durata", align: "right", sort: (t) => t.end - t.start, render: (t) => dur(t.end - t.start) },
+            ]}
+            rows={(data.activityTimeline || []).map((t, i) => ({ ...t, id: i }))} minWidth={520} density="compact"
+            empty="Nessuna attività mostrata da Discord mentre era in vocale." />
+        )}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
         <div>
           <SectionTitle>Stanze</SectionTitle>
@@ -137,8 +174,9 @@ function SchedaStorico({ id }) {
           { key: "mic", label: "Microfono aperto", align: "right", render: (d) => (d.ms ? pct(d.mic, d.ms) : "—") },
           { key: "first", label: "Dalle · alle", render: (d) => (d.ms ? `${hm(d.first)} · ${d.live ? "ora" : hm(d.last)}` : "—") },
           { key: "channels", label: "Stanze", sortable: false, render: (d) => (d.channels || []).join(", ") || "—" },
+          { key: "play", label: "Attività in vocale", sort: (d) => playMs(d.activities), render: (d) => (d.ms ? <Attivita list={d.activities} recorded={actRecorded(data.activitiesSince, Date.parse(`${d.day}T12:00:00Z`) + 17 * 3600e3)} /> : "—") },
         ]}
-        rows={days.map((d) => ({ ...d, id: d.day }))} minWidth={820} density="compact" />
+        rows={days.map((d) => ({ ...d, id: d.day }))} minWidth={1000} density="compact" />
     </>
   );
 }
@@ -185,6 +223,8 @@ export default function PresenzeDiscordPage() {
   const tot = people.reduce((a, p) => a + p.ms, 0), mic = people.reduce((a, p) => a + p.mic, 0);
   const partial = data && data.trackingSince > data.from;
   const isToday = current && current === days.data?.today;
+  const actRec = data ? actRecorded(data.activitiesSince, data.to) : false;
+  const playing = people.filter((p) => playMs(p.activities) > 0);
 
   const cols = [
     { key: "name", label: "Persona", render: (p) => <span><span style={{ color: CP.textPrimary }}>{p.name}</span><br /><span style={muted}>{p.mansione}</span></span> },
@@ -194,6 +234,7 @@ export default function PresenzeDiscordPage() {
     { key: "deaf", label: "Cuffie disattivate", align: "right", render: (p) => dur(p.deaf) },
     { key: "first", label: "Dalle · alle", render: (p) => `${hm(p.first)} · ${p.live ? "dentro ora" : hm(p.last)}` },
     { key: "channels", label: "Stanze", sortable: false, render: (p) => <span style={{ color: CP.textSecondary }}>{p.channels.join(", ")}</span> },
+    { key: "play", label: "Attività in vocale", sort: (p) => playMs(p.activities), render: (p) => <Attivita list={p.activities} recorded={actRec} /> },
   ];
   const outByGroup = groupsPresent.map((g) => [g, notSeen.filter((p) => p.mansione === g)]).filter(([, l]) => l.length);
 
@@ -227,12 +268,14 @@ export default function PresenzeDiscordPage() {
             <Metric label="Tempo totale" value={dur(tot)} />
             <Metric label="Media a testa" value={people.length ? dur(tot / people.length) : "—"} />
             <Metric label="Microfono aperto" value={pct(mic, tot)} />
+            {actRec && <Metric label="Hanno giocato in vocale" value={fmtInt(playing.length)} note={playing.length ? dur(playing.reduce((a, p) => a + playMs(p.activities), 0)) : undefined} />}
           </div>
           <Spiega style={{ margin: "0 0 16px" }}>
             <span>La giornata va dalle 05:00 alle 05:00 del giorno dopo (ora italiana): chi si collega dopo mezzanotte resta nella giornata a cui appartiene. {isToday ? "Oggi si aggiorna ogni due minuti." : ""}</span>
             <span>Contano solo le stanze vocali; la stanza AFK e i bot sono esclusi. Un ingresso è il passaggio da scollegato a collegato: cambiare stanza non conta come nuovo ingresso.</span>
             <span>La mansione si legge dal ruolo Discord; chi ha più ruoli va nel più alto (Project Manager, poi Account Manager, Sales Manager, Formatore, Area HR, Area Social, Admin). «Operatori» è chi ha altri ruoli (creator, team).</span>
             <span>«Microfono aperto» è la parte del tempo in vocale col microfono acceso; «cuffie disattivate» è il tempo collegato senza sentire. «Insieme a» somma il tempo passato nella stessa stanza con ciascuna persona.</span>
+            <span>«Attività in vocale» è lo stato che Discord mostra a tutti («Sta giocando a…», «Ascolta Spotify», «Guarda…»), registrato solo mentre la persona è in una stanza vocale e solo dal 10 novembre 2026. Non è una prova: chi ha spento «Mostra l'attività corrente» o è in modalità invisibile risulta «nessuna» anche se gioca, e un gioco aperto in sottofondo conta come gioco. Il bot non vede cosa c'è nello schermo condiviso.</span>
           </Spiega>
           <Tabs value={tab} onChange={setTab} items={[["dentro", "Chi è entrato", people.length], ["fuori", "Non entrati", notSeen.length], ["stanze", "Per stanza", data.channels.length]]} />
 
@@ -241,7 +284,7 @@ export default function PresenzeDiscordPage() {
               {!people.length ? (
                 <EmptyState title="Nessuna presenza">Con questi filtri nessuno è entrato nelle stanze vocali in questa giornata.</EmptyState>
               ) : (
-                <DataTable columns={cols} rows={people} defaultSort={{ key: "ms", dir: -1 }} minWidth={1000} maxHeight={560}
+                <DataTable columns={cols} rows={people} defaultSort={{ key: "ms", dir: -1 }} minWidth={1200} maxHeight={560}
                   onRowClick={(p) => setSel(p)} selected={(p) => p.id === sel?.id} />
               )}
               {sel && <Persona key={`${sel.id}-${current}`} person={sel} day={current} onClose={() => setSel(null)} />}
