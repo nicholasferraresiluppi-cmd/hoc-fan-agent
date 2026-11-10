@@ -240,7 +240,7 @@ export default function PresenzeDiscordPage() {
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 64px", fontFamily: FONTS.body }}>
-      <PageHead title="Presenze Discord" subtitle="Chi è stato nelle stanze vocali del server, quanto e con chi · giornata dalle 05:00 alle 05:00" />
+      <PageHead title="Presenze Discord" riservato="Riservato: tu e chi è abilitato alle presenze" subtitle="Chi è stato nelle stanze vocali del server, quanto e con chi · giornata dalle 05:00 alle 05:00" />
       {err && <Notice danger>{err.message}</Notice>}
       {(days.isLoading || (isLoading && !data)) && !err && <p style={muted}>Caricamento…</p>}
 

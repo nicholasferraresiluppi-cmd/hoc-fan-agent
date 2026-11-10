@@ -9,10 +9,10 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save, Wallet, Mail, Hourglass, Landmark, Send } from "lucide-react";
+import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save, Wallet, Mail, Hourglass, Landmark, Send, Lock } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
-import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, BTN_PRIMARY } from "@/components/ds";
+import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, BTN_PRIMARY, Riservato } from "@/components/ds";
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
 import { DEFAULT_FEE, WHALE_SHARE, splitDollar, rateFor, linkKey } from "@/lib/publisher-x-core";
@@ -308,7 +308,7 @@ export default function PublisherXPage() {
             sub={pubs.length ? `${int(pubs.length)} publisher · compensi ${eur(T.bonus, 0)} + basi ${eur(T.base, 0)}${data.current ? " · il mese è in corso: altre buste si chiuderanno" : ""}` : "Nessun publisher ancora"} />
           <KpiCard i={1} icon={Mail} tone={0} label="Buste chiuse nel mese" value={int(T.subs)} sub="fan arrivati al 30° giorno in questo mese" />
           <KpiCard i={2} icon={Hourglass} tone={1} label="Buste ancora aperte" value={int(T.openCount)} sub={`stanno maturando ${eur(T.openBonus, 0)} di compensi`} />
-          {priv && <KpiCard i={3} icon={Landmark} tone={T.margin < 0 ? 4 : 3} label="Resta all'agenzia" value={usd(T.margin)} sub="sulle buste chiuse, dopo creator, chatter, publisher e basi" />}
+          {priv && <KpiCard i={3} icon={Landmark} tone={T.margin < 0 ? 4 : 3} label={<>Resta all&apos;agenzia <Lock size={12} aria-label="visibile solo a te" /></>} value={usd(T.margin)} sub="sulle buste chiuse, dopo creator, chatter, publisher e basi" />}
         </div>
 
         <div style={{ ...muted, marginTop: -8, marginBottom: 16 }}>
@@ -407,7 +407,7 @@ export default function PublisherXPage() {
         )}
         {priv && (
         <section style={{ ...card, padding: 18, display: "grid", gap: 16 }}>
-          <SectionTitle aside="solo per chi tiene la contabilità: gli altri admin non lo vedono">Controllo interno: quanto resta all'agenzia</SectionTitle>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><SectionTitle>Controllo interno: quanto resta all&apos;agenzia</SectionTitle><Riservato /></div>
           {settings && <Torta fee={DEFAULT_FEE} rate={settings.pubRate} settings={settings} />}
           <label style={{ display: "grid", gap: 4, fontSize: 13, color: CP.textSecondary, width: "fit-content" }}>
             Provvigione chatter

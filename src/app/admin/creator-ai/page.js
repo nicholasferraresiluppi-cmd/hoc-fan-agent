@@ -130,7 +130,7 @@ export default function CreatorAiPage() {
   const studio = studi.find((s) => s.id === open);
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 64px", fontFamily: FONTS.body }}>
-      <PageHead title="Creator AI" subtitle={data?.aggiornato ? `Studi e mappature, aggiornati al ${data.aggiornato}` : "Studi e mappature"} />
+      <PageHead title="Creator AI" riservato subtitle={data?.aggiornato ? `Studi e mappature, aggiornati al ${data.aggiornato}` : "Studi e mappature"} />
       {isLoading && <p style={muted}>Caricamento…</p>}
       {error && <Notice danger>{error.message}</Notice>}
       {data && !items.length && <EmptyState title="Nessuno studio ancora">Gli studi compaiono qui appena vengono caricati.</EmptyState>}

@@ -327,6 +327,7 @@ export default function SplitPage() {
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità", href: "/contabilita" }, { label: "Conto dello split" }]}
         title="Conto dello split"
+        riservato="Riservato: tu e chi autorizzi in «Accessi»"
         subtitle="Per ogni creator: quanto entra a HOC dal suo accordo, quanto costa chi ci lavora, il netto. Revenue in dollari, tutto il resto in euro al cambio del mese. Visibile solo a chi ha l'accesso contabilità."
         actions={<>
           {docDirty && <button style={btn(true)} onClick={saveDoc} disabled={busy === "doc"}>{busy === "doc" ? <Loader2 size={14} /> : <Check size={14} />}Salva il mese</button>}
