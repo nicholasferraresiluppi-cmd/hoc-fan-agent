@@ -309,6 +309,7 @@ export default function ContabilitaPage() {
       <PageHead
         crumbs={[{ label: "People" }, { label: "Contabilità" }]}
         title="Compensi team"
+        riservato="Riservato: tu e chi autorizzi in «Accessi»"
         subtitle="Quanto si paga a chi, mese per mese: fissi e gamification, una voce per persona. Operatori esclusi. Visibile solo a chi ha l'accesso contabilità."
         actions={<>
           {dirty && <button style={btn(true)} onClick={save} disabled={saving}>{saving ? <Loader2 size={14} /> : <Check size={14} />}Salva modifiche</button>}

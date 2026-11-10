@@ -8,7 +8,7 @@
  */
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, HelpCircle, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, HelpCircle, Lock, X } from "lucide-react";
 import { CP, FONTS, alpha } from "@/lib/brand";
 import { useStyle } from "@/lib/theme-client";
 import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
@@ -25,7 +25,20 @@ import { tierLabel, TIER_ORDER } from "@/lib/tier-label";
 const NUM = { fontVariantNumeric: "tabular-nums" };
 export const card = { background: CP.surface, border: `1px solid ${CP.border}`, borderRadius: 10 };
 
-export function PageHead({ crumbs = [], title, line2, subtitle, actions }) {
+/**
+ * Etichetta «riservato» (10/11, Nicholas: «se ci sono sezioni che vedo solo io, fammelo presente mentre le
+ * guardo»). Va su pagine e sezioni che il SERVER mostra solo a pochi (contabilità, controllo interno…):
+ * l'etichetta ricorda, non protegge. Testo esatto su chi vede, mai generico.
+ */
+export function Riservato({ children = "Visibile solo a te", title }) {
+  return (
+    <span title={title || "Gli altri utenti, admin compresi, non vedono questa parte"} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", color: CP.accentSoftText, background: CP.accentSoft, border: `1px solid ${CP.border}` }}>
+      <Lock size={12} />{children}
+    </span>
+  );
+}
+
+export function PageHead({ crumbs = [], title, line2, subtitle, actions, riservato }) {
   // line2: seconda riga del titolo in corsivo, solo nello stile Casa (la frase che dice com'è andata)
   const [st] = useStyle();
   return (
@@ -42,6 +55,7 @@ export function PageHead({ crumbs = [], title, line2, subtitle, actions }) {
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 420px" }}>
+          {riservato && <div style={{ marginBottom: 6 }}><Riservato>{riservato === true ? undefined : riservato}</Riservato></div>}
           <h1 className="ds-h1" style={{ fontSize: 28, fontWeight: 500, margin: "0 0 4px", letterSpacing: "-0.01em", color: CP.textPrimary }}>{title}{st === "v3" && line2 && <><br /><em className="ds-h1-em">{line2}</em></>}</h1>
           {subtitle && <p className="ds-sub" onClick={(e) => e.currentTarget.toggleAttribute("data-open")} style={{ fontSize: 14, color: CP.textSecondary, margin: 0, maxWidth: 760, lineHeight: 1.5 }}>{subtitle}</p>}
         </div>
