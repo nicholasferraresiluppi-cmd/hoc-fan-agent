@@ -15,6 +15,7 @@ import { Modal } from "@/components/cp-style";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, BTN_PRIMARY, Riservato } from "@/components/ds";
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 import { DEFAULT_FEE, WHALE_SHARE, splitDollar, rateFor, linkKey } from "@/lib/publisher-x-core";
 import { confirmDialog, alertDialog } from "@/components/AppDialogs";
 
@@ -280,6 +281,7 @@ export default function PublisherXPage() {
           ? "Quanto si deve ai publisher su X, mese per mese. Ogni fan portato è una busta che si chiude al suo 30° giorno: un mese paga le buste chiuse in quel mese, più la base."
           : "Quanto pagare chi porta sub da X. Ogni fan portato è una busta che si chiude al suo 30° giorno: un mese paga le buste chiuse in quel mese. Spesa dal warehouse (solo HOC, aggiornata a ieri)."}
         actions={hr ? null : <>
+          <TutorialVideoButton id="publisher-x-gestione" />
           {dirty && <button style={btnMain} onClick={save} disabled={busy}>{busy ? <Loader2 size={14} /> : <Save size={14} />}Salva le modifiche</button>}
           <button style={btn} onClick={refresh} disabled={busy}>{busy ? <Loader2 size={14} /> : <RefreshCw size={14} />}Ricalcola</button>
         </>}
