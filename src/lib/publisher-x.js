@@ -185,6 +185,12 @@ export async function getMyPublisher(verifiedEmails = []) {
   const nameOf = new Map(mine.map((e) => [e.creatorId, e.creatorName]));
   const rates = myCreators.map((id) => ({ profile: nameOf.get(id) || String(id), rate: rateFor(config, id) }));
   const cutoff = new Date(Date.now() - 100 * 86400000).toISOString(); // buste chiuse degli ultimi ~3 mesi + tutte le aperte
+  // 11/11 (Nicholas): al publisher i fan escono NUMERATI (Fan 1, 2, 3…) in ordine di arrivo, non con un codice.
+  // Il numero non rivela nulla del fan (né nome, né username, né id) e si legge meglio. Admin e referente
+  // continuano a vedere lo username nella loro pagina. Limite: la numerazione parte dal primo fan nella
+  // finestra dati (LOOKBACK_MONTHS): per un link più vecchio di così i numeri scalano quando i più vecchi escono.
+  const order = [...mine].sort((x, y) => String(x.subStart).localeCompare(String(y.subStart)) || String(x.creatorId).localeCompare(String(y.creatorId)) || String(x.userId).localeCompare(String(y.userId)));
+  const numOf = new Map(order.map((e, i) => [`${e.creatorId}|${e.userId}`, i + 1]));
   return {
     linked: true, name, dataUntil, windowDays: WINDOW_DAYS,
     deal: { rate: config.settings.pubRate, perProfileEur: perProfile, profiles: profilesFor(config, name, month), rates },
@@ -192,7 +198,7 @@ export async function getMyPublisher(verifiedEmails = []) {
     months: monthsHistory(mine, { config, publisher: name, fxByMonth }).slice(0, 6),
     open: { count: mine.filter((e) => !e.closed).length, bonusEur: r2(mine.filter((e) => !e.closed).reduce((s, e) => s + e.bonus, 0) * fx) },
     envelopes: mine.filter((e) => !e.closed || e.closeAt >= cutoff).map((e) => ({
-      code: fanCode(e.creatorId, e.userId), profile: e.creatorName, entered: e.subStart, closeAt: e.closeAt,
+      code: fanCode(e.creatorId, e.userId), n: numOf.get(`${e.creatorId}|${e.userId}`), profile: e.creatorName, entered: e.subStart, closeAt: e.closeAt,
       day: e.day, closed: e.closed, spent: e.spent, bonusEur: r2(e.bonus * fxFor(fxByMonth, e.closed ? e.closeMonth : month).fx), rate: e.rate,
     })),
   };

@@ -4,7 +4,7 @@
  * /me/publisher — la pagina del publisher su X (27/10/2026, disegno di Nicholas).
  * Ogni fan che arriva dal suo link apre una BUSTA: per 30 giorni si vede quanto spende,
  * al 30° giorno la busta si chiude (missione compiuta) e il compenso si sblocca e si somma.
- * Vede SOLO le sue buste: fan in codice (mai nome o username), niente fee, niente altri
+ * Vede SOLO le sue buste: fan numerati in ordine di arrivo (mai nome o username), niente fee, niente altri
  * publisher — il deal è una percentuale sulla spesa (lib/publisher-x getMyPublisher).
  */
 import { useMemo, useState } from "react";
@@ -14,6 +14,7 @@ import { CP, FONTS } from "@/lib/brand";
 import { PageHead, Notice, FilterChip, SectionTitle } from "@/components/ds";
 import VetroScope, { useVetro } from "@/components/VetroScope";
 import { KpiCard } from "@/components/VetroCharts";
+import { TutorialVideoButton } from "@/components/TutorialVideo";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -45,7 +46,7 @@ function Busta({ e, windowDays }) {
     <div className="vt-glass" style={{ borderRadius: 16, padding: "12px 14px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "6px 14px", alignItems: "center" }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14.5, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>Fan #{e.code}</span>
+          <span style={{ fontSize: 14.5, fontWeight: 500, color: CP.textPrimary, fontVariantNumeric: "tabular-nums" }}>Fan {e.n ?? `#${e.code}`}</span>
           <span style={muted}>{e.profile} · entrato il {dm(e.entered)}</span>
         </div>
       </div>
@@ -92,7 +93,7 @@ export default function MyPublisherPage() {
   return (
     <VetroScope on={vetro}>
       <div style={{ display: "grid", gap: 18, maxWidth: 1100, margin: "0 auto", padding: "8px 0 48px" }}>
-        <PageHead title="I miei fan"
+        <PageHead title="I miei fan" actions={<TutorialVideoButton id="publisher-i-miei-fan" />}
           subtitle="Ogni fan che arriva dal tuo link apre una busta: per 30 giorni conta tutto quello che spende. Al 30° giorno la busta si chiude e il tuo compenso si sblocca." />
 
         {error && <Notice danger>{error.message}</Notice>}
@@ -120,7 +121,7 @@ export default function MyPublisherPage() {
           )}
 
           <section style={{ display: "grid", gap: 10 }}>
-            <SectionTitle aside="i fan sono in codice: il nome non serve per il tuo lavoro">Le tue buste</SectionTitle>
+            <SectionTitle aside="i fan sono numerati in ordine di arrivo: il nome non serve per il tuo lavoro">Le tue buste</SectionTitle>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               <FilterChip label={`Tutte (${int(counts.all)})`} active={status === "all"} onClick={() => { setStatus("all"); setShown(PAGE); }} />
               <FilterChip label={`Aperte (${int(counts.open)})`} active={status === "open"} onClick={() => { setStatus("open"); setShown(PAGE); }} />

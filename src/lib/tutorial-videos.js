@@ -16,6 +16,11 @@
  *  - group: sezione in /guida ("Per tutti" | "Sales Manager" | "HR" | "Board"); senza group = "Altri video"
  */
 export const TUTORIAL_VIDEOS = [
+  // Publisher X (11/11/2026): due video. Gestione 16:9 per chi assegna link e invita (pulsante «Come funziona»
+  // in /admin/publisher-x); publisher 9:16 perché lo apre dal telefono (pulsante in /me/publisher, l'unica pagina
+  // che vede). Sorgenti in ~/Documents/progetti/hoc-video/tutorial-publisher-admin e tutorial-publisher.
+  { id: "publisher-x-gestione", title: "Publisher X: link, inviti e pagamenti", summary: "Assegnare un link e la data «Conta dal», Salva dalla barra in basso, email e «Salva e invita», Rimanda invito, il conto del mese e le buste, «Copia il testo» del deal, le sezioni riservate, «Vedi come» e come correggere un abbinamento.", src: "/video/tutorial-publisher-x-gestione.mp4", poster: "/video/tutorial-publisher-x-gestione.jpg", orientation: "landscape", durationSec: 87, audience: "Chi gestisce i publisher su X", adminOnly: true, asOf: "2026-11-11" },
+  { id: "publisher-i-miei-fan", title: "I miei fan: la pagina del publisher", summary: "Le buste da 30 giorni, Sbloccato e Sta maturando, il tuo deal (5% + 150 € per profilo), i filtri, i fan numerati e lo storico mese per mese.", src: "/video/tutorial-publisher-i-miei-fan.mp4", poster: "/video/tutorial-publisher-i-miei-fan.jpg", orientation: "portrait", durationSec: 82, audience: "Publisher su X", asOf: "2026-11-11" },
   // Serie «HOC Pro, vista per vista» (14/10/2026): 8 video 16:9, uno per pezzo di lavoro, con i passaggi
   // tra una pagina e l'altra. Sorgenti in ~/Documents/progetti/hoc-video/tour-app (motore riusabile).
   // Sostituisce il vecchio «La settimana del Sales Manager» (03/10), coperto e aggiornato da hoc-sm-settimana.
