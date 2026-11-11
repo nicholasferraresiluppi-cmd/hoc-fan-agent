@@ -210,6 +210,19 @@ export async function fetchSocialTalentRevenue({ startDate, endDate, page = 1, l
   });
 }
 
+/**
+ * Account Instagram di Social Analytics (11/11/2026, endpoint letto dal bundle di app.creatorspro.com):
+ * GET /v1/social-metrics/instagram/all/accounts/list/timeframe → {data:[{accountId, username,
+ * clicksInBio, linksInBioUrls:[url OnlyFans], followers, ...}], pagination:{hasNextPage}}.
+ * `clicksInBio` = clic sui tracking link OnlyFans di `linksInBioUrls` (gli stessi di links_stats).
+ */
+export async function fetchInstagramAccountsList({ startDate, endDate, page = 1, limit = 600 } = {}) {
+  return apiFetch("/v1/social-metrics/instagram/all/accounts/list/timeframe", {
+    query: { startDate, endDate, page, limit },
+    timeoutMs: 30000,
+  });
+}
+
 export async function fetchPaymentProfiles({ page = 1, limit = 100 } = {}) {
   return apiFetch("/v1/payment-profiles", { query: { page, limit } });
 }

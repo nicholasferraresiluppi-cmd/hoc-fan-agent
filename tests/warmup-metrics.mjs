@@ -22,6 +22,34 @@ const igRow = {
   ],
 };
 
+t("Instagram: link in bio (anche fra i link multipli)", () => {
+  assert.equal(M.parseInstagram(igRow, AT).website, null);
+  assert.equal(M.parseInstagram({ ...igRow, externalUrl: "https://onlyfans.com/giuliaottorini/c216" }, AT).website, "https://onlyfans.com/giuliaottorini/c216");
+  const multi = { ...igRow, externalUrl: "https://linktr.ee/g", externalUrls: [{ url: "https://linktr.ee/g" }, { url: "https://onlyfans.com/giuliaottorini/c216" }] };
+  assert.equal(M.parseInstagram(multi, AT).website, "https://onlyfans.com/giuliaottorini/c216");
+  assert.equal(M.parseInstagram({ ...igRow, externalUrls: [{ url: "https://linktr.ee/g" }] }, AT).website, "https://linktr.ee/g");
+});
+
+t("Instagram: link associato da CreatorsPro quando in bio non c'è", () => {
+  const m = M.cpLinksByHandle([
+    { username: "About.Julii_", linksInBioUrls: ["https://onlyfans.com/giuliaottorini/c216"] },
+    { username: "ellyvimercati", linksInBioUrls: [] },
+    { username: "x", linksInBioUrls: ["https://linktr.ee/x", "https://onlyfans.com/x/c9"] },
+  ]);
+  assert.equal(m.get("about.julii_"), "https://onlyfans.com/giuliaottorini/c216");
+  assert.equal(m.has("ellyvimercati"), false);
+  assert.equal(m.get("x"), "https://onlyfans.com/x/c9");
+  assert.deepEqual(M.effectiveLink({ platform: "ig" }, { website: null, cpLink: m.get("about.julii_") }), { url: "onlyfans.com/giuliaottorini/c216", from: "creatorspro" });
+  // la bio vince su CreatorsPro, il link scritto a mano vince su tutto
+  assert.equal(M.effectiveLink({ platform: "ig" }, { website: "onlyfans.com/a/c1", cpLink: "onlyfans.com/b/c2" }).from, "bio");
+  assert.equal(M.effectiveLink({ platform: "ig", trackingLink: "onlyfans.com/c/c3" }, { cpLink: "onlyfans.com/b/c2" }).from, "profilo");
+});
+
+t("Instagram: tocchi in bio = clic del tracking link della settimana", () => {
+  assert.deepEqual(M.prefillFor("ig", { followers: 4, linkClicks: 58 }), { followers: 4, taps: 58 });
+  assert.deepEqual(M.prefillFor("ig", { followers: 4 }), { followers: 4 }); // senza link resta a mano
+});
+
 t("Instagram: profilo letto", () => {
   const r = M.parseInstagram(igRow, AT);
   assert.equal(r.followers, 2); assert.equal(r.posts, 19); assert.equal(r.notFound, false);
@@ -131,7 +159,10 @@ t("allarme copertura: crollo, calo, pochi dati", () => {
 t("tracking link OnlyFans: quale si usa, righe del magazzino, settimana", () => {
   assert.equal(M.effectiveLink({ platform: "ig", trackingLink: "https://onlyfans.com/Giulia/c12?x=1" }, null).url, "onlyfans.com/giulia/c12");
   assert.deepEqual(M.effectiveLink({ platform: "x" }, { website: "https://onlyfans.com/elisavimercati/c320" }), { url: "onlyfans.com/elisavimercati/c320", from: "bio" });
-  assert.equal(M.effectiveLink({ platform: "ig" }, { website: "https://onlyfans.com/x/c1" }), null); // su IG la bio ha il dominio, non il link
+  // dall'11/11/2026 anche su IG: se in bio c'è il link OnlyFans si usa (è quello che CreatorsPro conta come «click in bio»)
+  assert.deepEqual(M.effectiveLink({ platform: "ig" }, { website: "https://onlyfans.com/x/c1" }), { url: "onlyfans.com/x/c1", from: "bio" });
+  assert.equal(M.effectiveLink({ platform: "ig" }, { website: "https://mio-dominio.com/elisa" }), null); // un dominio non è un tracking link
+  assert.equal(M.effectiveLink({ platform: "ig", trackingLink: "onlyfans.com/a/c2" }, { website: "https://onlyfans.com/x/c1" }).url, "onlyfans.com/a/c2"); // quello scritto vince
   const sql = M.linkStatsSQL(["https://onlyfans.com/elisavimercati/c320", "non un link"], { dataset: "d", orgId: "o" });
   assert.match(sql, /IN \('onlyfans.com\/elisavimercati\/c320'\)/);
   assert.equal(M.linkStatsSQL(["nulla"], { dataset: "d", orgId: "o" }), null);

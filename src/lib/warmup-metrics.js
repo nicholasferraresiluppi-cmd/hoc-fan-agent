@@ -9,8 +9,24 @@
 import { kv } from "@vercel/kv";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
 import { lastWeeks } from "@/lib/warmup-plan";
-import { parseInstagram, parseReels, withReels, wakeups, reelBudget, REEL_DAYS, REEL_LIMIT, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows, linkNeedsCheck } from "@/lib/warmup-metrics-core";
+import { parseInstagram, parseReels, withReels, wakeups, reelBudget, REEL_DAYS, REEL_LIMIT, parseX, mergeReading, weeklyFromStore, dailyFromStore, postsFromStore, reachCheck, handleOf, romeDay, runBudget, PRICE, effectiveLink, linkStatsSQL, mergeLinkRows, linkNeedsCheck, cpLinksByHandle } from "@/lib/warmup-metrics-core";
 import { bqQuery, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
+import { fetchInstagramAccountsList } from "@/lib/creatorspro-api";
+
+/** Il tracking link che CreatorsPro associa a ogni account IG (Social Analytics). Errore → mappa vuota. */
+async function cpLinks(errors) {
+  if (!process.env.CREATORSPRO_BOT_EMAIL) return new Map();
+  const endDate = new Date().toISOString(), startDate = new Date(Date.now() - 7 * 86400000).toISOString();
+  const rows = [];
+  try {
+    for (let page = 1; page <= 6; page++) {
+      const r = await fetchInstagramAccountsList({ startDate, endDate, page, limit: 600 });
+      rows.push(...(r?.data || []));
+      if (!r?.pagination?.hasNextPage) break;
+    }
+  } catch (e) { errors.push("CreatorsPro: " + (e.message || e)); }
+  return cpLinksByHandle(rows);
+}
 
 const API = "https://api.apify.com/v2";
 const RUN = "warmup:pub:run";
@@ -55,11 +71,12 @@ export async function refreshPublicMetrics({ force = false } = {}) {
     const list = all.filter((x) => x.handle);
     const ig = list.filter((x) => x.platform === "ig"), xs = list.filter((x) => x.platform === "x");
     const at = Date.now();
-    const [igRows, reelRows, xProfiles, xPosts] = await Promise.all([
+    const [igRows, reelRows, xProfiles, xPosts, cpBy] = await Promise.all([
       ig.length ? runSync(IG_ACTOR, { usernames: ig.map((x) => x.handle) }, { maxUsd: runBudget(ig.length, 0) }).catch((e) => { errors.push(e.message); return null; }) : [],
       ig.length ? runSync(IG_REEL_ACTOR, { username: ig.map((x) => x.handle), resultsLimit: REEL_LIMIT, onlyPostsNewerThan: `${REEL_DAYS} days` }, { maxUsd: reelBudget(ig.length) }).catch((e) => { errors.push("reel: " + e.message); return null; }) : [],
       xs.length ? runSync(X_PROFILE_ACTOR, { usernames: xs.map((x) => x.handle) }, { maxUsd: runBudget(0, xs.length) }).catch((e) => { errors.push(e.message); return null; }) : [],
       xs.length ? runSync(X_POSTS_ACTOR, { twitterHandles: xs.map((x) => x.handle), maxItems: 40 * xs.length, getAboutData: false }, { maxUsd: runBudget(0, xs.length) }).catch((e) => { errors.push(e.message); return null; }) : [],
+      ig.length ? cpLinks(errors) : new Map(),
     ]);
     const key = (h) => String(h || "").toLowerCase();
     const reelsBy = parseReels(reelRows);
@@ -70,7 +87,10 @@ export async function refreshPublicMetrics({ force = false } = {}) {
     let read = 0, notFound = 0;
     for (const t of list) {
       let reading = null;
-      if (t.platform === "ig" && igRows) reading = withReels(parseInstagram(igBy.get(key(t.handle)), at), reelsBy.get(key(t.handle)));
+      if (t.platform === "ig" && igRows) {
+        reading = withReels(parseInstagram(igBy.get(key(t.handle)), at), reelsBy.get(key(t.handle)));
+        if (reading) reading.cpLink = cpBy.get(key(t.handle)) || null;
+      }
       if (t.platform === "x" && xProfiles) reading = parseX(xBy.get(key(t.handle)), tweetsBy.get(key(t.handle)) || [], at);
       if (!reading) continue;
       const merged = mergeReading(await kv.get(PUB(t.id)), reading);

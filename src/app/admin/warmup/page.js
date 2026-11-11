@@ -194,7 +194,7 @@ function ProfileForm({ edit, plat, preCreator, creators, devices, people, admin,
             </select>
           </Field>
         )}
-        <Field label="Tracking link OnlyFans di questo account" hint={px ? "Quello in bio. Se lo lasci vuoto si usa quello che si legge dal profilo pubblico: clic, iscritti e ricavo arrivano da soli." : "Il link di tracciamento OnlyFans che porta il traffico di QUESTO account (anche se in bio c'è un dominio che ci rimanda): clic, iscritti e ricavo arrivano da soli."}>
+        <Field label="Tracking link OnlyFans di questo account" hint={px ? "Quello in bio. Se lo lasci vuoto si usa quello che si legge dal profilo pubblico: clic, iscritti e ricavo arrivano da soli." : "Se in bio c'è già il link OnlyFans, o CreatorsPro lo associa a questo account, si legge da solo e puoi lasciarlo vuoto. Scrivilo solo se in bio c'è un dominio che rimanda a OnlyFans: clic (cioè i tocchi in bio), iscritti e ricavo arrivano da soli."}>
           <input style={input} value={f.trackingLink} onChange={set("trackingLink")} placeholder="https://onlyfans.com/pagina/c123" autoCapitalize="none" autoCorrect="off" />
         </Field>
         <Field label="Note"><textarea style={{ ...input, minHeight: 64, resize: "vertical" }} value={f.notes} onChange={set("notes")} placeholder="Nicchia, branding, link assegnato dal PM…" /></Field>
@@ -267,7 +267,7 @@ function PublicCard({ a, wk, label }) {
           )}
         </>
       )}
-      <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "Visite al profilo e tocchi sul link li vede solo l'app: restano da segnare a mano. "}{x ? "Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine." : "Ogni notte si rileggono tutti i reel degli ultimi 45 giorni: il numero di una settimana cresce finché crescono i suoi reel."}</p>
+      <p style={{ ...hint, margin: "10px 0 0" }}>Solo quello che vede chiunque apra il profilo. {x ? "" : "I tocchi sul link in bio arrivano dai clic sul tracking link OnlyFans in bio; le visite al profilo le vede solo l'app e restano da segnare a mano. "}{x ? "Le visualizzazioni di un post crescono nei giorni dopo: il numero di una settimana si assesta qualche giorno dopo la fine." : "Ogni notte si rileggono tutti i reel degli ultimi 45 giorni: il numero di una settimana cresce finché crescono i suoi reel."}</p>
     </div>
   );
 }
@@ -275,7 +275,7 @@ function PublicCard({ a, wk, label }) {
 // tracking link OnlyFans dell'account: clic, iscritti e ricavo dal magazzino dati
 function LinkLine({ l, w }) {
   const box = { marginTop: 12, padding: "10px 12px", borderRadius: 10, border: `1px solid ${CP.borderSoft}`, background: CP.bgSunken, fontSize: 14 };
-  if (!l) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · non impostato: aggiungilo nei dati del profilo e da domani arrivano da soli clic, iscritti e ricavo di questo account.</div>;
+  if (!l) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · nessun link OnlyFans in bio e nessuno scritto nei dati del profilo. Aggiungilo e da domani arrivano da soli clic (i tocchi in bio), iscritti e ricavo di questo account.</div>;
   if (l.missing) return <div style={box}><b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b> · <span style={NUM}>{l.url}</span> non risulta ancora tra i link delle creator HOC. Un link appena creato compare nei dati qualche ora dopo e si ricontrolla da solo; se resta così per più di un giorno, controlla che sia giusto.</div>;
   const t = l.total || {};
   const money = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("it-IT", { maximumFractionDigits: 0 }));
@@ -283,7 +283,7 @@ function LinkLine({ l, w }) {
     <div style={box}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "baseline", marginBottom: 8 }}>
         <b style={{ fontWeight: 500 }}>Tracking link OnlyFans</b>
-        <span style={{ ...hint, ...NUM }}>{l.url}{l.name ? ` · «${l.name}»` : ""}{l.created ? ` · creato il ${new Date(l.created + "T12:00:00").toLocaleDateString("it-IT")}` : ""}{l.from === "bio" ? " · letto dalla bio" : ""}</span>
+        <span style={{ ...hint, ...NUM }}>{l.url}{l.name ? ` · «${l.name}»` : ""}{l.created ? ` · creato il ${new Date(l.created + "T12:00:00").toLocaleDateString("it-IT")}` : ""}{l.from === "bio" ? " · letto dalla bio" : l.from === "creatorspro" ? " · associato all'account in CreatorsPro" : ""}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
         <Metric2 value={numFmt(t.clicks)} label="Clic in tutto" sub={w?.linkClicks != null ? `${w.linkClicks} questa settimana` : null} />
@@ -339,8 +339,9 @@ function WeeklyPane({ a, onSave }) {
   const rec = W[wk] || {};
   const F = wfields(a);
   const [vals, setVals] = useState({});
-  // settimana non ancora salvata: i campi vuoti si precompilano coi numeri letti dal profilo pubblico
-  const auto = W[wk] ? {} : Object.fromEntries(Object.entries(prefillFor(a.platform, a.pub?.weekly?.[wk])).filter(([, v]) => v != null));
+  // i campi vuoti si precompilano coi numeri letti in automatico: tutti nella settimana non ancora salvata,
+  // i tocchi in bio (clic sul tracking link) anche in quelle già salvate senza (11/11/2026)
+  const auto = Object.fromEntries(Object.entries(prefillFor(a.platform, a.pub?.weekly?.[wk])).filter(([k, v]) => v != null && (rec[k] == null || rec[k] === "") && (!W[wk] || k === "taps")));
   useEffect(() => { setVals(Object.fromEntries(F.map((x) => [x.k, rec[x.k] != null ? String(rec[x.k]) : auto[x.k] != null ? String(auto[x.k]).replace(".", ",") : ""]))); }, [wk, a.id, a.pub?.lastAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const filled = Object.keys(W).sort().reverse();
   const prevKey = filled.find((k) => k < wk);
@@ -371,7 +372,7 @@ function WeeklyPane({ a, onSave }) {
           {F.filter((x) => x.num).map((x) => {
             const g = xGoal(x, live);
             return (
-              <Field key={x.k} label={x.lab} hint={x.goalTxt || auto[x.k] != null ? <>{x.goalTxt && <span style={g == null ? undefined : { color: g ? CP.accentGreen : CP.accentRed, fontWeight: 500 }}>{x.goalTxt}{g == null ? "" : g ? " ✓" : " ✗"}</span>}{auto[x.k] != null && <span style={{ color: CP.accentSoftText }}>{x.goalTxt ? " · " : ""}dal profilo pubblico, controlla</span>}</> : null}>
+              <Field key={x.k} label={x.lab} hint={x.goalTxt || auto[x.k] != null ? <>{x.goalTxt && <span style={g == null ? undefined : { color: g ? CP.accentGreen : CP.accentRed, fontWeight: 500 }}>{x.goalTxt}{g == null ? "" : g ? " ✓" : " ✗"}</span>}{auto[x.k] != null && <span style={{ color: CP.accentSoftText }}>{x.goalTxt ? " · " : ""}{x.k === "taps" ? "clic sul tracking link in bio" : "dal profilo pubblico, controlla"}</span>}</> : null}>
                 <input style={{ ...input, ...NUM }} inputMode={x.dec ? "decimal" : "numeric"} placeholder="0" value={vals[x.k] ?? ""} onChange={(e) => setVals((v) => ({ ...v, [x.k]: e.target.value }))} />
               </Field>
             );
@@ -407,7 +408,7 @@ function WeeklyPane({ a, onSave }) {
               <thead><tr><th style={th}>Settimana</th>{F.filter((x) => x.num).map((x) => <th key={x.k} style={{ ...th, textAlign: "right" }}>{x.lab}</th>)}{F.filter((x) => !x.num && !x.big).map((x) => <th key={x.k} style={th}>{x.lab}</th>)}</tr></thead>
               <tbody>{filled.map((k) => { const r = W[k], w = weeks.find((x) => x.key === k); return (
                 <tr key={k} style={k === wk ? { background: CP.accentSoft } : undefined}><td style={td}><b style={{ fontWeight: 500 }}>{w ? w.label : k}</b></td>
-                  {F.filter((x) => x.num).map((x) => <td key={x.k} style={{ ...td, textAlign: "right", ...NUM }}>{numFmt(r[x.k])}</td>)}
+                  {F.filter((x) => x.num).map((x) => { const v = r[x.k] === "" || r[x.k] == null ? (x.k === "taps" ? prefillFor(a.platform, a.pub?.weekly?.[k]).taps : null) : r[x.k]; return <td key={x.k} style={{ ...td, textAlign: "right", ...NUM }} title={r[x.k] == null && v != null ? "clic sul tracking link in bio" : undefined}>{numFmt(v)}</td>; })}
                   {F.filter((x) => !x.num && !x.big).map((x) => <td key={x.k} style={td}>{r[x.k] || "—"}</td>)}</tr>); })}</tbody>
             </table>
           </div>

@@ -46,6 +46,12 @@ export function handleOf(username) {
 
 const num = (v) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
 
+/** Il link in bio di Instagram (anche fra i link multipli): il primo tracking link OnlyFans, altrimenti il primo link. */
+function igBioLink(item) {
+  const urls = [...(item.externalUrls || []).map((x) => x?.url), item.externalUrl].filter(Boolean).map(String);
+  return urls.find((u) => normalizeLinkUrl(u)) || urls[0] || null;
+}
+
 /** Una riga di apify/instagram-profile-scraper → lettura. */
 export function parseInstagram(item, at = Date.now()) {
   if (!item) return null;
@@ -64,6 +70,7 @@ export function parseInstagram(item, at = Date.now()) {
     private: Boolean(item.private),
     followers: num(item.followersCount), following: num(item.followsCount), posts: num(item.postsCount),
     highlights: num(item.highlightReelCount), professional: Boolean(item.isBusinessAccount || item.businessCategoryName),
+    website: igBioLink(item),
     items: posts,
   };
 }
@@ -248,8 +255,22 @@ export const normalizeOfLink = (u) => normalizeLinkUrl(u);
 export function effectiveLink(rec, pubLast) {
   const own = normalizeLinkUrl(rec?.trackingLink);
   if (own) return { url: own, from: "profilo" };
-  if (rec?.platform === "x") { const bio = normalizeLinkUrl(pubLast?.website); if (bio) return { url: bio, from: "bio" }; }
+  // dal 11/11/2026 anche su Instagram: lo stesso link che CreatorsPro legge in bio per i suoi «click in bio»
+  const bio = normalizeLinkUrl(pubLast?.website); if (bio) return { url: bio, from: "bio" };
+  // CreatorsPro associa all'account il suo link anche quando in bio non c'è (es. «check my story»)
+  const cp = normalizeLinkUrl(pubLast?.cpLink); if (cp) return { url: cp, from: "creatorspro" };
   return null;
+}
+
+/** Righe di CreatorsPro (Social Analytics IG) → nome utente minuscolo → primo tracking link OnlyFans. */
+export function cpLinksByHandle(rows) {
+  const out = new Map();
+  for (const r of rows || []) {
+    const u = String(r?.username || "").toLowerCase();
+    const l = (r?.linksInBioUrls || []).find((x) => normalizeLinkUrl(x));
+    if (u && l && !out.has(u)) out.set(u, l);
+  }
+  return out;
 }
 
 export function linkStatsSQL(urls, { dataset, orgId, days = 120 }) {
@@ -366,7 +387,9 @@ function prefillRaw(platform, w) {
   if (platform === "x") return { followers: w.followersDelta, views: w.avgViews, eng: w.engagementPct, clicks: w.linkClicks, subs: w.linkSubs, spent: w.linkRevenue };
   // le «Visualizzazioni» del modulo sono quelle dell'app (tutto l'account, anche reel vecchi e storie):
   // non si precompilano con la somma dei reel della settimana, che è un altro numero (5/11/2026)
-  return { followers: w.followers };
+  // «Tocchi link in bio» = clic sul tracking link OnlyFans della settimana (11/11/2026): è il link in bio,
+  // quindi lo stesso numero che CreatorsPro chiama «click in bio». Senza link resta a mano.
+  return { followers: w.followers, taps: w.linkClicks };
 }
 
 /** Avvisi per «Da non dimenticare» dalla lettura pubblica più recente. */
