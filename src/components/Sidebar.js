@@ -97,7 +97,6 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
-      { href: "/admin/publisher-x",              label: "Publisher X",           icon: UserPlus },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
@@ -161,6 +160,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/editing",                  label: "Editing",         icon: Scissors },
       { href: "/admin/studio-social",            label: "Regia social",    icon: Clapperboard },
       { href: "/admin/supervisor",               label: "Account social",  icon: Share2 },
+      { href: "/admin/publisher-x",              label: "Publisher X",     icon: UserPlus },
       { href: "/admin/warmup",                   label: "Clipping",       icon: Sunrise },
       { href: "/admin/piani",                    label: "Piani",          icon: ListChecks },
       { href: "/admin/social-proxies",           label: "Proxy account social", icon: Shield },
