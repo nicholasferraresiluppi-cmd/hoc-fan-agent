@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save, Wallet, Mail, Hourglass, Landmark, Send, Lock } from "lucide-react";
+import { Loader2, RefreshCw, Copy, ExternalLink, Plus, Save, Wallet, Mail, Hourglass, Landmark, Send, Lock, Search, X } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, Metric, FilterChip, DataTable, Notice, SectionTitle, card, BTN_PRIMARY, Riservato } from "@/components/ds";
@@ -180,6 +180,7 @@ export default function PublisherXPage() {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(null);
   const [onlyX, setOnlyX] = useState(true);
+  const [q, setQ] = useState("");
   const [adding, setAdding] = useState({ creatorId: "", linkName: "", publisher: "" });
 
   useEffect(() => { if (data?.config && !draft) setDraft(data.config); }, [data, draft]);
@@ -263,7 +264,12 @@ export default function PublisherXPage() {
   const T = pubs.reduce((s, p) => ({ total: s.total + p.totalEur, subs: s.subs + p.subs, bonus: s.bonus + p.bonusEur, base: s.base + p.baseEur, margin: s.margin + (p.margin || 0), openCount: s.openCount + p.openCount, openBonus: s.openBonus + p.openBonusEur }), { total: 0, subs: 0, bonus: 0, base: 0, margin: 0, openCount: 0, openBonus: 0 });
   const priv = data?.view === "full"; // fee, provvigione chatter e margine: solo chi tiene la contabilità
   const [vetro] = useVetro();
-  const shownLinks = links.filter((l) => !onlyX || l.isX || l.publisher);
+  // ricerca (11/11): su profilo, link e publisher; mentre si cerca vale su TUTTI i link, non solo quelli X
+  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const terms = norm(q).split(/\s+/).filter(Boolean);
+  const shownLinks = terms.length
+    ? links.filter((l) => { const hay = norm(`${l.creatorName} ${l.linkName} ${assignOf(l)?.publisher || l.publisher || ""}`); return terms.every((t) => hay.includes(t)); })
+    : links.filter((l) => !onlyX || l.isX || l.publisher);
   const settings = cfg?.settings;
   // spesa media a 30 gg dei fan da X (pesata sui fan con 30 giorni chiusi): l'esempio del deal
   const xLinks = links.filter((l) => l.isX && l.avgD30 !== null && l.mature6m > 0);
@@ -349,7 +355,14 @@ export default function PublisherXPage() {
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
             <FilterChip label={`Link X e assegnati (${int(links.filter((l) => l.isX || l.publisher).length)})`} active={onlyX} onClick={() => setOnlyX(true)} />
             <FilterChip label={`Tutti (${int(links.length)})`} active={!onlyX} onClick={() => setOnlyX(false)} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", border: `1px solid ${CP.border}`, borderRadius: 8, background: CP.surface, flex: "0 1 300px", marginLeft: "auto" }}>
+              <Search size={14} color={CP.textMuted} />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca profilo, link o publisher" aria-label="Cerca profilo, link o publisher"
+                style={{ border: "none", outline: "none", background: "transparent", color: CP.textPrimary, fontSize: 14, width: "100%", fontFamily: FONTS.body }} />
+              {q && <button type="button" onClick={() => setQ("")} aria-label="Cancella ricerca" style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}><X size={14} color={CP.textMuted} /></button>}
+            </label>
           </div>
+          {terms.length > 0 && <div style={{ fontSize: 13, color: CP.textMuted, marginBottom: 8 }}>{shownLinks.length ? `${int(shownLinks.length)} link trovati su tutti i ${int(links.length)}` : "Nessun link trovato: prova con una parte del nome"}</div>}
           <DataTable
             rows={shownLinks.map((l) => ({ ...l, id: l.key }))}
             defaultSort={{ key: "subsMonth", dir: -1 }}
