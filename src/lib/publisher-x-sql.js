@@ -50,6 +50,22 @@ ORDER BY subs_month DESC, subs_6m DESC`;
 }
 
 /**
+ * Tutti i link di tutti i profili dell'org negli ultimi 6 mesi (11/11): per assegnare a mano un link X
+ * che il nome non tradisce, anche su un profilo che di link X riconosciuti non ne ha.
+ */
+export function allLinksSql({ table, org }) {
+  return `
+SELECT creator_id, ANY_VALUE(creator_name) AS creator_name, link_name, COUNT(*) AS subs_6m
+FROM ${table}
+WHERE organization_id = ${sqlStr(org)}
+  AND is_first_sub
+  AND link_name IS NOT NULL
+  AND sub_start_at >= TIMESTAMP(DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL ${LOOKBACK_MONTHS} MONTH))
+GROUP BY creator_id, link_name
+ORDER BY creator_name, subs_6m DESC`;
+}
+
+/**
  * Le buste: i fan nuovi entrati dai link assegnati da `since` (YYYY-MM-DD, ora di Roma) in poi.
  * Una sola lettura per tutti i mesi: il mese di pagamento dipende dalla CHIUSURA (ingresso + 30 gg).
  * spend_d30 di una busta aperta = speso fino a oggi (verificato al centesimo con attributed_transactions).

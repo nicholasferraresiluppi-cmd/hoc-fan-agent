@@ -23,13 +23,14 @@ import { HOC_ORGANIZATION_ID, bqQuery, bqProjects } from "@/lib/bigquery-api";
 import { createHmac } from "node:crypto";
 import { sanitizeConfig, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, profilesFor, fxFor, monthOf, linkKey, isXLink, feeFor, rateFor, splitDollar, WINDOW_DAYS } from "@/lib/publisher-x-core";
 import { getFx } from "@/lib/referral";
-import { linksSql as linksSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
+import { linksSql as linksSqlFor, allLinksSql as allLinksSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
 
 export const PUBX_VERSION = "pubx-1";
 const CONFIG_KEY = "pubx:config";
 const MAX_BYTES = 2 * 1024 ** 3;
 const T = () => ({ table: `\`${bqProjects().dataProject}.hoc.newsubs_spending\``, org: HOC_ORGANIZATION_ID });
 const linksSql = (month, links) => linksSqlFor(T(), month, links);
+const allLinksSql = () => allLinksSqlFor(T());
 const fansSql = (since, links) => fansSqlFor(T(), since, links);
 const untilSql = () => untilSqlFor(T());
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -114,6 +115,14 @@ export async function getOverview(month, { force = false, view = "full" } = {}) 
     linkRows = (await bqQuery(linksSql(month, config.links), { maxBytesBilled: MAX_BYTES })).rows;
     await kv.set(lk, linkRows, { ex: 26 * 3600 }).catch(() => {});
   }
+  // catalogo di tutti i profili e dei loro link (per «Aggiungi»): non dipende dal mese né dagli abbinamenti
+  const ck = cacheKey("all-links", 0);
+  let catalogRows = force ? null : await kv.get(ck).catch(() => null);
+  if (!catalogRows) {
+    catalogRows = (await bqQuery(allLinksSql(), { maxBytesBilled: MAX_BYTES }).catch(() => ({ rows: [] }))).rows || [];
+    if (catalogRows.length) await kv.set(ck, catalogRows, { ex: 26 * 3600 }).catch(() => {});
+  }
+  const catalog = catalogRows.map((r) => ({ creatorId: Number(r.creator_id), creatorName: r.creator_name || String(r.creator_id), linkName: r.link_name, subs6m: Number(r.subs_6m) || 0 }));
   const assigned = new Map(config.links.map((l) => [linkKey(l.creatorId, l.linkName), l]));
   const links = linkRows.map((r) => {
     const creatorId = Number(r.creator_id);
@@ -136,7 +145,7 @@ export async function getOverview(month, { force = false, view = "full" } = {}) 
     }
   }
   const out = {
-    ...base, current, links,
+    ...base, current, links, catalog,
     publishers: publishers.map(({ fans, ...p }) => ({ ...p, creators: [...new Set(fans.map((x) => x.creatorName))] })),
     config,
   };

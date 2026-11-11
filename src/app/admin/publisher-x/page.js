@@ -192,9 +192,11 @@ export default function PublisherXPage() {
   const pubNames = useMemo(() => [...new Set((cfg?.links || []).map((l) => l.publisher))].sort((a, b) => a.localeCompare(b, "it")), [cfg]);
   const creators = useMemo(() => {
     const m = new Map();
-    for (const l of links) if (!m.has(l.creatorId)) m.set(l.creatorId, l.creatorName);
+    // tutti i profili dell'org (catalogo), non solo quelli con un link X riconosciuto (11/11)
+    for (const l of [...(data?.catalog || []), ...links]) if (!m.has(l.creatorId)) m.set(l.creatorId, l.creatorName);
     return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [links]);
+  }, [links, data?.catalog]);
+  const creatorLinks = useMemo(() => (data?.catalog || []).filter((l) => String(l.creatorId) === String(adding.creatorId)), [data?.catalog, adding.creatorId]);
 
   const assignOf = (row) => (cfg?.links || []).find((l) => linkKey(l.creatorId, l.linkName) === row.key);
   const setAssign = (row, patch) => setDraft((d) => {
@@ -385,18 +387,19 @@ export default function PublisherXPage() {
               ...(priv ? [{ key: "perSubToAgency", label: "All'agenzia per fan", align: "right", render: (l) => <span style={{ color: l.perSubToAgency < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(l.perSubToAgency)}</span> }] : []),
             ]}
           />
+          <datalist id="pubx-creator-links">{creatorLinks.map((l) => <option key={l.linkName} value={l.linkName}>{`${int(l.subs6m)} fan in 6 mesi`}</option>)}</datalist>
           <datalist id="pubx-names">{pubNames.map((n) => <option key={n} value={n} />)}</datalist>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-            <span style={muted}>Un link X che non riconosco dal nome?</span>
+            <span style={muted}>Un link X che non riconosco dal nome, o un profilo che non è in tabella?</span>
             <select value={adding.creatorId} onChange={(e) => setAdding((a) => ({ ...a, creatorId: e.target.value }))} style={input} aria-label="Profilo">
               <option value="">Profilo</option>
               {creators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <input placeholder="nome esatto del link" value={adding.linkName} onChange={(e) => setAdding((a) => ({ ...a, linkName: e.target.value }))} style={{ ...input, width: 220 }} />
+            <input list="pubx-creator-links" placeholder={adding.creatorId ? "scegli o scrivi il link" : "nome esatto del link"} value={adding.linkName} onChange={(e) => setAdding((a) => ({ ...a, linkName: e.target.value }))} style={{ ...input, width: 220 }} />
             <input list="pubx-names" placeholder="publisher" value={adding.publisher} onChange={(e) => setAdding((a) => ({ ...a, publisher: e.target.value }))} style={{ ...input, width: 140 }} />
             <button style={{ ...btn, padding: "6px 10px" }} onClick={addLink} disabled={!adding.creatorId || !adding.linkName.trim() || !adding.publisher.trim()}><Plus size={13} />Aggiungi</button>
           </div>
-          <div style={{ ...muted, marginTop: 6 }}>Per i profili che non sono in elenco serve almeno un link X con fan. Dopo aver aggiunto, salva e ricalcola: il link compare con i suoi numeri.</div>
+          <div style={{ ...muted, marginTop: 6 }}>Ci sono tutti i profili: scegli il profilo e poi il link dall'elenco (con i fan arrivati negli ultimi 6 mesi). Dopo aver aggiunto, salva: il link compare in tabella con i suoi numeri.</div>
         </section>
 
         {settings && <DealCard settings={settings} avgSpend={avgSpend} overrides={overrides} onSet={setSetting} fx={data.fx || 0.86} />}
