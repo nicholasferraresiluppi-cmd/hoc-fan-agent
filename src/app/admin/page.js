@@ -59,7 +59,6 @@ const SHORTCUT_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",          title: "P&L Live",            desc: "Per creator: venduto e costo degli operatori, anche sul mese in corso", icon: Wallet },
       { href: "/admin/retention",         title: "Retention fan",       desc: "Per pagina dello split: dipendenza dai fan più grossi, fan di valore in pausa, nuovi che tornano", icon: Repeat },
-      { href: "/admin/publisher-x",       title: "Publisher X",         desc: "Quanto pagare chi porta sub da X: fan per fan, sui loro primi 30 giorni", icon: UserPlus },
       { href: "/admin/comp-calendar",     title: "Calendario compensi", desc: "Quanto costa ogni giorno di turni e perché, con simulatore", icon: Calendar },
       { href: "/admin/profiles-compare",  title: "Scaglioni a confronto", desc: "Standardizzazione dei profili di pagamento", icon: Scale },
     ],
@@ -135,6 +134,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/editing", title: "Editing", desc: "Una scrivania per creator: la squadra che produce i reel, dal girato al reel misurato, con la cosa che blocca adesso", icon: Scissors },
       { href: "/admin/studio-social", title: "Regia social", desc: "I profili social delle creator gestiti dalla redazione: identità, coda dei contenuti con i revisori, cosa fare oggi a mano", icon: Clapperboard },
       { href: "/admin/supervisor", title: "Account social", desc: "Account di promozione per creator e alterego, telefoni dei publisher, caselle mail e link in bio; password cifrate, viste una alla volta e registrate", icon: Share2 },
+      { href: "/admin/publisher-x", title: "Publisher X", desc: "Quanto pagare chi porta sub da X: fan per fan, sui loro primi 30 giorni", icon: UserPlus },
       { href: "/admin/warmup", title: "Clipping", desc: "I profili Instagram e X delle creator: il to-do di oggi (warm-up e contenuti da pubblicare), il calendario dei contenuti dal drive, segnalazioni, cooldown e numeri della settimana", icon: Sunrise },
       { href: "/admin/piani", title: "Piani", desc: "I piani di lavoro a fasi (come gli sprint): chi fa cosa e per quando, le voci che si spuntano da sole dai dati, le decisioni con le loro condizioni", icon: ListChecks },
       { href: "/admin/social-proxies", title: "Proxy account social", desc: "Proxy SOCKS5/HTTP per isolare le connessioni degli account social ufficiali dei creator", icon: Shield },
