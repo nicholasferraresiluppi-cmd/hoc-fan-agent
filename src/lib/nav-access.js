@@ -10,6 +10,8 @@ const SCOPE_RANK = { own: 1, team: 2, all: 3 };
 const all = (cap) => ({ type: "cap", cap, scope: "all" });
 const any = (cap) => ({ type: "cap", cap, scope: "any" });
 const SEED = any("seed");
+// basta UNO dei permessi elencati (scope qualsiasi)
+const anyOf = (...caps) => ({ type: "anycap", caps });
 const team = (cap) => ({ type: "cap", cap, scope: "team" });
 // pagine con dati di TUTTA l'agenzia: in più serve vedere tutte le creator (lib/creator-scope)
 const allC = (cap) => ({ type: "cap", cap, scope: "all", creatorsAll: true });
@@ -26,7 +28,7 @@ export const NAV_ACCESS = {
   "/admin/pnl-live": SEED, "/admin/retention": SEED, "/admin/profiles-compare": SEED, "/admin/comp-calendar": SEED, "/admin/threshold-study": SEED,
   "/admin/comp-review": SEED, "/admin/comp-exam": SEED, "/admin/payment-profiles": SEED, "/admin/shift-research": SEED,
   "/admin/academy-tapes": SEED, "/admin/academy-signals": SEED, "/admin/transfer": SEED, "/admin/creator-difficulty": SEED, "/admin/citta": SEED, "/admin/sede": SEED, "/admin/qualita": SEED, "/admin/hr/contratti": any("people.manage"), "/admin/citta/ufficio": SEED, "/admin/citta/persone": SEED, "/admin/ads": SEED, "/admin/scouting": any("scouting.use"), "/admin/supervisor": any("social.manage"), "/admin/warmup": any("social.manage"), "/admin/piani": any("social.manage"), "/admin/editoriale": any("social.manage"), "/admin/studio-social": any("social.manage"), "/admin/editing": any("social.manage"), "/admin/social-accounts": SEED, "/admin/social-proxies": SEED, "/admin/operator-signals": SEED, "/admin/activation": SEED,
-  "/admin/infloww-ingest": SEED, "/admin/creator-split": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/hr": any("people.manage"), "/admin/hr/sync": any("people.manage"), "/admin/referral": any("referral.manage"), "/admin/publisher-x": any("people.manage"), "/admin/action-center": team("scores.view"), "/admin/settimana": team("scores.view"),
+  "/admin/infloww-ingest": SEED, "/admin/creator-split": SEED, "/admin/roadmap": SEED, "/admin/candidate-assessments": SEED, "/admin/hr": any("people.manage"), "/admin/hr/sync": any("people.manage"), "/admin/referral": any("referral.manage"), "/admin/publisher-x": anyOf("people.manage", "publisherx.manage"), "/admin/action-center": team("scores.view"), "/admin/settimana": team("scores.view"),
   "/admin/coaching-center": team("scores.view"), "/admin/employee-profiles": SEED, "/admin/creatorspro-sync": SEED, "/admin/wage-audit": SEED,
   "/admin/creatorspro-sync-history": SEED, "/admin/infloww-agency": SEED, "/admin/infloww-revenue": SEED, "/admin/infloww-reconcile": SEED,
   "/admin/debug-mapping": SEED, "/admin/user-mapping": SEED, "/admin/leaderboard-exclusions": SEED, "/admin/group-languages": SEED,
@@ -59,6 +61,7 @@ export function canSee(href, caps, isAdmin) {
   if (req.type === "presenze") return Boolean(caps?.["presenze.private"]);
   if (isAdmin) return true;
   if (req.type === "admin") return false;
+  if (req.type === "anycap") return req.caps.some((c) => Boolean(caps?.[c]));
   const scope = caps?.[req.cap];
   if (!scope) return false;
   if (req.creatorsAll && !caps?.["creators.all"]) return false;

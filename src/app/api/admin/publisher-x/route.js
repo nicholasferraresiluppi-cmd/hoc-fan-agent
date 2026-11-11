@@ -4,9 +4,10 @@
  *   Admin (SEED): tutto — link X, regole, fee, margine, persone.
  *   Admin non titolare della contabilità: come sopra ma SENZA fee, provvigione chatter e margine
  *   (10/11, Nicholas: «sono dati sensibili dell'agenzia») — vista "admin".
+ *   Referente X (publisherx.manage, 11/11): come la vista "admin" — gestisce link e inviti, mai fee né margine.
  *   HR (people.manage): solo quanto si deve a ogni publisher — niente fee, margine, nomi dei fan.
- * PUT { config, rev } → salva abbinamenti, regole, persone (SEED).
- * POST { action: "invite", publisher } → invita il publisher col solo ruolo «Publisher» (SEED).
+ * PUT { config, rev } → salva abbinamenti, regole, persone (SEED o Referente X).
+ * POST { action: "invite", publisher } → invita il publisher col solo ruolo «Publisher» (SEED o Referente X).
  */
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
@@ -14,6 +15,7 @@ import { bigQueryConfigured } from "@/lib/bigquery-api";
 import { logAuditAction } from "@/lib/audit-log";
 import { isAccountingOwner } from "@/lib/compensi-access";
 import { internalOrigin } from "@/lib/cron-chain";
+import { authorizePublisherX } from "@/lib/publisher-x-access";
 import { getOverview, saveConfig, invitePublisher, ConflictError } from "@/lib/publisher-x";
 
 export const runtime = "nodejs";
@@ -21,7 +23,7 @@ export const maxDuration = 60;
 
 export async function GET(request) {
   let view = "full";
-  let az = await authorize(CAPABILITIES.SEED);
+  let az = await authorizePublisherX();
   if (az.ok && !isAccountingOwner(az.userId)) view = "admin";
   if (!az.ok) {
     const hr = await authorize(CAPABILITIES.PEOPLE_MANAGE);
@@ -41,7 +43,7 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizePublisherX();
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const body = await request.json().catch(() => null);
   if (!body?.config) return Response.json({ error: "config mancante" }, { status: 400 });
@@ -55,7 +57,7 @@ export async function PUT(request) {
 }
 
 export async function POST(request) {
-  const az = await authorize(CAPABILITIES.SEED);
+  const az = await authorizePublisherX();
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const body = await request.json().catch(() => null);
   if (body?.action !== "invite" || !body.publisher) return Response.json({ error: "azione non valida" }, { status: 400 });
