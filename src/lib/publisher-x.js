@@ -23,7 +23,8 @@ import { HOC_ORGANIZATION_ID, bqQuery, bqProjects } from "@/lib/bigquery-api";
 import { createHmac } from "node:crypto";
 import { sanitizeConfig, toEnvelopes, monthPayout, monthsHistory, publisherForEmails, profilesFor, fxFor, monthOf, linkKey, isXLink, feeFor, rateFor, splitDollar, WINDOW_DAYS } from "@/lib/publisher-x-core";
 import { getFx } from "@/lib/referral";
-import { linksSql as linksSqlFor, allLinksSql as allLinksSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
+import { inflowwPaged, fetchInflowwLinks } from "@/lib/infloww-api";
+import { linksSql as linksSqlFor, allLinksSql as allLinksSqlFor, creatorHandlesSql as creatorHandlesSqlFor, fansSql as fansSqlFor, untilSql as untilSqlFor, isMonth } from "@/lib/publisher-x-sql";
 
 export const PUBX_VERSION = "pubx-1";
 const CONFIG_KEY = "pubx:config";
@@ -31,6 +32,7 @@ const MAX_BYTES = 2 * 1024 ** 3;
 const T = () => ({ table: `\`${bqProjects().dataProject}.hoc.newsubs_spending\``, org: HOC_ORGANIZATION_ID });
 const linksSql = (month, links) => linksSqlFor(T(), month, links);
 const allLinksSql = () => allLinksSqlFor(T());
+const creatorHandlesSql = () => creatorHandlesSqlFor(T());
 const fansSql = (since, links) => fansSqlFor(T(), since, links);
 const untilSql = () => untilSqlFor(T());
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -95,6 +97,82 @@ const PAYOUT_FIELDS = ["name", "profiles", "subs", "spend30", "bonusUsd", "bonus
 const loadFx = () => getFx().catch(() => ({}));
 const pickFields = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
 
+const FRESH_DAYS = 60;
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Tracking link creati su Infloww negli ultimi 60 giorni, anche senza iscritti (12/11/2026: il link X di
+ * Christina, creato il 10/11 e a 0 fan, non compariva in «Aggiungi»). Infloww → creator del warehouse
+ * via username OnlyFans; username ambiguo (due creator) = scartato. Cache breve (15 min) perché il punto è
+ * vedere SUBITO il link appena creato; se Infloww non risponde il catalogo resta quello del warehouse.
+ */
+async function loadFreshLinks({ force = false, catalog = [] } = {}) {
+  const fk = `pubx:${PUBX_VERSION}:fresh-links`;
+  const cached = force ? null : await kv.get(fk).catch(() => null);
+  if (cached) return cached;
+  try {
+    const hk = cacheKey("handles", 0);
+    let handles = force ? null : await kv.get(hk).catch(() => null);
+    if (!handles) {
+      handles = (await bqQuery(creatorHandlesSql(), { maxBytesBilled: MAX_BYTES })).rows || [];
+      if (handles.length) await kv.set(hk, handles, { ex: 26 * 3600 }).catch(() => {});
+    }
+    const byHandle = new Map();
+    for (const h of handles) {
+      const prev = byHandle.get(h.handle);
+      byHandle.set(h.handle, prev && prev.creatorId !== Number(h.creator_id) ? null : { creatorId: Number(h.creator_id), creatorName: h.creator_name });
+    }
+    // nome link → creator del warehouse, solo se il nome è di UN solo creator ("X" ce l'hanno in tanti)
+    const byLink = new Map();
+    for (const l of catalog) {
+      const prev = byLink.get(l.linkName);
+      byLink.set(l.linkName, prev && prev.creatorId !== l.creatorId ? null : { creatorId: l.creatorId, creatorName: l.creatorName });
+    }
+    const deadline = Date.now() + 20000;
+    const { items: creators } = await inflowwPaged("/v1/creators", { query: { platformCode: "OnlyFans" }, maxPages: 5, deadline });
+    const now = Date.now();
+    const windows = [];
+    for (let e = now; e > now - FRESH_DAYS * DAY_MS; e -= 30 * DAY_MS) windows.push([Math.max(e - 30 * DAY_MS + 1, now - FRESH_DAYS * DAY_MS), e]);
+    const jobs = creators.flatMap((c) => windows.map(([s, e]) => ({ c, s, e })));
+    const linksOf = new Map();
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length && Date.now() < deadline) {
+        const { c, s, e } = jobs[next++];
+        const r = await fetchInflowwLinks({ creatorId: c.id, linkType: "TRACKING", startTime: s, endTime: e }).catch(() => null);
+        const list = (r?.data?.list || []).filter((l) => l?.name && !l.finishedFlag);
+        linksOf.set(c.id, [...(linksOf.get(c.id) || []), ...list]);
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+    const out = [];
+    for (const c of creators) {
+      const list = linksOf.get(c.id) || [];
+      // 1) username OnlyFans; 2) se Infloww dà un username diverso o "u123…": i link CON fan già nel warehouse,
+      //    almeno il 90% sullo stesso creator (sotto = non si aggancia: meglio un link in meno che sul profilo sbagliato)
+      let who = byHandle.get(String(c.userName || "").toLowerCase()) || null;
+      if (!who) {
+        const votes = new Map();
+        let total = 0;
+        for (const l of list) {
+          const w = Number(l.subCount) > 0 ? byLink.get(l.name) : null;
+          if (!w) continue;
+          total++;
+          votes.set(w.creatorId, { w, n: (votes.get(w.creatorId)?.n || 0) + 1 });
+        }
+        const top = [...votes.values()].sort((a, b) => b.n - a.n)[0];
+        who = top && top.n / total >= 0.9 ? top.w : null;
+      }
+      if (!who) continue;
+      for (const l of list) out.push({ creatorId: who.creatorId, creatorName: who.creatorName || String(who.creatorId), linkName: l.name, subs6m: Number(l.subCount) || 0, fresh: true });
+    }
+    await kv.set(fk, out, { ex: 15 * 60 }).catch(() => {});
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Conto del mese (mese = quando le buste si CHIUDONO).
  * view "full" (admin): + link X, regole, margine, persone. view "payout" (HR): solo quanto si deve.
@@ -123,6 +201,13 @@ export async function getOverview(month, { force = false, view = "full" } = {}) 
     if (catalogRows.length) await kv.set(ck, catalogRows, { ex: 26 * 3600 }).catch(() => {});
   }
   const catalog = catalogRows.map((r) => ({ creatorId: Number(r.creator_id), creatorName: r.creator_name || String(r.creator_id), linkName: r.link_name, subs6m: Number(r.subs_6m) || 0 }));
+  // + i link appena creati su Infloww (anche a 0 iscritti): il warehouse li vede solo dal primo fan
+  const known = new Set(catalog.map((l) => linkKey(l.creatorId, l.linkName)));
+  for (const l of await loadFreshLinks({ force, catalog })) {
+    if (known.has(linkKey(l.creatorId, l.linkName))) continue;
+    known.add(linkKey(l.creatorId, l.linkName));
+    catalog.push(l);
+  }
   const assigned = new Map(config.links.map((l) => [linkKey(l.creatorId, l.linkName), l]));
   const links = linkRows.map((r) => {
     const creatorId = Number(r.creator_id);
