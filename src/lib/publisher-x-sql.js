@@ -66,6 +66,23 @@ ORDER BY creator_name, subs_6m DESC`;
 }
 
 /**
+ * creator_id ↔ username OnlyFans (dal link_url delle sub): serve ad agganciare i tracking link appena
+ * creati su Infloww, che il warehouse non conosce finché non portano il primo fan (12/11/2026).
+ */
+export function creatorHandlesSql({ table, org }) {
+  return `
+SELECT creator_id, ANY_VALUE(creator_name) AS creator_name, handle
+FROM (
+  SELECT creator_id, creator_name, LOWER(REGEXP_EXTRACT(link_url, r'onlyfans\\.com/([^/?#]+)')) AS handle
+  FROM ${table}
+  WHERE organization_id = ${sqlStr(org)} AND link_url IS NOT NULL
+    AND sub_start_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 400 DAY)
+)
+WHERE handle IS NOT NULL AND handle != 'null'
+GROUP BY creator_id, handle`;
+}
+
+/**
  * Le buste: i fan nuovi entrati dai link assegnati da `since` (YYYY-MM-DD, ora di Roma) in poi.
  * Una sola lettura per tutti i mesi: il mese di pagamento dipende dalla CHIUSURA (ingresso + 30 gg).
  * spend_d30 di una busta aperta = speso fino a oggi (verificato al centesimo con attributed_transactions).

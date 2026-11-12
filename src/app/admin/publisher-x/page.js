@@ -387,7 +387,7 @@ export default function PublisherXPage() {
               ...(priv ? [{ key: "perSubToAgency", label: "All'agenzia per fan", align: "right", render: (l) => <span style={{ color: l.perSubToAgency < 0 ? CP.accentRed : CP.textPrimary }}>{usd2(l.perSubToAgency)}</span> }] : []),
             ]}
           />
-          <datalist id="pubx-creator-links">{creatorLinks.map((l) => <option key={l.linkName} value={l.linkName}>{`${int(l.subs6m)} fan in 6 mesi`}</option>)}</datalist>
+          <datalist id="pubx-creator-links">{creatorLinks.map((l) => <option key={l.linkName} value={l.linkName}>{l.fresh ? (l.subs6m ? `nuovo · ${int(l.subs6m)} fan` : "nuovo · ancora nessun fan") : `${int(l.subs6m)} fan in 6 mesi`}</option>)}</datalist>
           <datalist id="pubx-names">{pubNames.map((n) => <option key={n} value={n} />)}</datalist>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
             <span style={muted}>Un link X che non riconosco dal nome, o un profilo che non è in tabella?</span>
