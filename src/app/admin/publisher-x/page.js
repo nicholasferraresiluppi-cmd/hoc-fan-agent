@@ -480,7 +480,7 @@ export default function PublisherXPage() {
         {open && <PublisherFans month={month} name={open} />}
       </Modal>
       {dirty && !hr && (
-        <div role="region" aria-label="Modifiche non salvate" style={{ position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", zIndex: 50, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px 10px 18px", borderRadius: 14, background: CP.bg, border: `1px solid ${CP.borderSoft}`, boxShadow: "0 10px 30px rgba(0,0,0,.18)", maxWidth: "calc(100vw - 32px)", flexWrap: "wrap" }}>
+        <div className="hoc-dock" role="region" aria-label="Modifiche non salvate" style={{ position: "fixed", left: "50%", bottom: "calc(20px + env(safe-area-inset-bottom))", transform: "translateX(-50%)", zIndex: 50, display: "flex", gap: 10, alignItems: "center", padding: "10px 12px 10px 18px", borderRadius: 14, background: CP.bg, border: `1px solid ${CP.borderSoft}`, boxShadow: "0 10px 30px rgba(0,0,0,.18)", maxWidth: "calc(100vw - 32px)", flexWrap: "wrap" }}>
           <span style={{ color: CP.textPrimary, fontSize: 14 }}>Hai modifiche non salvate</span>
           <button style={btn} onClick={() => setDraft(null)} disabled={busy}>Annulla</button>
           <button style={btnMain} onClick={save} disabled={busy}>{busy ? <Loader2 size={14} /> : <Save size={14} />}Salva</button>
