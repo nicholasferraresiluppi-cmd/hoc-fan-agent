@@ -13,6 +13,8 @@ export const maxDuration = 300;
 
 import { currentUser } from "@clerk/nextjs/server";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { accessOf, noAccess } from "@/lib/clipping-access";
+import { canWindow } from "@/lib/clipping-access-core";
 import {
   loadAll, createFormat, addToFormat, removeFromFormat, editFormat, deleteFormat, describeHits, manualRefresh,
   bigQueryConfigured, aiConfigured,
@@ -23,6 +25,8 @@ const noStore = { headers: { "Cache-Control": "no-store" } };
 async function gate() {
   const az = await authorize(CAPABILITIES.SOCIAL_MANAGE);
   if (!az.ok) return { err: Response.json({ error: az.message }, { status: az.status }) };
+  // ruoli Clipping (13/11/2026): la finestra deve essere concessa per almeno un account
+  if (!canWindow(await accessOf(az.userId), "trend")) return { err: noAccess() };
   let name = az.userId;
   try { const u = await currentUser(); name = u?.fullName || u?.firstName || u?.primaryEmailAddress?.emailAddress || az.userId; } catch {}
   return { by: { userId: az.userId, name } };

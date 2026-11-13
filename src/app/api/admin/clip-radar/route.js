@@ -19,6 +19,8 @@ import { after } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
+import { accessOf, noAccess } from "@/lib/clipping-access";
+import { canWindow } from "@/lib/clipping-access-core";
 import { parseProfileInput, profileStats, scoreVideo, runBudget, MAX_PROFILES } from "@/lib/clip-radar-core";
 import { loadAll, addProfile, removeProfile, updateProfile, toggleSaved, readProfiles, listProfiles, apifyConfigured, syncOurProfiles, videoChunk } from "@/lib/clip-radar";
 import { loadTrends, collectTrends, startTrends, addQuery, removeQuery } from "@/lib/clip-trends";
@@ -29,6 +31,8 @@ const noStore = { headers: { "Cache-Control": "no-store" } };
 async function gate() {
   const az = await authorize(CAPABILITIES.SOCIAL_MANAGE);
   if (!az.ok) return { err: Response.json({ error: az.message }, { status: az.status }) };
+  // ruoli Clipping (13/11/2026): la finestra deve essere concessa per almeno un account
+  if (!canWindow(await accessOf(az.userId), "radar")) return { err: noAccess() };
   let name = az.userId;
   try { const u = await currentUser(); name = u?.fullName || u?.firstName || u?.primaryEmailAddress?.emailAddress || az.userId; } catch {}
   return { by: { userId: az.userId, name } };
