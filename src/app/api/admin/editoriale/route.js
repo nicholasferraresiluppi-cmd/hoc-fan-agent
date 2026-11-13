@@ -24,6 +24,8 @@ import {
 } from "@/lib/editoriale-store";
 import { creatorKey, usageMap, rawUses } from "@/lib/editoriale-core";
 import { kv } from "@vercel/kv";
+import { accessOf, noAccess } from "@/lib/clipping-access";
+import { canAccount } from "@/lib/clipping-access-core";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 
@@ -32,7 +34,14 @@ async function gate() {
   if (!az.ok) return { err: Response.json({ error: az.message }, { status: az.status }) };
   let name = az.userId;
   try { const u = await currentUser(); name = u?.fullName || u?.firstName || u?.primaryEmailAddress?.emailAddress || az.userId; } catch {}
-  return { by: { userId: az.userId, name } };
+  return { by: { userId: az.userId, name }, access: await accessOf(az.userId) };
+}
+
+// ruoli Clipping (13/11/2026): solo i profili concessi per «Contenuti»; una creator senza profili concessi non esiste
+async function allowedCreators(access) {
+  const all = await creatorsWithProfiles();
+  if (access.all) return all;
+  return all.map((c) => ({ ...c, profiles: c.profiles.filter((p) => canAccount(access, p.id, "contenuti")) })).filter((c) => c.profiles.length);
 }
 
 export async function GET(request) {
@@ -42,10 +51,12 @@ export async function GET(request) {
   const creator = sp.get("creator");
   const drive = { configured: driveConfigured(), email: driveEmail() };
   if (!creator) {
-    const [creators, cfgs] = await Promise.all([creatorsWithProfiles(), allConfigs()]);
+    const [creators, cfgs] = await Promise.all([allowedCreators(g.access), allConfigs()]);
     return Response.json({ creators: creators.map((c) => ({ ...c, folder: cfgs[c.ck] || null })), drive }, noStore);
   }
   const ck = creatorKey(creator);
+  const allowed = await allowedCreators(g.access);
+  if (!allowed.some((x) => x.ck === ck)) return g.access.all ? Response.json({ error: "Creator senza profili Instagram in Account social" }, { status: 404 }) : noAccess();
   if (sp.get("thumb")) {
     // solo file che stanno nella cartella di questa creator: l'anteprima non apre il resto del drive
     const id = sp.get("thumb");
@@ -84,8 +95,8 @@ export async function GET(request) {
     } catch { return new Response(null, { status: 502 }); }
   }
   if (sp.get("log")) return Response.json({ log: await getLog(ck) }, noStore);
-  const [creators, cfg] = await Promise.all([creatorsWithProfiles(), getConfig(ck)]);
-  const c = creators.find((x) => x.ck === ck);
+  const cfg = await getConfig(ck);
+  const c = allowed.find((x) => x.ck === ck);
   if (!c) return Response.json({ error: "Creator senza profili Instagram in Account social" }, { status: 404 });
   const [files, items] = await Promise.all([cfg ? getFiles(ck, { force: sp.get("refresh") === "1" }) : null, listItems(ck)]);
   const used = usageMap(items), raw = rawUses(items);
@@ -93,7 +104,8 @@ export async function GET(request) {
   return Response.json({
     creator: c.creator, ck, profiles: c.profiles, folder: cfg, drive,
     files: list, folders: files?.folders || [], filesAt: files?.at || null, filesError: files?.error || null, truncated: Boolean(files?.truncated),
-    items: items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+    // con i ruoli: niente contenuti in calendario su profili non concessi (quelli senza calendario restano)
+    items: items.filter((it) => g.access.all || !it.slot?.profileId || c.profiles.some((p) => p.id === it.slot.profileId)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
   }, noStore);
 }
 
@@ -103,6 +115,13 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const ck = creatorKey(body.creator);
   if (!ck) return Response.json({ error: "Manca la creator" }, { status: 400 });
+  if (!g.access.all) {
+    const c = (await allowedCreators(g.access)).find((x) => x.ck === ck);
+    if (!c) return noAccess();
+    // in calendario solo sui profili concessi
+    const pid = body.slot?.profileId || body.item?.slot?.profileId || body.profileId;
+    if (pid && !c.profiles.some((p) => p.id === pid)) return noAccess();
+  }
   const fail = (r) => Response.json({ error: (r.errors || ["Errore"]).join("; ") }, { status: r.status || 400 });
   try {
     let r;

@@ -31,6 +31,8 @@ import { refreshPublicMetrics, getRunState, apifyConfigured } from "@/lib/warmup
 import { scheduledForProfiles, publishFromTask } from "@/lib/editoriale-store";
 import { pubKindOfTask } from "@/lib/editoriale-core";
 import { loadAll as loadSupervisor } from "@/lib/supervisor-store";
+import { accessOf, noAccess } from "@/lib/clipping-access";
+import { canAccount, canWork } from "@/lib/clipping-access-core";
 
 const noStore = { headers: { "Cache-Control": "no-store" } };
 const LOG_TYPES = new Set(["accesso", "account", "task", "flag", "traguardo", "utente", "profilo", "dati", "stato"]);
@@ -46,7 +48,8 @@ async function gate() {
   const az = await authorize(CAPABILITIES.SOCIAL_MANAGE);
   if (!az.ok) return { err: Response.json({ error: az.message }, { status: az.status }) };
   const [name, admin] = await Promise.all([who(az.userId), isUserIdAdmin(az.userId).catch(() => false)]);
-  return { by: { userId: az.userId, name }, admin };
+  // ruoli Clipping (13/11/2026): chi non è admin vede e lavora solo gli account dei suoi ruoli
+  return { by: { userId: az.userId, name }, admin, access: await accessOf(az.userId, admin) };
 }
 
 export async function GET(request) {
@@ -54,11 +57,13 @@ export async function GET(request) {
   if (g.err) return g.err;
   const sp = new URL(request.url).searchParams;
   if (sp.get("pfp")) {
+    if (!canAccount(g.access, sp.get("pfp"))) return new Response(null, { status: 404 });
     const v = await getPfp(sp.get("pfp"));
     const m = v && /^data:(image\/[a-z]+);base64,(.*)$/.exec(v);
     if (!m) return new Response(null, { status: 404 });
     return new Response(Buffer.from(m[2], "base64"), { headers: { "Content-Type": m[1], "Cache-Control": "private, max-age=300" } });
   }
+  if (sp.get("log") && !canAccount(g.access, sp.get("log"))) return noAccess();
   if (sp.get("log")) return Response.json({ log: await getLog(sp.get("log")) }, noStore);
   if (sp.get("activity")) {
     if (!g.admin) return Response.json({ error: "Il registro lo vede solo un amministratore" }, { status: 403 });
@@ -66,12 +71,13 @@ export async function GET(request) {
   }
   await notePerson(g.by.userId, g.by.name);
   const [state, people, pubRun] = await Promise.all([loadState(), listPeople(), getRunState().catch(() => null)]);
+  if (!g.access.all) state.profiles = state.profiles.filter((p) => canAccount(g.access, p.id));
   // Editoriale: cosa c'è in calendario ieri, oggi e domani (giorni UTC larghi: il browser sceglie il suo)
   const now = Date.now();
   const days = [-1, 0, 1].map((d) => new Date(now + d * 86400000).toISOString().slice(0, 10));
   const ed = await scheduledForProfiles(state.profiles.filter((p) => p.platform !== "x" && p.creator), days).catch(() => ({}));
   for (const p of state.profiles) p.ed = ed[p.id] || null;
-  return Response.json({ ...state, people, pubRun: { ...(pubRun || {}), configured: apifyConfigured() }, me: { id: g.by.userId, name: g.by.name, admin: g.admin } }, noStore);
+  return Response.json({ ...state, people, pubRun: { ...(pubRun || {}), configured: apifyConfigured() }, me: { id: g.by.userId, name: g.by.name, admin: g.admin, access: g.access } }, noStore);
 }
 
 export async function POST(request) {
@@ -104,6 +110,7 @@ export async function POST(request) {
       return Response.json({ report });
     }
     if (!id) return Response.json({ error: "Manca il profilo" }, { status: 400 });
+    if (!canWork(g.access, id)) return noAccess();
     if (body.action === "update") {
       const r = await updateProfile(id, body.fields || {}, by);
       if (!r.ok) return fail(r);

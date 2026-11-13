@@ -23,6 +23,8 @@ import { GuideIG, GuideX } from "@/components/warmup/guide";
 import XRefs from "@/components/warmup/xrefs";
 import ClipRadar from "@/components/warmup/clip-radar";
 import TrendModelle from "@/components/warmup/trend-modelle";
+import ClippingRoles from "@/components/warmup/roles";
+import { canAccount, canWindow } from "@/lib/clipping-access-core";
 import {
   DAY, PLATS, platOf, isX, keyOf, norm, todayKey, startOfDay, fmtDur, mmss, weekKey, weekLabel, lastWeeks,
   numFmt, delta, planFor, planForDate, visibleItems, dayProgress, tasksOn, adherence, hasArrears,
@@ -519,6 +521,11 @@ function LineChart({ title, pts }) {
   );
 }
 
+// ruoli Clipping: finestra o account non permesso (anche da link diretto)
+function NoAccess() {
+  return <div style={{ ...cardBox, textAlign: "center", padding: "30px 18px" }}><h3 style={{ margin: 0, fontSize: 16, fontWeight: 500 }}>Non hai accesso a questa sezione</h3></div>;
+}
+
 // ── pagina ──────────────────────────────────────────────────────────────────
 
 const TABS = [["oggi", "Oggi"], ["acct", "Account"], ["dati", "Dati"], ["guide", "Guida"]];
@@ -574,11 +581,20 @@ export default function WarmupPage() {
   const admin = Boolean(me.admin);
   const people = data?.people || [];
   const profiles = useMemo(() => (data?.profiles || []).map((p) => fillDefaults({ ...p, pfpV: p.updatedAt || p.addedAt || 0 })), [data]);
-  const ACC = useMemo(() => profiles.filter((a) => !a.archived && platOf(a) === plat), [profiles, plat]);
+  // ruoli Clipping (13/11/2026): il server manda solo gli account permessi; qui ogni finestra mostra quelli concessi in quella finestra
+  const access = me.access || { all: true };
+  const accWin = tab === "oggi" || tab === "dati" ? tab : "acct";
+  const accFor = (w) => profiles.filter((a) => !a.archived && platOf(a) === plat && canAccount(access, a.id, w));
+  const ACC = useMemo(() => profiles.filter((a) => !a.archived && platOf(a) === plat && canAccount(access, a.id, accWin)), [profiles, plat, access, accWin]);
   const archived = profiles.filter((a) => a.archived);
   const byId = (id) => profiles.find((a) => a.id === id);
   const isMine = (a) => mine(a, me.id);
 
+  useEffect(() => {
+    if (!data || access.all || tab !== "oggi" || canWindow(access, "oggi")) return;
+    const first = ["contenuti", "acct", "dati", "xrefs", "radar", "trend", "guide"].find((k) => canWindow(access, k));
+    if (first) setTab(first);
+  }, [data, tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const toast = (m) => { setToastMsg(m); setTimeout(() => setToastMsg((x) => (x === m ? null : x)), 2800); };
   const setPlat = (v) => { if (v === plat) return; setPlatState(v); ls.set(PLAT_KEY, v); setSel(null); setFolder(null); setPane("oggi"); setOpenWhy({}); setForm(null); if (tab === "xrefs" || tab === "contenuti") setTab("oggi"); window.scrollTo(0, 0); };
 
@@ -1687,7 +1703,9 @@ export default function WarmupPage() {
       const edit = form.edit ? byId(form.edit) : null;
       body = <ProfileForm key={form.edit || "new"} edit={edit} plat={plat} preCreator={form.preCreator} creators={data.creators} devices={data.devices} people={people} admin={admin} accounts={ACC}
         onCancel={() => setForm(null)} onDone={async (id, msg) => { await mutate(); setForm(null); toast(msg); openProfile(id, form.edit ? "profilo" : "oggi"); }} />;
-    } else if (tab === "oggi") body = viewToday();
+    } else if (tab === "ruoli") body = admin ? <ClippingRoles toast={toast} /> : <NoAccess />;
+    else if (tab !== "admin" && !canWindow(access, tab)) body = <NoAccess />;
+    else if (tab === "oggi") body = viewToday();
     else if (tab === "contenuti" && plat === "ig") body = <EditorialeView embedded />;
     else if (tab === "dati") body = viewReport();
     else if (tab === "admin" && admin) body = viewAdmin();
@@ -1700,13 +1718,13 @@ export default function WarmupPage() {
       : <HeroHead eyebrow="Guida" title="Come si scalda un profilo" accent="Instagram" sub="Il riassunto delle SOP a cui la console fa riferimento: calendario, pubblicazioni, finestre, segnalazioni."
           numbers={<><BigNum label="Giorni di warm-up" value={7} strong /><BigNum label="Reel al giorno, a regime" value={3} /><BigNum label="Finestre USA" value={WINDOWS.length} /></>} />}
       {plat === "x" ? <GuideX /> : <GuideIG />}</>;
-    else { const a = sel && byId(sel); body = a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
+    else { const a = sel && byId(sel); body = sel && !access.all && (!a || !canAccount(access, a.id, "acct")) ? <NoAccess /> : a && !a.archived ? viewDay(a) : folder ? viewFolder(folder) : viewFolders(); }
   }
   const modalA = modal?.id ? byId(modal.id) : null;
   // Ispirazioni: reference di creator su X (per Instagram c'è il Radar creator)
   // Contenuti (29/10/2026): l'Editoriale dentro Social, solo per Instagram
-  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ["trend", "Trend modelle"], ...TABS.slice(3), ...(admin ? [["admin", "Admin"]] : [])];
-  const openToday = ACC.reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
+  const tabs = [TABS[0], ...(plat === "ig" ? [["contenuti", "Contenuti"]] : []), ...TABS.slice(1, 3), ...(plat === "x" ? [["xrefs", "Ispirazioni"]] : []), ["radar", "Radar clipping"], ["trend", "Trend modelle"], ...TABS.slice(3), ...(admin ? [["ruoli", "Ruoli"], ["admin", "Admin"]] : [])].filter(([k]) => k === "ruoli" || k === "admin" || canWindow(access, k));
+  const openToday = accFor("oggi").reduce((t, a) => t + tasksOn(a, todayKey()).open.length, 0);
 
   return (
     <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))", fontFamily: FONTS.body, color: CP.textPrimary }}>
@@ -1714,7 +1732,7 @@ export default function WarmupPage() {
         subtitle="I profili Instagram e X delle creator: cosa fare oggi, i contenuti, i numeri."
         actions={data ? <button type="button" style={btnPrimary} onClick={() => { setTab("acct"); setSel(null); setForm({}); }}><Plus size={15} />Nuovo profilo</button> : null} />
       <Tabs value={form ? null : tab} style={{ marginBottom: 22 }}
-        items={tabs.map(([k, l]) => [k, l, !data ? null : k === "oggi" ? openToday || null : k === "acct" ? ACC.length : null])}
+        items={tabs.map(([k, l]) => [k, l, !data ? null : k === "oggi" ? openToday || null : k === "acct" ? accFor("acct").length : null])}
         onChange={(k) => { setTab(k); setSel(null); setForm(null); setModal(null); if (k === "acct") setFolder(null); window.scrollTo(0, 0); }}
         aside={<span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
           <span title={net === "ok" ? "Collegato" : net === "pending" ? "Salvataggio…" : "Non salvato"} style={{ width: 8, height: 8, borderRadius: "50%", background: net === "ok" ? CP.accentGreen : net === "pending" ? CP.attn : CP.accentRed }} />
