@@ -17,6 +17,7 @@ export const AUTO_TYPES = {
   calendar_days: "Giorni di calendario pieni",
   weekly_data: "Dati della settimana inseriti",
   feedback_open: "Segnalazioni aperte",
+  social_posts: "Pubblicati o click di un profilo social",
 };
 
 /** Campi di ogni controllo automatico, per l'editor: [chiave, etichetta, tipo | elenco di valori]. */
@@ -28,6 +29,8 @@ export const AUTO_FIELDS = {
   calendar_days: [["days", "Giorni", "n"]],
   weekly_data: [],
   feedback_open: [["kind", "Tipo", [["", "tutte"], ["problem", "Problemi"], ["idea", "Idee"], ["question", "Domande"]]], ["page", "Pagina che inizia con", "t"]],
+  // `from`/`to` vuoti = le date della fase (dal giorno dopo la fase prima alla sua scadenza)
+  social_posts: [["platform", "Piattaforma", [["ig", "Instagram"], ["tt", "TikTok"]]], ["account", "Account (senza @)", "t"], ["metric", "Cosa conta", [["post", "Pubblicati"], ["views", "Views"], ["click", "Click in bio"]]], ["min", "Almeno", "n"], ["from", "Dal (vuoto = fase)", "d"], ["to", "Al (vuoto = fase)", "d"]],
 };
 
 /** Id nuovo e stabile per voci e fasi aggiunte dall'editor (mai dalla posizione: le spunte sono legate all'id). */
@@ -173,6 +176,55 @@ export function shortDay(day) {
   if (!isDay(day)) return "";
   const d = new Date(day + "T12:00:00Z");
   return `${WD[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+}
+
+/**
+ * Finestra di date di ogni fase, per i controlli che contano «in questa fase» (`social_posts`
+ * senza date proprie): dal giorno dopo la scadenza della fase di lavoro precedente (o dall'inizio
+ * del piano) alla scadenza della fase (o alla fine del piano). → { [phaseId]: {from, to} }
+ */
+export function phaseWindows(plan) {
+  const out = {};
+  let prevDue = null;
+  for (const ph of plan.phases || []) {
+    const from = prevDue ? new Date(Date.parse(prevDue + "T12:00:00Z") + 86400000).toISOString().slice(0, 10) : plan.start || null;
+    out[ph.id] = { from, to: ph.due || plan.end || null };
+    if (ph.kind !== "decision" && ph.due) prevDue = ph.due;
+  }
+  return out;
+}
+
+const normAccount = (v) => String(v || "").trim().replace(/^@/, "").toLowerCase();
+
+/**
+ * Controllo `social_posts`: somma pubblicati, views o click in bio di UN account nella finestra.
+ * `rows` = righe giornaliere dal magazzino [{p:"ig"|"tt", u, d:"YYYY-MM-DD", posts, views, clicks}];
+ * le views sono quelle di tutti i contenuti dell'account in quei giorni, non solo dei nuovi;
+ * il magazzino arriva a ieri, quindi si dice fin dove arrivano i dati. Un account che il
+ * magazzino non conosce NON chiude la voce («non trovato»), mai un falso «fatto».
+ */
+export function socialCheck(auto, rows, win = {}, today) {
+  const platform = auto.platform === "tt" ? "tt" : "ig";
+  const metric = ["click", "views"].includes(auto.metric) ? auto.metric : "post";
+  const u = normAccount(auto.account);
+  const min = Math.max(1, Number(auto.min) || 1);
+  const from = isDay(auto.from) ? auto.from : win.from;
+  const to = isDay(auto.to) ? auto.to : win.to || today;
+  if (!u || !isDay(from)) return null;
+  if (platform === "tt" && metric === "click") return { ok: false, value: null, target: min, label: "TikTok non ha i click in bio nel magazzino" };
+  if (today && from > today) return { ok: false, value: 0, target: min, label: `si conta da ${shortDay(from)}` };
+  const mine = (rows || []).filter((r) => r.p === platform && normAccount(r.u) === u);
+  if (!mine.length) return { ok: false, value: null, target: min, label: `@${u} non trovato nel magazzino` };
+  const inWin = mine.filter((r) => r.d >= from && (!to || r.d <= to));
+  const field = metric === "click" ? "clicks" : metric === "views" ? "views" : "posts";
+  const n = inWin.reduce((s, r) => s + Math.max(0, Number(r[field]) || 0), 0);
+  // ultimo giorno con dati fino alla fine della finestra (il magazzino arriva a ieri, a volte salta giorni)
+  const last = mine.filter((r) => !to || r.d <= to).reduce((m, r) => (r.d > m ? r.d : m), "");
+  const what = metric === "click" ? "click" : metric === "views" ? "views" : platform === "tt" ? "video" : "reel";
+  const fmt = (x) => String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  let label = `${fmt(n)} ${what} su ${fmt(min)}`;
+  if (last && to && last < to && (!today || last < today)) label += ` · dati fino a ${shortDay(last)}`;
+  return { ok: n >= min, value: n, target: min, label };
 }
 
 /** Giorni consecutivi da `today` coperti (almeno un contenuto) — per `calendar_days`. */

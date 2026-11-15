@@ -56,6 +56,9 @@ function mainWho(items) {
 
 const chip = { display: "inline-flex", alignItems: "center", gap: 5, height: 26, padding: "0 9px", borderRadius: 7, fontSize: 12.5, whiteSpace: "nowrap", fontFamily: FONTS.body, lineHeight: 1 };
 
+// 400000 → «400.000» (views e click arrivano a sei cifre)
+const thousands = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
 /** Mini barra «3 su 5» per le voci che si spuntano dai dati. */
 function AutoChip({ st }) {
   const a = st.auto || {};
@@ -67,7 +70,7 @@ function AutoChip({ st }) {
       <Zap size={12} />
       {has ? <>
         <span style={{ width: 34, height: 4, borderRadius: 4, background: CP.border, overflow: "hidden" }}><span style={{ display: "block", width: `${pct}%`, height: "100%", background: st.done ? CP.accentGreen : CP.accent }} /></span>
-        {a.value}/{a.target}
+        {thousands(a.value)}/{thousands(a.target)}
       </> : (a.label || "dai dati")}
     </span>
   );
