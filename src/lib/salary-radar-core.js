@@ -316,7 +316,7 @@ export function salaryHints(bio) {
 }
 
 export const SEARCH_KINDS = {
-  parola: { label: "Per parola", unit: 0.003, max: 50, hint: "Cerca tra gli utenti di Instagram, come la lente dell'app. Esempi: «2008 modena», «prima storia in evidenza», «secondo profilo»." },
+  parola: { label: "Per parola", unit: 0.003, max: 50, hint: "Cerca tra gli utenti di Instagram come la lente dell'app: guarda il nome e il nome utente, NON la bio. Funzionano parole corte che le reti usano nei nomi: «privata», «backup», «08», «reels», o il nome di una modella. Le frasi lunghe non trovano niente." },
   seguiti: { label: "Chi segue un account", unit: 0.35, max: 1, hint: "Tutti gli account che un profilo segue. Le reti delle salary si seguono tra loro: partendo da un account di un'altra agenzia si trovano i suoi gemelli." },
 };
 
