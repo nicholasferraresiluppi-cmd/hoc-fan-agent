@@ -30,7 +30,7 @@ import { UserButton, SignedIn } from "@clerk/nextjs";
 import { Headphones,
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
-  LayoutDashboard, UserCog, Sparkles, Radar, Bot,
+  LayoutDashboard, UserCog, Sparkles, Radar, Network, Bot,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
@@ -155,6 +155,7 @@ const NAV_GROUPS_RAW = [
     label: "Marketing",
     items: [
       { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
+      { href: "/admin/salary-radar",             label: "Radar salary",  icon: Network },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/creator-ai",               label: "Creator AI",      icon: Bot },
       { href: "/admin/editing",                  label: "Editing",         icon: Scissors },

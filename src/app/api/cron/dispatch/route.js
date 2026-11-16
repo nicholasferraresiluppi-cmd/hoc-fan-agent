@@ -22,6 +22,7 @@
  *   - sempre:            pilota OnlyFansAPI (ofapi-pilot)
  *   - sempre:            Radar creator (scouting-refresh: giro Apify settimanale, esito al giro dopo;
  *                        scouting-webcheck: OnlyFans cercato su Google, catena propria)
+ *   - sempre:            Radar salary (salary-radar: giro Apify settimanale sugli account aggiunti a mano)
  *   - sempre:            Radar creator, rilettura delle prime evidenze (riaccende la catena se in corso)
  *   - sempre:            Warm-up: numeri pubblici dei profili IG e X (warmup-metrics, una volta al giorno)
  *   - sempre:            Trend modelle: reel esplosi dal warehouse + descrizione AI (trend-modelle)
@@ -115,6 +116,8 @@ export async function POST(request) {
   // Radar creator (10/10/2026): giro settimanale Apify sulle creator dello scouting —
   // lancia il run una volta a settimana, ne raccoglie l'esito al giro dopo
   out.scouting_refresh = await kickEndpoint(request, "/api/cron/scouting-refresh");
+  // Radar salary (16/11/2026): giro settimanale Apify sugli account delle salary aggiunti a mano
+  out.salary_radar = await kickEndpoint(request, "/api/cron/salary-radar");
   // Warm-up (22/10/2026): numeri pubblici dei profili IG e X letti con Apify, una volta al giorno
   out.warmup_metrics = await kickEndpoint(request, "/api/cron/warmup-metrics");
   // Trend modelle (03/11/2026): reel esplosi dal warehouse (trendfinder + i nostri) e descrizione AI
