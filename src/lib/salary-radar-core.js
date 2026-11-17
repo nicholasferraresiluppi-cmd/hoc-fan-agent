@@ -14,10 +14,36 @@
 
 export const SALARY_RADAR_VERSION = "salradar-1";
 
-// Le salary che il magazzino segue già (16/11/2026). Le altre dell'altro split (Marta Bellini,
-// Bianca De Angelis, Laura Cipriani, Milena, Eva) non hanno account Instagram collegati nel
-// magazzino: si aggiungono a mano come «nostre» e le legge Apify.
+// Le salary che il magazzino segue già (16/11/2026; la scelta vera vive in KV e la cambia un admin:
+// dal 17/11 c'è anche Marta Bellini). Bianca De Angelis non ha account collegati nel magazzino: è
+// aggiunta a mano come «nostra» e la legge Apify. Milena, Laura Cipriani ed Eva: nessun Instagram trovato.
 export const DEFAULT_TALENTS = ["Alice Pinotti", "Anna Belti", "Atena Gentile", "Vittoria Sbanca"];
+
+// Persone che il magazzino tiene dentro un'altra salary (17/11/2026, richiesta di Nicholas: «Allie
+// come scheda separata»). Allie Adams (persona inglese, OnlyFans worldofallie) è sotto il talent
+// Alice Pinotti: una parte dei suoi account è collegata alla creator «Allie ENG», un'altra (allie.bunni,
+// peachie_allie, worldof.allie…) risulta collegata ad «Alice Pinotti - IT» ma è lei per nome e bio.
+// Regola: un account va nella scheda separata se è collegato SOLO alla sua creator OPPURE il nome
+// utente contiene il suo nome (collegato a entrambe le creator e senza il nome: resta alla salary). Nessun account di Alice contiene «allie» (verificato sul magazzino).
+// La scheda separata compare solo se la salary da cui nasce è tra quelle scelte.
+export const SPLITS = [
+  { name: "Allie", from: "Alice Pinotti", creators: ["Allie ENG"], handle: "allie" },
+];
+
+/** La scheda di un account del magazzino: la sua salary, o la persona separata che vive dentro. */
+export function modelFor(t, handle, creators = [], splits = SPLITS) {
+  for (const s of splits) {
+    if (s.from !== t) continue;
+    const onlyHers = creators.length > 0 && creators.every((c) => s.creators.includes(c));
+    if (onlyHers || (s.handle && handle.includes(s.handle))) return s.name;
+  }
+  return t;
+}
+
+/** I nomi delle schede del magazzino, nell'ordine: ogni salary seguita dalle persone separate. */
+export function modelNames(talents, splits = SPLITS) {
+  return talents.flatMap((t) => [t, ...splits.filter((s) => s.from === t).map((s) => s.name)]);
+}
 
 export const DAYS = 35;          // finestra letta dal magazzino
 export const WEEK = 7;
@@ -110,10 +136,11 @@ function lastAt(byDay, field, day) {
  * Le nostre salary: per modella, gli account con i numeri della settimana e quella prima.
  * `today` = l'ultimo giorno presente nel magazzino (non la data di sistema: il magazzino arriva a D-1).
  */
-export function buildOurModels(rawRows, { talents = DEFAULT_TALENTS, today } = {}) {
+export function buildOurModels(rawRows, { talents = DEFAULT_TALENTS, today, splits = SPLITS } = {}) {
   const rows = (rawRows || []).map(normalizeRow).filter(Boolean).filter((r) => talents.includes(r.t));
+  const names = modelNames(talents, splits);
   const last = today || rows.reduce((m, r) => (r.d > m ? r.d : m), "");
-  if (!last) return { day: null, models: talents.map((t) => emptyModel(t)) };
+  if (!last) return { day: null, models: names.map((t) => emptyModel(t)) };
   const w1 = addDays(last, -WEEK), w2 = addDays(last, -2 * WEEK);
   const byAcc = new Map();
   for (const r of rows) {
@@ -121,7 +148,7 @@ export function buildOurModels(rawRows, { talents = DEFAULT_TALENTS, today } = {
     if (!byAcc.has(k)) byAcc.set(k, { t: r.t, u: r.u, days: new Map() });
     byAcc.get(k).days.set(r.d, r);
   }
-  const models = new Map(talents.map((t) => [t, []]));
+  const models = new Map(names.map((t) => [t, []]));
   for (const a of byAcc.values()) {
     const days = [...a.days.keys()].sort();
     const lastSeen = days[days.length - 1];
@@ -140,7 +167,7 @@ export function buildOurModels(rawRows, { talents = DEFAULT_TALENTS, today } = {
       const r = a.days.get(d);
       series.push([d, r ? r.views : null, r ? r.fol : null]);
     }
-    models.get(a.t).push({
+    models.get(modelFor(a.t, a.u, lastRow.c, splits)).push({
       h: a.u,
       creators: lastRow.c,
       fol,
@@ -158,7 +185,7 @@ export function buildOurModels(rawRows, { talents = DEFAULT_TALENTS, today } = {
   }
   return {
     day: last,
-    models: talents.map((t) => summarizeModel({
+    models: names.map((t) => summarizeModel({
       id: `t:${slug(t)}`, name: t, side: "nostra", source: "magazzino", talent: t,
       accounts: (models.get(t) || []).sort((x, y) => (y.views7 - x.views7) || ((y.fol || 0) - (x.fol || 0))),
     }, last)),

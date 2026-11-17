@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   parseHandles, normHandle, buildOurModels, buildManualModels, applyRead, weekGrowth, parseCandidates,
-  salaryHints, pct, addDays, slug,
+  salaryHints, pct, addDays, slug, modelFor, modelNames,
 } from "../src/lib/salary-radar-core.js";
 
 let n = 0;
@@ -40,14 +40,17 @@ rows.push({ t: "", u: "x", d: "boh" });
 
 const ours = buildOurModels(rows, { talents: ["Alice Pinotti", "Anna Belti"] });
 eq(ours.day, "2026-11-15", "ultimo giorno del magazzino");
-eq(ours.models.map((m) => m.name), ["Alice Pinotti", "Anna Belti"], "una scheda per modella scelta, anche vuota");
+eq(ours.models.map((m) => m.name), ["Alice Pinotti", "Allie", "Anna Belti"], "una scheda per modella scelta, anche vuota; Allie subito dopo Alice");
+const allie = ours.models[1];
+eq(allie.accounts.map((a) => a.h), ["allie.bunni"], "Allie: l'account collegato ad Allie ENG va nella sua scheda");
+eq(allie.id, "t:allie", "id stabile della scheda separata");
 const alice = ours.models[0];
 const acc = Object.fromEntries(alice.accounts.map((a) => [a.h, a]));
-eq(Object.keys(acc).sort(), ["aliiciottaa", "allie.bunni", "atenagentilee", "pinoali08"], "solo gli account della modella");
+eq(Object.keys(acc).sort(), ["aliiciottaa", "atenagentilee", "pinoali08"], "solo gli account della modella (Allie a parte)");
 eq(acc.aliiciottaa.status, "attivo", "vivo");
 eq(acc.pinoali08.status, "fermo", "nessun reel in 7 giorni = fermo");
 eq(acc.atenagentilee.status, "sparito", "non compare da 5 giorni = sparito");
-ok(acc["allie.bunni"].isNew, "comparso da 3 giorni = nuovo");
+ok(allie.accounts[0].isNew, "comparso da 3 giorni = nuovo");
 ok(!acc.aliiciottaa.isNew, "presente da 20 giorni = non nuovo");
 eq(acc.aliiciottaa.views7, 7000, "view degli ultimi 7 giorni");
 eq(acc.aliiciottaa.viewsPrev, 3500, "view della settimana prima");
@@ -60,12 +63,22 @@ eq(acc.aliiciottaa.folDelta, 70, "follower guadagnati in 7 giorni");
 eq(acc.atenagentilee.folDelta, null, "uno sparito non dà variazione di follower");
 eq(acc.aliiciottaa.creators, ["Alice Pinotti - IT", "Allie ENG"], "creator collegate");
 eq(acc.aliiciottaa.series.length, 30, "serie di 30 giorni");
-eq(alice.counts, { total: 4, attivo: 2, fermo: 1, sparito: 1, nuovi: 1 }, "conteggi");
-eq(alice.fol, 5000 + 1200 + 50, "follower totali senza gli sparito");
-eq(alice.views7, 7000 + 210 + 300 + 400, "view della settimana: anche quelle dello sparito nei giorni in cui c era (2 × 200)");
-ok(alice.series.length === 30 && alice.series[29][1] === 1000 + 30 + 100, "serie della modella = somma degli account");
-eq(ours.models[1].counts.total, 0, "Anna senza righe: scheda vuota");
+eq(alice.counts, { total: 3, attivo: 1, fermo: 1, sparito: 1, nuovi: 0 }, "conteggi");
+eq(alice.fol, 5000 + 1200, "follower totali senza gli sparito");
+eq(alice.views7, 7000 + 210 + 400, "view della settimana: anche quelle dello sparito nei giorni in cui c era (2 × 200)");
+ok(alice.series.length === 30 && alice.series[29][1] === 1000 + 30, "serie della modella = somma degli account");
+eq(allie.views7, 300, "view di Allie contate solo da lei");
+eq(ours.models[2].counts.total, 0, "Anna senza righe: scheda vuota");
 eq(buildOurModels([], { talents: ["X"] }).models[0].day, null, "magazzino vuoto");
+eq(buildOurModels([], { talents: ["Anna Belti"] }).models.map((m) => m.name), ["Anna Belti"], "senza Alice niente scheda Allie");
+
+// --- persone separate ---
+eq(modelFor("Alice Pinotti", "peachie_allie", ["Alice Pinotti - IT"]), "Allie", "Allie per nome utente anche se collegata ad Alice");
+eq(modelFor("Alice Pinotti", "thebestinallie", ["Allie ENG"]), "Allie", "Allie per creator");
+eq(modelFor("Alice Pinotti", "aliiciottaa", ["Alice Pinotti - IT", "Allie ENG"]), "Alice Pinotti", "collegato a entrambe e senza il nome: resta ad Alice");
+eq(modelFor("Alice Pinotti", "pinotti_alice", ["Alice Pinotti - IT"]), "Alice Pinotti", "Alice resta Alice");
+eq(modelFor("Anna Belti", "allie.x", []), "Anna Belti", "la regola vale solo dentro Alice");
+eq(modelNames(["Anna Belti", "Alice Pinotti"]), ["Anna Belti", "Alice Pinotti", "Allie"], "ordine delle schede");
 
 // --- aggiunti a mano (Apify) ---
 let a = { h: "rival.one", modelId: "m:1", hist: [] };
