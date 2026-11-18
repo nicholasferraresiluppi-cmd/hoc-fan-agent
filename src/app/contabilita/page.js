@@ -314,6 +314,7 @@ export default function ContabilitaPage() {
         actions={<>
           {dirty && <button style={btn(true)} onClick={save} disabled={saving}>{saving ? <Loader2 size={14} /> : <Check size={14} />}Salva modifiche</button>}
           <button style={btn()} onClick={newMonth}><Plus size={14} />Nuovo mese</button>
+          <a href="/contabilita/quadro" style={{ ...btn(), textDecoration: "none" }}>Conti dell&apos;impresa</a>
           <a href="/contabilita/split" style={{ ...btn(), textDecoration: "none" }}>Conto dello split</a>
         </>}
       />
