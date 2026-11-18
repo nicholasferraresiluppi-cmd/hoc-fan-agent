@@ -18,6 +18,8 @@ export const RESTRICTED_ROLES = {
   publisher: { home: "/me/publisher", paths: ["/me/publisher"], label: "I miei fan" },
   // 11/11/2026: chi segue i publisher su X
   referente_x: { home: "/admin/publisher-x", paths: ["/admin/publisher-x"], label: "Publisher X" },
+  // 18/11/2026: chi segue le salary vede solo il Radar salary
+  salary: { home: "/admin/salary-radar", paths: ["/admin/salary-radar"], label: "Radar salary" },
   smm: { home: "/admin/scouting", paths: ["/admin/scouting", "/admin/studio-social", "/admin/editing", "/admin/supervisor", "/admin/warmup", "/admin/editoriale"], label: "Radar creator" },
 };
 
@@ -27,6 +29,7 @@ export const RESTRICTED_LABELS = {
   "/admin/warmup": "Social", "/admin/scouting": "Radar creator", "/admin/studio-social": "Regia social", "/admin/editing": "Editing",
   "/admin/supervisor": "Account social", "/admin/hr": "Persone", "/admin/hr/contratti": "Contratti", "/admin/referral": "Porta un amico",
   "/admin/publisher-x": "Publisher X", "/contabilita": "Contabilità", "/me/porta-un-amico": "Porta un amico", "/me/publisher": "I miei fan",
+  "/admin/salary-radar": "Radar salary",
 };
 const MENU_SKIP = new Set(["/admin/editoriale"]);
 

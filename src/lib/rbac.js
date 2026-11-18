@@ -22,13 +22,14 @@ import { memoAuthz, forgetAuthz } from "@/lib/authz-cache";
  */
 
 // "social" per primo = il più basso: diventa ruolo principale solo se è l'unico (lib/invitations)
-export const ROLES = ["referente", "publisher", "referente_x", "social", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
+export const ROLES = ["referente", "publisher", "referente_x", "social", "salary", "smm", "people", "operator", "team_lead", "sales_manager", "qa_reviewer", "admin"];
 
 export const ROLE_META = {
   referente: { label: "Referente", emoji: "🎁", color: "#A78BFA", description: "Porta un amico — vede solo quanto guadagna sulle persone che ha portato" },
   publisher: { label: "Publisher", emoji: "📣", color: "#7C6CF0", description: "Publisher su X — vede solo i fan che porta, le sue buste e quanto ha maturato" },
   referente_x: { label: "Referente X", emoji: "🧭", color: "#7C6CF0", description: "Publisher X — link, inviti dei publisher e loro fan; niente fee né margine" },
   social: { label: "Social", emoji: "📱", color: "#EC4899", description: "Gestione account social — vede solo Account social" },
+  salary: { label: "Salary", emoji: "📡", color: "#D9B46A", description: "Vede solo il Radar salary: i profili delle salary, nostre e delle altre agenzie" },
   smm: { label: "Social Media Manager", emoji: "🎬", color: "#D9B46A", description: "Radar creator, format e mercato, account social" },
   people: { label: "People Partner", emoji: "🤝", color: "#14B8A6", description: "Area Partner — CRM persone, documenti e contratti" },
   operator: { label: "Operator", emoji: "💬", color: "#10B981", description: "Chatter in training — vede i suoi dati" },
@@ -61,6 +62,7 @@ export const CAPABILITIES = {
   USERS_INVITE: "users.invite",               // invitare persone in HOC Pro (accesso solo su invito dal 25/09/2026)
   SCOUTING_USE: "scouting.use",               // Radar creator: guardare, valutare, segnalare, caricare reel (15/10/2026, ruolo SMM)
   SOCIAL_MANAGE: "social.manage",             // Account social (/admin/supervisor): account, telefoni, caselle, password (13/10/2026)
+  SALARY_RADAR: "salary.radar",               // Radar salary (/admin/salary-radar): guardare, aggiungere profili, cercare (18/11/2026, ruolo Salary)
   PEOPLE_MANAGE: "people.manage",
   PUBLISHERX_MANAGE: "publisherx.manage",     // Publisher X (/admin/publisher-x) senza fee né margine (11/11/2026, ruolo Referente X)
   REFERRAL_MANAGE: "referral.manage",         // Porta un amico (/admin/referral): referenti, persone portate, storie, pagamenti (26/10/2026)             // CRM persone (/admin/hr): schede, documenti, contratti, link del modulo (18/10/2026, Area Partner)
@@ -82,6 +84,11 @@ export const ROLE_CAPABILITIES = {
   // 13/10/2026: solo Account social; chi ha solo questo ruolo vede l'app ridotta a quella pagina (lib/restricted-roles)
   social: {
     [CAPABILITIES.SOCIAL_MANAGE]: "all",
+  },
+  // 18/11/2026: chi segue le salary — solo il Radar salary (lib/restricted-roles riduce l'app a quella pagina).
+  // Le impostazioni del radar (quali modelle del magazzino sono salary, giro manuale dei numeri) restano admin (SEED).
+  salary: {
+    [CAPABILITIES.SALARY_RADAR]: "all",
   },
   // 15/10/2026: Social Media Manager — Radar creator (anche Format, Mercato, Le nostre creator) + Account social.
   // Le ricerche che spendono di più (giri Apify, scoperta, foto) e la cancellazione dei dati restano admin (SEED).
@@ -149,6 +156,7 @@ export const ROLE_CAPABILITIES = {
     [CAPABILITIES.PEOPLE_MANAGE]: "all",
     [CAPABILITIES.REFERRAL_MANAGE]: "all",
     [CAPABILITIES.PUBLISHERX_MANAGE]: "all",
+    [CAPABILITIES.SALARY_RADAR]: "all",
   },
 };
 
