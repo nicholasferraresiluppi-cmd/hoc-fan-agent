@@ -55,6 +55,11 @@ export const LIMITS = {
   studio_qc:       [{ window: 3600, max: 30 }, { window: 86400, max: 120 }],
   landing_visit:   [{ window: 3600, max: 3 }],
   landing_click:   [{ window: 3600, max: 3 }],
+  // Scheda numeri della creator (19/11/2026): link personale pubblico. Il salvataggio automatico
+  // fa una richiesta ogni pochi secondi mentre scrive; ogni screenshot = 3 richieste (slot, token, conferma).
+  numeri_form:     [{ window: 60, max: 60 }, { window: 86400, max: 3000 }],  // per link
+  numeri_upload:   [{ window: 3600, max: 150 }],                             // per link
+  numeri_ip:       [{ window: 60, max: 300 }],                               // per IP, solo freno ai loop
 };
 
 /**

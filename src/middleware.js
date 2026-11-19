@@ -44,6 +44,10 @@ const isPublicRoute = createRouteMatcher([
   // Mostra solo i testi e la foto scelti per la landing (lib/studio-telegram: landingBySlug,
   // solo se attiva); il redirect va SOLO alla destinazione salvata; conteggi con tetto per IP.
   '/l/(.*)', '/api/l/(.*)',
+  // Scheda numeri della creator (19/11/2026): la creator non ha un account. Pagina e API si
+  // difendono da sole col token del link (lib/creator-numeri: validità, scadenza, stato) +
+  // tetti per link e per IP; gli screenshot si leggono solo se appartengono a quel link.
+  '/numeri/(.*)', '/api/numeri/(.*)',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
