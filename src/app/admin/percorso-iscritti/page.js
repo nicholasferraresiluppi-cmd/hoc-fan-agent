@@ -190,7 +190,7 @@ function compareColumns(first) {
 const PATH_CSS = `
 .pi-path{display:flex;align-items:stretch;gap:0}
 .pi-stop{flex:1 1 0;min-width:0;border-radius:16px;padding:16px 16px 14px}
-.pi-gap{flex:0 0 92px;display:flex;align-items:center;justify-content:center;position:relative}
+.pi-gap{flex:0 0 120px;display:flex;align-items:center;justify-content:center;position:relative}
 .pi-line{position:absolute;left:0;right:0;top:50%;height:1px}
 .pi-glabel{position:relative;transform:translateY(-11px)}
 @media (max-width:899px){
