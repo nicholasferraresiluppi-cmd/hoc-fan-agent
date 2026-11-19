@@ -7,7 +7,8 @@
 // Le voci automatiche leggono i dati che l'app ha già (Radar, editoriale, warm-up, segnalazioni):
 // un controllo che fallisce torna «dato non disponibile» e non chiude la voce — mai un falso «fatto».
 import { kv } from "@vercel/kv";
-import { normalizePlan, evaluatePlan, coveredDays } from "@/lib/piani-core";
+import { normalizePlan, evaluatePlan, coveredDays, phaseWindows, socialCheck } from "@/lib/piani-core";
+import { loadSocialRows } from "@/lib/piani-social";
 import { listProfiles as radarProfiles } from "@/lib/clip-radar";
 import { listItems } from "@/lib/editoriale-store";
 import { creatorKey } from "@/lib/editoriale-core";
@@ -80,7 +81,7 @@ export async function setItem(planId, itemId, patch, by) {
 
 // ── controlli automatici ─────────────────────────────────────────────────────
 
-async function sources(plan, wanted) {
+async function sources(plan, wanted, autoItems = [], wins = {}) {
   const need = (t) => wanted.has(t);
   const startMs = plan.start ? Date.parse(plan.start + "T00:00:00+01:00") : 0;
   const out = { startMs };
@@ -98,13 +99,25 @@ async function sources(plan, wanted) {
       out.items = (await Promise.all(cks.map((ck) => listItems(ck).catch(() => [])))).flat();
     })());
   }
+  if (need("social_posts")) {
+    // una sola query per tutto il piano: tutti gli account, dalla data più vecchia alla più recente
+    const socials = autoItems.filter((i) => i.auto.type === "social_posts");
+    const days = socials.flatMap((i) => [i.auto.from || wins[i.phaseId]?.from, i.auto.to || wins[i.phaseId]?.to]).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "")).sort();
+    const ig = socials.filter((i) => i.auto.platform !== "tt").map((i) => i.auto.account);
+    const tt = socials.filter((i) => i.auto.platform === "tt").map((i) => i.auto.account);
+    if (days.length) jobs.push(loadSocialRows({ ig, tt, from: days[0], to: days[days.length - 1] }).then((v) => { out.social = v; }));
+  }
   await Promise.allSettled(jobs);
   return out;
 }
 
-function check(auto, src, today) {
+function check(auto, src, today, win) {
   const min = Number(auto.min) || 1;
   switch (auto.type) {
+    case "social_posts": {
+      if (!src.social) return null;
+      return socialCheck(auto, src.social, win, today);
+    }
     case "radar_profiles": {
       if (!src.radar) return null;
       const n = src.radar.filter((p) => !p.ours && (!auto.country || p.country === auto.country)).length;
@@ -157,11 +170,12 @@ export async function loadEvaluated(id, now = Date.now()) {
   const plan = await getPlan(id);
   if (!plan) return null;
   const today = romeToday(now);
-  const autoItems = plan.phases.flatMap((p) => p.items).filter((i) => i.auto);
-  const [state, src] = await Promise.all([getState(id), sources(plan, new Set(autoItems.map((i) => i.auto.type)))]);
+  const autoItems = plan.phases.flatMap((p) => p.items.map((i) => ({ ...i, phaseId: p.id }))).filter((i) => i.auto);
+  const wins = phaseWindows(plan);
+  const [state, src] = await Promise.all([getState(id), sources(plan, new Set(autoItems.map((i) => i.auto.type)), autoItems, wins)]);
   const autos = {};
   for (const it of autoItems) {
-    try { autos[it.id] = check(it.auto, src, today) || undefined; } catch { autos[it.id] = undefined; }
+    try { autos[it.id] = check(it.auto, src, today, wins[it.phaseId]) || undefined; } catch { autos[it.id] = undefined; }
   }
   return { ...evaluatePlan(plan, state, autos, today), today };
 }

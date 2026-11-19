@@ -85,7 +85,7 @@ function ItemEditor({ it, people, onChange, onMove, onRemove, condition }) {
                   {ty.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
                 </select>
               ) : (
-                <input type={ty === "n" ? "number" : "text"} min={0} value={it.auto[k] ?? ""} onChange={(e) => set("auto", { ...it.auto, [k]: ty === "n" ? Number(e.target.value) : e.target.value })} style={input} />
+                <input type={ty === "n" ? "number" : ty === "d" ? "date" : "text"} min={0} value={it.auto[k] ?? ""} onChange={(e) => set("auto", { ...it.auto, [k]: ty === "n" ? Number(e.target.value) : e.target.value })} style={input} />
               )}
             </Field>
           ))}

@@ -29,6 +29,7 @@ export const WORKSPACES = {
       { title: "Le creator", items: [
         { href: "/admin/bilancio", label: "Bilancio del mese", desc: "La classifica di tutte le creator dello split sul loro goal: venduto, ritmo, proiezione, entrate di oggi" },
         { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Tutte a confronto sugli stessi numeri, come vanno e perché, scheda di ogni creator" },
+        { href: "/admin/andamento-orario", label: "Andamento per ora", desc: "Quando entra l'incasso su OF ora per ora, chi c'è a quell'ora e oggi contro un giorno tipico" },
         { href: "/admin/le-mie-creator", label: "Revenue e chat", desc: "Oggi, dal vivo: proiezione di fine mese, benvenuto, fan senza risposta, latenza" },
       ] },
       { title: "Soldi", items: [
@@ -70,6 +71,7 @@ export const WORKSPACES = {
       { title: "Vendite", items: [
         { href: "/admin/bilancio", label: "Bilancio del mese", desc: "La classifica di tutte le creator dello split sul loro goal: venduto, ritmo, proiezione, entrate di oggi" },
         { href: "/admin/analisi-vendite", label: "Analisi vendite", desc: "Le tue creator a confronto, come vanno e perché, scheda di ogni creator" },
+        { href: "/admin/andamento-orario", label: "Andamento per ora", desc: "Quando entra l'incasso ora per ora e chi c'è a quell'ora" },
         { href: "/admin/fan-da-recuperare", label: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano e si sono fermati, con una bozza di ripresa personale" },
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
         { href: "/leaderboard/creators", label: "Creator" },

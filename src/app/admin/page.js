@@ -20,11 +20,11 @@ import { Headphones,
   Wallet, Scale, ShieldCheck, History, FlaskConical, MessageSquareWarning,
   Signpost, Bell, ListTree, Inbox, Clapperboard, Scissors, TrendingUp, UserSearch, UserCheck, Rocket,
   HandCoins, MessageCircle, ArrowLeftRight, Send,
-  Snowflake, Megaphone, Share2, Shield, Sunrise, Building2, BookUser, Radar, UserPlus,
+  Snowflake, Megaphone, Share2, Shield, Sunrise, Building2, BookUser, Radar, Network, UserPlus,
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen, Footprints } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen, Footprints, Clock } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useRouter } from "next/navigation";
@@ -76,6 +76,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/creator-split",         title: "Creator dello split", desc: "Aggiungi o togli una creator: HOC Pro collega da solo pagine OnlyFans, paese e turni, e la creator compare in Revenue e chat, Analisi vendite e S4S", icon: Users },
       { href: "/admin/fan-da-recuperare",     title: "Fan da recuperare", desc: "Ogni mattina i fan che spendevano bene e si sono fermati, con il perché e una bozza di ripresa personale scritta dall'AI dalle loro ultime chat. Segni a chi hai scritto e vedi chi ha ricomprato", icon: HeartHandshake },
       { href: "/admin/analisi-vendite",       title: "Analisi vendite", desc: "Le tue creator in un posto solo: tutte a confronto sugli stessi numeri (lordo, abbonati, reach, click, fan paganti) con una riga di lettura, come vanno e perché (prima chi perde di più, con il perché letto nelle chat), e la scheda di ogni creator", icon: BarChart3 },
+      { href: "/admin/andamento-orario",      title: "Andamento per ora", desc: "Quando entra l'incasso su OnlyFans ora per ora (ora italiana), per tutte le creator o una sola: ore d'oro, da dove arriva (chat, massivi, mance), fan che scrivono, nuovi abbonati, operatori in turno, settimana × ora e oggi contro un giorno tipico", icon: Clock },
       { href: "/admin/benvenuto",             title: "Benvenuto a pagamento", desc: "Quanto sblocca il benvenuto di ogni pagina, prima e dopo ogni cambio di prezzo. Il prezzo si legge dalle chat; se il benvenuto parte da un altro strumento lo inserisci a mano con la data da cui vale", icon: MailOpen },
       { href: "/admin/looker",                title: "Report Looker", desc: "Le 16 pagine originali di Looker Studio (HOC Analytics 3.0 e KPI Sales) con gli stessi nomi, la stessa disposizione e le stesse formule, verificate contro Looker. Solo le tue creator, export CSV", icon: LayoutDashboard },
       { href: "/leaderboard/creators/heatmap", title: "Mappa operatore×creator",      desc: "Score operatore × creator a colpo d'occhio", icon: Flame },
@@ -130,6 +131,7 @@ const SHORTCUT_GROUPS_RAW = [
     label: "Marketing",
     items: [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
+      { href: "/admin/salary-radar", title: "Radar salary", desc: "Le reti di account Instagram delle salary: le nostre ogni giorno dal magazzino (view, reel, account spariti), quelle delle altre agenzie che troviamo, e la ricerca per trovarne altre", icon: Network },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
       { href: "/admin/creator-ai", title: "Creator AI", desc: "Studi su Fanvue e mappa delle creator AI italiane con i loro profili. Sezione privata.", icon: Bot },
       { href: "/admin/editing", title: "Editing", desc: "Una scrivania per creator: la squadra che produce i reel, dal girato al reel misurato, con la cosa che blocca adesso", icon: Scissors },

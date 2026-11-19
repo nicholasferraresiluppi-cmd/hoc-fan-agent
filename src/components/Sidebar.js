@@ -30,7 +30,7 @@ import { UserButton, SignedIn } from "@clerk/nextjs";
 import { Headphones,
   Landmark, ArrowLeftRight, Send, Trophy, BarChart3, DollarSign, Users, Flame, Swords, Crown, HeartHandshake,
   GraduationCap, BookOpen, BookMarked, ClipboardCheck, Target, Brain, Award,
-  LayoutDashboard, UserCog, Sparkles, Radar, Bot,
+  LayoutDashboard, UserCog, Sparkles, Radar, Network, Bot,
   UserCircle2, Contact, Medal, Key, Lock, Wrench, Gauge, MessageSquareWarning,
   RefreshCw, Ban, Languages, Tags, Upload, Sliders, Sprout, ShieldCheck,
   Building2, ChevronDown, ChevronRight, Compass, Layers,
@@ -38,7 +38,7 @@ import { Headphones,
   History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, Scissors, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, Footprints, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
-  FileSignature, Repeat, Gift, MailOpen } from "lucide-react";
+  FileSignature, Repeat, Gift, MailOpen, Clock } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -74,6 +74,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/le-mie-creator",           label: "Revenue e chat", icon: LineChart },
       { href: "/admin/creator-split",            label: "Creator dello split", icon: Users },
       { href: "/admin/analisi-vendite",          label: "Analisi vendite", icon: BarChart3 },
+      { href: "/admin/andamento-orario",         label: "Andamento per ora", icon: Clock },
       { href: "/admin/benvenuto",                label: "Benvenuto a pagamento", icon: MailOpen },
       { href: "/admin/looker",                   label: "Report Looker", icon: LayoutDashboard },
       { href: "/admin/fan-da-recuperare",        label: "Fan da recuperare", icon: HeartHandshake },
@@ -156,6 +157,7 @@ const NAV_GROUPS_RAW = [
     label: "Marketing",
     items: [
       { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
+      { href: "/admin/salary-radar",             label: "Radar salary",  icon: Network },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/creator-ai",               label: "Creator AI",      icon: Bot },
       { href: "/admin/editing",                  label: "Editing",         icon: Scissors },
