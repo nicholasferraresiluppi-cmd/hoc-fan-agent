@@ -111,7 +111,7 @@ function Percorso({ m }) {
     <div className="pi-path">
       {stops.map((s, i) => (
         <div key={s.t} style={{ display: "contents" }}>
-          <div className="pi-stop" style={{ background: i === 0 ? CP.textPrimary : CP.surface, color: i === 0 ? CP.bg : CP.textPrimary, border: `1px solid ${i === 0 ? CP.textPrimary : CP.border}` }}>
+          <div className="pi-stop" style={{ background: i === 0 ? CP.accent : CP.surface, color: i === 0 ? CP.accentInk : CP.textPrimary, border: `1px solid ${i === 0 ? CP.accent : CP.border}` }}>
             <div style={{ fontSize: 12.5, opacity: 0.7 }}>{s.t}</div>
             <div style={{ fontSize: 30, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.15, ...NUM }}>{s.big}</div>
             <div style={{ fontSize: 12.5, opacity: 0.75 }}>{s.sub}</div>
@@ -120,7 +120,7 @@ function Percorso({ m }) {
           {i < stops.length - 1 && (
             <div className="pi-gap" aria-hidden={!gaps[i]}>
               <span className="pi-line" style={{ background: CP.borderStrong }} />
-              {gaps[i] && <span style={{ fontSize: 12, color: CP.textSecondary, whiteSpace: "nowrap", background: CP.bg, padding: "2px 6px", borderRadius: 6, ...NUM }}>{gaps[i]}</span>}
+              {gaps[i] && <span className="pi-glabel" style={{ fontSize: 12, color: CP.textSecondary, whiteSpace: "nowrap", ...NUM }}>{gaps[i]}</span>}
             </div>
           )}
         </div>
@@ -192,11 +192,13 @@ const PATH_CSS = `
 .pi-stop{flex:1 1 0;min-width:0;border-radius:16px;padding:16px 16px 14px}
 .pi-gap{flex:0 0 92px;display:flex;align-items:center;justify-content:center;position:relative}
 .pi-line{position:absolute;left:0;right:0;top:50%;height:1px}
-.pi-gap > span:last-child{position:relative}
+.pi-glabel{position:relative;transform:translateY(-11px)}
 @media (max-width:899px){
   .pi-path{flex-direction:column}
   .pi-gap{flex:0 0 40px}
-  .pi-line{left:50%;right:auto;top:0;bottom:0;width:1px;height:auto}
+  .pi-gap{justify-content:flex-start;padding-left:34px}
+  .pi-line{left:22px;right:auto;top:0;bottom:0;width:1px;height:auto}
+  .pi-glabel{transform:none}
 }
 .pi-two{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
 `;
@@ -330,9 +332,10 @@ export default function PercorsoIscrittiPage() {
               <span style={muted}>{page === "all" ? `${month === "all" ? `iscritti degli ultimi ${months.length} mesi` : `iscritti di ${mese(month)}`} · tocca una pagina per il suo percorso` : `${nameOf[page] || ""} · tocca un mese per il suo percorso`}</span>
             </div>
             <DataTable
+              key={page === "all" ? "pagine" : "mesi"}
               columns={compareColumns(page === "all"
                 ? { key: "name", label: "Pagina", render: (x) => x.name, sort: (x) => x.name }
-                : { key: "mo", label: "Mese di iscrizione", render: (x) => <span>{meseBreve(x.mo)}{x.m.partial ? <span style={muted}> · in corso</span> : null}</span>, sort: (x) => x.mo })}
+                : { key: "mo", label: "Mese di iscrizione", render: (x) => <span>{meseBreve(x.mo)}{x.mo === lastMonth ? <span style={muted}> · in corso</span> : x.m.partial ? <span style={muted}> · in osservazione</span> : null}</span>, sort: (x) => x.mo })}
               rows={compareRows}
               defaultSort={page === "all" ? { key: "subs", dir: -1 } : { key: "mo", dir: -1 }}
               onRowClick={(x) => { if (page === "all") setPage(x.id); else setMonth(x.mo); window.scrollTo({ top: 0, behavior: "smooth" }); }}
