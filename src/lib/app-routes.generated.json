@@ -67,6 +67,7 @@
  "/admin/outcomes",
  "/admin/payment-profiles",
  "/admin/payout-tree",
+ "/admin/percorso-iscritti",
  "/admin/piani",
  "/admin/pnl-live",
  "/admin/presenze-discord",

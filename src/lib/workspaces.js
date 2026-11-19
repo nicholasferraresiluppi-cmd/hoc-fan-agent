@@ -35,6 +35,7 @@ export const WORKSPACES = {
       { title: "Soldi", items: [
         { href: "/admin/pnl-live", label: "P&L Live", desc: "Margini per creator" },
         { href: "/admin/retention", label: "Retention fan", desc: "Fan di valore in pausa e nuovi che tornano" },
+        { href: "/admin/percorso-iscritti", label: "Percorso nuovi iscritti", desc: "Iscrizione, prima spesa, pausa, ritorno: l'identikit del fan nuovo" },
         { href: "/admin/infloww-agency", label: "Incassi Infloww", desc: "Gli incassi dell'agenzia" },
         { href: "/admin/comp-review", label: "Anomalie compensi", desc: "Chi incassa molto più o molto meno della media del team sulla stessa creator, per dollari in gioco" },
       ] },

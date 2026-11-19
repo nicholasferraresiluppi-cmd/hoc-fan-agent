@@ -98,6 +98,7 @@ const NAV_GROUPS_RAW = [
     items: [
       { href: "/admin/pnl-live",                 label: "P&L Live",              icon: Wallet },
       { href: "/admin/retention",                label: "Retention fan",         icon: Repeat },
+      { href: "/admin/percorso-iscritti",        label: "Percorso nuovi iscritti", icon: Footprints },
       { href: "/admin/profiles-compare",         label: "Scaglioni a confronto", icon: Scale },
       { href: "/admin/comp-calendar",            label: "Calendario compensi",   icon: CalendarDays },
       { href: "/admin/threshold-study",          label: "Studio soglie",         icon: Ruler },
