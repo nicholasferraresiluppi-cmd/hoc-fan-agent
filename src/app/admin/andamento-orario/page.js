@@ -303,12 +303,12 @@ export default function AndamentoOrarioPage() {
     { key: "net", label: "Incasso", align: "right", render: (r) => usd(r.net) },
     { key: "delta", label: "vs prima", align: "right", render: (r) => <span style={{ color: r.delta == null || Math.abs(r.delta) < 0.1 ? CP.textSecondary : r.delta > 0 ? CP.accentGreen : CP.accentRed }}>{signed(r.delta)}</span> },
     { key: "share", label: "Quota", align: "right", render: (r) => fmtPct(r.share, 1) },
-    { key: "tx", label: "Acquisti", align: "right", render: (r) => dec1(r.tx) },
-    { key: "payers", label: "Fan che pagano", align: "right", render: (r) => dec1(r.payers) },
+    { key: "tx", label: "Acquisti", align: "right", render: (r) => (one ? int(r.tx) : dec1(r.tx)) },
+    { key: "payers", label: "Fan che pagano", align: "right", render: (r) => (one ? int(r.payers) : dec1(r.payers)) },
     { key: "ticket", label: "Spesa media", align: "right", render: (r) => usd2(r.ticket) },
-    { key: "new_subs", label: "Nuovi abbonati", align: "right", render: (r) => dec1(r.new_subs) },
+    { key: "new_subs", label: "Nuovi abbonati", align: "right", render: (r) => (one ? int(r.new_subs) : dec1(r.new_subs)) },
     ...(d?.has?.chat ? [
-      { key: "fan_writers", label: "Fan che scrivono", align: "right", render: (r) => dec1(r.fan_writers) },
+      { key: "fan_writers", label: "Fan che scrivono", align: "right", render: (r) => (one ? int(r.fan_writers) : dec1(r.fan_writers)) },
       { key: "ppv_sent", label: "PPV mandati", align: "right", render: (r) => int(r.ppv_sent) },
     ] : []),
     ...(d?.has?.staff ? [
@@ -416,7 +416,7 @@ export default function AndamentoOrarioPage() {
           {kindStack.length > 0 && (
             <Panel title="Da dove arriva, ora per ora" aside={one ? "il giorno scelto" : "media al giorno"}>
               <HourChart values={d.hours.map((h) => h.kinds)} stack={kindStack} />
-              <Legend items={kindStack.map((k) => ({ label: k.label, color: k.color, value: `${usd((d.kinds.find((x) => x.key === k.key)?.net) || 0)} al giorno` }))} />
+              <Legend items={kindStack.map((k) => ({ label: k.label, color: k.color, value: `${usd((d.kinds.find((x) => x.key === k.key)?.net) || 0)}${one ? "" : " al giorno"}` }))} />
             </Panel>
           )}
 
@@ -426,7 +426,7 @@ export default function AndamentoOrarioPage() {
           </section>
 
           <section>
-            <SectionTitle aside={`confronto con i ${prevLabel}`}>Per fascia</SectionTitle>
+            <SectionTitle aside={one ? "confronto con il giorno prima" : `confronto con i ${prevLabel}`}>Per fascia</SectionTitle>
             <DataTable columns={bandColumns} rows={d.bands.map((b) => ({ ...b, key: b.key }))} minWidth={560} />
           </section>
 

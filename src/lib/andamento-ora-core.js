@@ -126,7 +126,8 @@ export function readInsideHour(d) {
     if (k.key === "mass" && k.share >= 0.5) out.push(`Viene soprattutto dai massivi (${pct(k.share)}, ${k.tx} acquisti di ${k.fans} fan): è un invio di massa che ha funzionato.`);
     else if (k.share >= 0.8) out.push(`Viene quasi tutta da ${k.label.toLowerCase()} (${pct(k.share)}).`);
     else out.push(`Da dove viene: ${d.kinds.slice(0, 3).map((x) => `${x.label.toLowerCase()} ${pct(x.share)}`).join(", ")}.`);
-    if (mass && k.key !== "mass" && mass.share >= 0.15) out.push(`I massivi pesano il ${pct(mass.share)} (${mass.tx} acquisti).`);
+    // la quota dei massivi si dice a parte solo se la riga «Da dove viene» non l'ha già detta
+    if (mass && k.key !== "mass" && mass.share >= 0.15 && k.share >= 0.8) out.push(`I massivi pesano il ${pct(mass.share)} (${mass.tx} acquisti).`);
   }
 
   if (d.fans.length) {

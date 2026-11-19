@@ -322,7 +322,7 @@ export function reading(d) {
   const moved = pct.filter((b) => Math.abs(b.net - b.net_prev) >= 100);
   const prevLabel = d.range.prevDays === 1 ? "al giorno prima" : `ai ${d.range.prevDays} giorni prima`;
   if (moved.length) {
-    const parts = moved.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).map((b) => `la ${b.label} ${b.delta > 0 ? "cresce" : "cala"} del ${fmtPct(b.delta)} (${fmtUsd(b.net_prev)} → ${fmtUsd(b.net)}${perDay})`);
+    const parts = moved.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).map((b) => `${b.key === "pomeriggio" ? "il" : "la"} ${b.label} ${b.delta > 0 ? "cresce" : "cala"} del ${fmtPct(b.delta)} (${fmtUsd(b.net_prev)} → ${fmtUsd(b.net)}${perDay})`);
     out.push(`Rispetto ${prevLabel}: ${parts.join(", ")}.`);
   } else if (d.totals.net_prev_day > 0 && !pct.length) {
     out.push(`Rispetto ${prevLabel} la forma della giornata non cambia: nessuna fascia si sposta di più del 10%.`);
