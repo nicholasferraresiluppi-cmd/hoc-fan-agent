@@ -33,9 +33,9 @@ function useNarrow() {
 
 /**
  * value: {from, to} | null · onChange(range) · max: ultimo giorno scegliibile (es. ieri)
- * maxDays: durata massima · compare: mostra il periodo di confronto · loading: periodo in caricamento
+ * maxDays: durata massima · dayPreset: etichetta della scelta «solo l'ultimo giorno» · compare: mostra il periodo di confronto · loading: periodo in caricamento
  */
-export default function PeriodPicker({ value, onChange, max, maxDays = 400, compare = true, loading = false }) {
+export default function PeriodPicker({ value, onChange, max, maxDays = 400, compare = true, loading = false, dayPreset = null }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(null); // {from, to|null}
   const [hover, setHover] = useState(null);
@@ -43,7 +43,8 @@ export default function PeriodPicker({ value, onChange, max, maxDays = 400, comp
   const narrow = useNarrow();
   const box = useRef(null);
   const min = addDays(max, -maxDays);
-  const presets = useMemo(() => presetsFor(max), [max]);
+  // dayPreset = etichetta della scelta rapida «un giorno solo» sull'ultimo giorno scegliibile (es. «Ieri»)
+  const presets = useMemo(() => (dayPreset ? [{ id: "1", label: dayPreset, from: max, to: max }, ...presetsFor(max)] : presetsFor(max)), [max, dayPreset]);
   const active = matchPreset(value, presets);
 
   const show = () => {

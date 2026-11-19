@@ -5,7 +5,7 @@
 // turno) e oggi contro un giorno tipico. Nata dalla domanda del board «dove si vede l'andamento per orari
 // complessivi su OF?». Numeri e lettura: /api/admin/andamento-orario (lib/andamento-orario*).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { RefreshCw } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
@@ -13,6 +13,7 @@ import { PageHead, Metric, DataTable, Notice, SectionTitle, EmptyState, FilterBa
 import { Panel, SERIES } from "@/components/VetroCharts";
 import PeriodPicker from "@/components/PeriodPicker";
 import { fmtInt, fmtPct } from "@/lib/format";
+import { peakHour, dayLabel } from "@/lib/andamento-ora-core";
 
 const DAY = 86400e3;
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
@@ -70,7 +71,7 @@ const inWindow = (h, w) => w && ((h - w.from + 24) % 24) < (w.len || 4);
  * 24 colonne, una per ora. `stack` = [{key, color}] per colonne a strati; `prev` = trattino del periodo prima;
  * `outline` = contorno tratteggiato (giorno tipico); `hi` = finestra evidenziata; `partial` = ora in corso.
  */
-function HourChart({ values = [], stack, prev, outline, hi, partial, format = usd, height = 200, prevLabel = "periodo prima", outlineLabel = "tipico" }) {
+function HourChart({ values = [], stack, prev, outline, hi, partial, format = usd, height = 200, prevLabel = "periodo prima", outlineLabel = "tipico", picked = null, onPick = null }) {
   const [ref, w] = useWidth();
   const [hover, setHover] = useState(null);
   const tot = (h) => (stack ? stack.reduce((a, s) => a + (Number(values[h]?.[s.key]) || 0), 0) : Number(values[h]) || 0);
@@ -94,12 +95,12 @@ function HourChart({ values = [], stack, prev, outline, hi, partial, format = us
               ? stack.map((s) => { const v = Number(values[h]?.[s.key]) || 0; const y0 = y(acc); acc += v; return { k: s.key, color: s.color, y: y(acc), hh: y0 - y(acc) }; })
               : [{ k: "v", color: on ? "var(--vt-c0)" : CP.textPrimary, y: y(tot(h)), hh: ih + padT - y(tot(h)) }];
             return (
-              <g key={h} onPointerEnter={() => setHover(h)}>
-                <rect x={x} y={padT} width={bw} height={ih} fill="transparent" />
+              <g key={h} onPointerEnter={() => setHover(h)} onClick={onPick ? () => onPick(h) : undefined} style={onPick ? { cursor: "pointer" } : undefined}>
+                <rect x={x} y={padT} width={bw} height={ih} fill={picked === h ? CP.sel : "transparent"} rx={4} />
                 {outline && outline[h] != null && <rect x={x + 0.5} y={y(outline[h])} width={Math.max(1, bw - 1)} height={Math.max(0, ih + padT - y(outline[h]))} rx={Math.min(4, bw / 2)} fill="none" stroke={CP.textMuted} strokeDasharray="3 3" />}
                 {segs.map((s) => s.hh > 0 && (
                   <rect key={s.k} x={x} y={s.y} width={bw} height={Math.max(1, s.hh)} rx={stack ? 0 : Math.min(4, bw / 2)} fill={s.color}
-                    opacity={stack ? (hover == null || hover === h ? 1 : 0.6) : on || hover === h ? 1 : 0.5} fillOpacity={isPartial ? 0.45 : 1} />
+                    opacity={stack ? (hover == null || hover === h ? 1 : 0.6) : on || hover === h || picked === h ? 1 : 0.5} fillOpacity={isPartial ? 0.45 : 1} />
                 ))}
                 {prev && prev[h] != null && prev[h] > 0 && <line x1={x - 1} x2={x + bw + 1} y1={y(prev[h])} y2={y(prev[h])} stroke={CP.textPrimary} strokeWidth={2} />}
                 {(w > 700 ? h % 2 === 0 : h % 3 === 0) && <text x={x + bw / 2} y={height - 6} textAnchor="middle" fontSize="10.5" fill={on ? CP.textPrimary : CP.textMuted} style={NUM}>{h}</text>}
@@ -114,6 +115,7 @@ function HourChart({ values = [], stack, prev, outline, hi, partial, format = us
           {stack
             ? stack.map((s) => <div key={s.key} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: s.color, marginRight: 5 }} />{s.label}</span><span>{format(values[hover]?.[s.key])}</span></div>)
             : <div>{format(values[hover])}</div>}
+          {onPick && <div style={{ color: CP.textMuted, marginTop: 2 }}>clic: guarda dentro quest'ora</div>}
           {prev && prev[hover] != null && <div>{prevLabel}: {format(prev[hover])}</div>}
           {outline && outline[hover] != null && <div>{outlineLabel}: {format(outline[hover])}</div>}
         </div>
@@ -169,22 +171,132 @@ function WeekTable({ week, field, fmt }) {
   );
 }
 
+const KIND_LABEL = { chat: "Chat 1:1", mass: "Massivo", tip: "Mancia", post: "Post", subs: "Abbonamento", other: "Altro" };
+const timeOf = (ts) => (ts ? ts.slice(11, 16) : "—");
+const since = (days, day) => (days == null ? "—" : days <= 0 ? "quel giorno" : days === 1 ? "1 giorno" : days < 60 ? `${days} giorni` : `dal ${dayLabel(day)}`);
+
+/**
+ * Dentro un'ora (20/11/2026): da cosa è fatto l'incasso di un'ora — fan grosso o massa? Voci, fan più grandi
+ * con i prezzi in sequenza, clienti vecchi o nuovi; su un giorno solo anche acquisto per acquisto.
+ */
+function InsideHour({ range, ids, hour, onHour, days }) {
+  const url = hour == null ? null : `/api/admin/andamento-orario/ora?from=${range.from}&to=${range.to}&h=${hour}${ids.length ? `&creators=${ids.join(",")}` : ""}`;
+  const { data: o, error, isValidating } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const one = days === 1;
+  const span = hour == null ? "" : `${hourLabel(hour)}–${hourLabel((hour + 1) % 24)}`;
+  const fanCell = (f) => (
+    <span style={{ whiteSpace: "nowrap" }}>
+      {f.handle ? <a href={`https://onlyfans.com/${f.handle}`} target="_blank" rel="noopener noreferrer" style={{ color: CP.textPrimary }}>{f.handle}</a> : "fan senza nome"}
+      {o?.multi_page && <span style={muted}> · {f.page}</span>}
+    </span>
+  );
+  const fanColumns = [
+    { key: "handle", label: "Fan", sort: (f) => f.handle || "", render: fanCell },
+    { key: "tx", label: "Acquisti", align: "right", render: (f) => int(f.tx) },
+    { key: "net", label: "Incasso", align: "right", render: (f) => usd2(f.net) },
+    { key: "share", label: "Quota", align: "right", render: (f) => fmtPct(f.share, 0) },
+    { key: "buys", label: one ? "Prezzi in ordine" : "Prezzi in ordine (tutti i giorni)", sortable: false, render: (f) => (
+      <span style={{ whiteSpace: "nowrap", color: f.rising ? CP.textPrimary : CP.textSecondary, ...NUM }}>
+        {f.buys.slice(0, 8).map((b) => usd2(b.price).replace(",00", "")).join(" → ")}{f.buys.length > 8 ? " …" : ""}
+        {f.rising && <span style={{ ...muted, marginLeft: 6 }}>a salire</span>}
+      </span>
+    ) },
+    { key: "sub_days", label: "Iscritto da", align: "right", sort: (f) => f.sub_days ?? -1, render: (f) => since(f.sub_days, f.sub_from) },
+    { key: "first_buy", label: "Primo acquisto", align: "right", sort: (f) => f.first_buy || "", render: (f) => (f.first_in_period ? <span style={{ color: CP.accentGreen }}>{one ? "quel giorno" : "nel periodo"}</span> : dayLabel(f.first_buy)) },
+    { key: "before_net", label: one ? "Speso prima" : "Speso prima del periodo", align: "right", render: (f) => usd(f.before_net) },
+  ];
+  const buys = one && o ? o.fans.flatMap((f) => f.buys.map((b, i) => ({ ...b, key: `${f.key}|${i}`, fan: f }))).sort((a, b) => a.ts.localeCompare(b.ts)) : [];
+  const buyColumns = [
+    { key: "ts", label: "Ora", render: (b) => timeOf(b.ts) },
+    { key: "fan", label: "Fan", sort: (b) => b.fan.handle || "", render: (b) => fanCell(b.fan) },
+    { key: "kind", label: "Voce", render: (b) => KIND_LABEL[b.kind] || b.kind },
+    { key: "price", label: "Prezzo", align: "right", render: (b) => usd2(b.price) },
+    { key: "net", label: "Netto", align: "right", render: (b) => usd2(b.net) },
+  ];
+  return (
+    <Panel title="Dentro l'ora" aside={one ? "chi ha fatto l'incasso di quell'ora" : `l'ora scelta in tutti i ${days} giorni`}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+        <select aria-label="Ora da guardare" value={hour ?? ""} onChange={(e) => onHour(Number(e.target.value))} style={select}>
+          {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hourLabel(h)}–{hourLabel((h + 1) % 24)}</option>)}
+        </select>
+        <span style={muted}>oppure clicca una colonna del grafico qui sopra{isValidating && o ? " · aggiorno…" : ""}</span>
+      </div>
+      {error && <Notice danger>{error.message}</Notice>}
+      {!o && !error && <div style={muted}>Guardo dentro le {span}: qualche secondo.</div>}
+      {o && (
+        <div style={{ display: "grid", gap: 16, opacity: isValidating ? 0.6 : 1, transition: "opacity .15s" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+            <Metric label={one ? `Incasso ${span}` : `Incasso ${span}, al giorno`} value={usd(one ? o.totals.net : o.totals.net_day)} note={one ? null : `${usd(o.totals.net)} in ${o.days} giorni`} />
+            <Metric label="Acquisti" value={int(o.totals.tx)} />
+            <Metric label="Fan che pagano" value={int(o.totals.fans)} />
+            <Metric label="Il fan più grande" value={o.fans[0] ? fmtPct(o.top1_share, 0) : "—"} note={o.fans[0] ? `${o.fans[0].handle || "un fan"} · ${usd(o.fans[0].net)}` : null} />
+          </div>
+          {o.reading?.length > 0 && (
+            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6, fontSize: 14, color: CP.textPrimary, lineHeight: 1.5 }}>
+              {o.reading.map((x, i) => <li key={i}>{x}</li>)}
+            </ul>
+          )}
+          {o.kinds.length > 1 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", fontSize: 13, color: CP.textSecondary, ...NUM }}>
+              {o.kinds.map((k) => <span key={k.key}>{k.label} <b style={{ color: CP.textPrimary, fontWeight: 500 }}>{usd(k.net)}</b> <span style={muted}>{fmtPct(k.share, 0)} · {int(k.tx)} acquisti</span></span>)}
+            </div>
+          )}
+          {o.fans.length > 0 && (
+            <div>
+              <SectionTitle aside={o.totals.fans > o.fans.length ? `i ${o.fans.length} più grandi su ${int(o.totals.fans)}` : "tutti, dal più grande"}>I fan di quest'ora</SectionTitle>
+              <DataTable columns={fanColumns} rows={o.fans} minWidth={880} density="compact" />
+            </div>
+          )}
+          {one && buys.length > 0 && buys.length <= 120 && (
+            <div>
+              <SectionTitle aside={o.totals.tx > buys.length ? `acquisti dei fan qui sopra: ${buys.length} su ${int(o.totals.tx)}` : "in ordine di tempo"}>Acquisto per acquisto</SectionTitle>
+              <DataTable columns={buyColumns} rows={buys} defaultSort={{ key: "ts", dir: 1 }} minWidth={560} density="compact" />
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export default function AndamentoOrarioPage() {
   const yesterday = iso(Date.now() - DAY);
   const [range, setRange] = useState(() => ({ from: iso(Date.now() - 28 * DAY), to: yesterday }));
   const [who, setWho] = useState(""); // "" = tutte; altrimenti nome della persona
+  const [hourPick, setHourPick] = useState(null); // null = l'ora con più incasso
+  // link condivisibile (20/11): periodo, creator e ora stanno nell'indirizzo (?from=&to=&c=&h=)
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const okDay = (x) => /^\d{4}-\d{2}-\d{2}$/.test(x || "") && x <= yesterday;
+    if (okDay(q.get("from")) && okDay(q.get("to")) && q.get("from") <= q.get("to")) setRange({ from: q.get("from"), to: q.get("to") });
+    if (q.get("c")) setWho(q.get("c"));
+    const h = q.get("h");
+    if (h != null && /^\d{1,2}$/.test(h) && Number(h) < 24) setHourPick(Number(h));
+    setReady(true);
+  }, [yesterday]);
+  useEffect(() => {
+    if (!ready) return;
+    const q = new URLSearchParams({ from: range.from, to: range.to });
+    if (who) q.set("c", who);
+    if (hourPick != null) q.set("h", String(hourPick));
+    window.history.replaceState(null, "", `${window.location.pathname}?${q}`);
+  }, [ready, range, who, hourPick]);
+  const pickRange = (r) => { setRange(r); setHourPick(null); };
+  const pickWho = (p) => { setWho(p); setHourPick(null); };
   const [metric, setMetric] = useState("net");
   const [weekField, setWeekField] = useState("net");
   const [personsCache, setPersonsCache] = useState([]);
   const ids = who ? (personsCache.find((p) => p.person === who)?.ids || []) : [];
   const url = `/api/admin/andamento-orario?from=${range.from}&to=${range.to}${ids.length ? `&creators=${ids.join(",")}` : ""}`;
-  const { data: d, error, isValidating, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false, keepPreviousData: true, onSuccess: (x) => x?.persons && setPersonsCache(x.persons) });
+  const { data: d, error, isValidating, mutate } = useSWR(ready ? url : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true, onSuccess: (x) => x?.persons && setPersonsCache(x.persons) });
   const persons = d?.persons || personsCache;
+  const one = d?.range?.days === 1; // un giorno solo: niente «al giorno»
 
   const m = METRICS.find((x) => x.key === metric) || METRICS[0];
   const available = METRICS.filter((x) => !x.need || d?.has?.[x.need]);
   const kindStack = (d?.kinds || []).map((k, i) => ({ key: k.key, label: k.label, color: SERIES[i] || "var(--vt-cx)" }));
-  const prevLabel = d ? `${d.range.prevDays} giorni prima` : "periodo prima";
+  const prevLabel = d ? (d.range.prevDays === 1 ? "giorno prima" : `${d.range.prevDays} giorni prima`) : "periodo prima";
 
   const hourColumns = [
     { key: "h", label: "Ora", render: (r) => <span style={{ whiteSpace: "nowrap", fontWeight: d?.gold && inWindow(r.h, { from: d.gold.from, len: 4 }) ? 600 : 400 }}>{hourLabel(r.h)}</span> },
@@ -207,7 +319,7 @@ export default function AndamentoOrarioPage() {
   ];
   const bandColumns = [
     { key: "label", label: "Fascia", sortable: false, render: (r) => <span style={{ textTransform: "capitalize" }}>{r.label} <span style={muted}>{r.from}–{r.to}</span></span> },
-    { key: "net", label: "Incasso al giorno", align: "right", render: (r) => usd(r.net) },
+    { key: "net", label: one ? "Incasso" : "Incasso al giorno", align: "right", render: (r) => usd(r.net) },
     { key: "share", label: "Quota", align: "right", render: (r) => fmtPct(r.share, 0) },
     { key: "net_prev", label: prevLabel, align: "right", muted: true, render: (r) => usd(r.net_prev) },
     { key: "delta", label: "Variazione", align: "right", render: (r) => <span style={{ color: r.delta == null || Math.abs(r.delta) < 0.1 ? CP.textSecondary : r.delta > 0 ? CP.accentGreen : CP.accentRed }}>{signed(r.delta)}</span> },
@@ -224,6 +336,7 @@ export default function AndamentoOrarioPage() {
   ];
 
   const t = d?.today;
+  const hour = hourPick ?? (d?.hours ? peakHour(d.hours) : null);
   const values = d ? d.hours.map((h) => h[m.key]) : [];
   const prevVals = d && m.prev ? d.hours.map((h) => h[m.prev]) : null;
 
@@ -234,8 +347,8 @@ export default function AndamentoOrarioPage() {
         actions={<button type="button" style={BTN} onClick={() => mutate(fetcher(`${url}&refresh=1`), { revalidate: false })} disabled={isValidating}><RefreshCw size={15} />{isValidating ? "Aggiorno…" : "Aggiorna"}</button>} />
 
       <FilterBar style={{ margin: 0 }}>
-        <PeriodPicker value={range} onChange={setRange} max={yesterday} maxDays={d?.max_days || 120} loading={isValidating && Boolean(d)} />
-        <select aria-label="Creator" value={who} onChange={(e) => setWho(e.target.value)} style={select}>
+        <PeriodPicker value={range} onChange={pickRange} max={yesterday} dayPreset="Ieri" maxDays={d?.max_days || 120} loading={isValidating && Boolean(d)} />
+        <select aria-label="Creator" value={who} onChange={(e) => pickWho(e.target.value)} style={select}>
           <option value="">Tutte le creator{persons.length ? ` (${persons.length})` : ""}</option>
           {persons.map((p) => <option key={p.person} value={p.person}>{p.person}{p.pages.length > 1 ? ` · ${p.pages.length} pagine` : ""}</option>)}
         </select>
@@ -257,27 +370,33 @@ export default function AndamentoOrarioPage() {
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-            <Metric label="Incasso medio al giorno" value={usd(d.totals.net_day)} delta={d.totals.delta == null ? null : signed(d.totals.delta)} deltaLabel={`sui ${d.range.prevDays} giorni prima`} />
+            <Metric label={one ? "Incasso del giorno" : "Incasso medio al giorno"} value={usd(d.totals.net_day)} delta={d.totals.delta == null ? null : signed(d.totals.delta)} deltaLabel={one ? "sul giorno prima" : `sui ${d.range.prevDays} giorni prima`} />
             <Metric label="Ore d'oro" value={d.gold ? d.gold.label : "—"} note={d.gold ? `${fmtPct(d.gold.share, 0)} dell'incasso in 4 ore` : null} />
-            <Metric label="Nuovi abbonati al giorno" value={dec1(d.totals.new_subs_day)} />
-            {d.has.staff && <Metric label="Ore di turno al giorno" value={fmtInt(d.totals.staff_hours_day)} note={`${dec1(d.totals.staff_hours_day / 24)} operatori in media per ora`} />}
-            <Metric label="Incasso nel periodo" value={usd(d.totals.net)} note={`${fmtInt(d.totals.tx)} acquisti`} />
+            <Metric label={one ? "Nuovi abbonati" : "Nuovi abbonati al giorno"} value={dec1(d.totals.new_subs_day)} />
+            {d.has.staff && <Metric label={one ? "Ore di turno" : "Ore di turno al giorno"} value={fmtInt(d.totals.staff_hours_day)} note={`${dec1(d.totals.staff_hours_day / 24)} operatori in media per ora`} />}
+            {one ? <Metric label="Acquisti" value={fmtInt(d.totals.tx)} note={`${fmtInt(d.totals.payers)} fan che pagano`} /> : <Metric label="Incasso nel periodo" value={usd(d.totals.net)} note={`${fmtInt(d.totals.tx)} acquisti`} />}
           </div>
 
-          <Panel title="Ora per ora" aside={`media al giorno, ${d.range.days} giorni`}>
+          <Panel title="Ora per ora" aside={one ? `il ${dayLabel(d.range.cur.from)} · clicca un'ora per guardarci dentro` : `media al giorno, ${d.range.days} giorni · clicca un'ora per guardarci dentro`}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
               <select aria-label="Cosa mostrare" value={metric} onChange={(e) => setMetric(e.target.value)} style={select}>
                 {available.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
               </select>
               {m.need === "chat" && d.range.chatTo && <span style={muted}>messaggi fino al {new Date(`${d.range.chatTo}T12:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "UTC" })}</span>}
             </div>
-            <HourChart values={values} prev={prevVals} hi={metric === "net" && d.gold ? { from: d.gold.from, len: 4 } : null} format={m.fmt} prevLabel={prevLabel} />
+            <HourChart values={values} prev={prevVals} hi={metric === "net" && d.gold ? { from: d.gold.from, len: 4 } : null} format={m.fmt} prevLabel={prevLabel} picked={hour} onPick={(h) => { setHourPick(h); document.getElementById("dentro-ora")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
             <Legend items={[
               { label: m.label, color: CP.textMuted },
               ...(prevVals ? [{ label: prevLabel, line: true }] : []),
               ...(metric === "net" && d.gold ? [{ label: `in colore le ore d'oro ${d.gold.label}`, color: "var(--vt-c0)" }] : []),
             ]} />
           </Panel>
+
+          {hour != null && (
+            <div id="dentro-ora" style={{ scrollMarginTop: 16 }}>
+              <InsideHour range={d.range.cur} ids={ids} hour={hour} onHour={setHourPick} days={d.range.days} />
+            </div>
+          )}
 
           {t && (
             <Panel title="Oggi" aside={t.weeks ? `contro un ${t.weekday} tipico (media delle ultime ${t.weeks} settimane)` : "nessun giorno di confronto"}>
@@ -295,14 +414,14 @@ export default function AndamentoOrarioPage() {
           )}
 
           {kindStack.length > 0 && (
-            <Panel title="Da dove arriva, ora per ora" aside="media al giorno">
+            <Panel title="Da dove arriva, ora per ora" aside={one ? "il giorno scelto" : "media al giorno"}>
               <HourChart values={d.hours.map((h) => h.kinds)} stack={kindStack} />
               <Legend items={kindStack.map((k) => ({ label: k.label, color: k.color, value: `${usd((d.kinds.find((x) => x.key === k.key)?.net) || 0)} al giorno` }))} />
             </Panel>
           )}
 
           <section>
-            <SectionTitle aside="media al giorno; in grassetto le ore d'oro">Ora per ora, in numeri</SectionTitle>
+            <SectionTitle aside={one ? "il giorno scelto; in grassetto le ore d'oro" : "media al giorno; in grassetto le ore d'oro"}>Ora per ora, in numeri</SectionTitle>
             <DataTable columns={hourColumns} rows={d.hours.map((h) => ({ ...h, key: h.h }))} minWidth={1100} density="compact" />
           </section>
 
@@ -311,7 +430,7 @@ export default function AndamentoOrarioPage() {
             <DataTable columns={bandColumns} rows={d.bands.map((b) => ({ ...b, key: b.key }))} minWidth={560} />
           </section>
 
-          <section>
+          {!one && <section>
             <SectionTitle aside="media al giorno; in grassetto le 3 ore più alte di ogni riga">Settimana × ora</SectionTitle>
             {d.has.staff && (
               <div style={{ marginBottom: 10 }}>
@@ -322,13 +441,13 @@ export default function AndamentoOrarioPage() {
               </div>
             )}
             <WeekTable week={d.week} field={weekField} fmt={weekField === "net" ? usd : dec1} />
-          </section>
+          </section>}
 
           {d.creators.length > 1 && (
             <section>
               <SectionTitle aside="clic su una creator per vedere solo lei">Creator per creator</SectionTitle>
               <DataTable columns={creatorColumns} rows={d.creators.map((c) => ({ ...c, key: c.person }))} minWidth={860}
-                onRowClick={(r) => { setWho(r.person); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                onRowClick={(r) => { pickWho(r.person); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
             </section>
           )}
 
@@ -339,6 +458,7 @@ export default function AndamentoOrarioPage() {
             <div><b>Fan che pagano, acquisti, spesa media.</b> Fan diversi che comprano in quell'ora (lo stesso fan su due pagine conta due volte), numero di acquisti e incasso diviso per gli acquisti.</div>
             <div><b>Messaggi.</b> Dalla copia giornaliera delle chat: arrivano fino a ieri (prima delle 7 di mattina fino all'altro ieri). Fan che scrivono = fan diversi che mandano almeno un messaggio in quell'ora; PPV mandati = messaggi a pagamento mandati dalla pagina, massivi compresi.</div>
             <div><b>Operatori in turno.</b> Dai turni CreatorsPro dei chatter sulle pagine scelte: quante persone sono in turno in quell'ora, in media. Chi copre due pagine nella stessa ora conta una volta. Incasso per operatore = incasso dell'ora diviso per gli operatori in turno; messaggi dei fan per operatore = quanta domanda ha ognuno. Sotto mezzo operatore in media l'ora è «scoperta» e i rapporti non si calcolano (con un turno ogni tanto darebbero numeri enormi e falsi). Un turno che non è in CreatorsPro non si vede.</div>
+            <div><b>Dentro l'ora.</b> Da cosa è fatto l'incasso di un'ora: si parte dall'ora con più incasso, oppure clicca una colonna. Fan = l'handle OnlyFans; i fan sono contati per pagina. «Prezzi in ordine» = quanto ha pagato il fan (lordo), acquisto dopo acquisto; «a salire» = almeno 3 acquisti nella stessa ora dello stesso giorno a prezzo che non scende mai (la scala in chat). «Iscritto da» = dalla prima iscrizione a quella pagina; «Primo acquisto» = il primo di sempre su quella pagina; «Speso prima» = netto speso prima del periodo, abbonamenti esclusi. Si mostrano i 25 fan più grandi; su più giorni l'ora è la stessa in tutti i giorni del periodo.</div>
             <div><b>Oggi.</b> Incasso di oggi fino all'ultima ora conclusa, contro la media dello stesso giorno della settimana nelle 4 settimane prima (le settimane senza incasso non entrano). L'ora in corso è mostrata a parte.</div>
             <div><b>Quali pagine.</b> Solo le pagine degli split che puoi vedere, solo l'organizzazione HOC (il warehouse contiene anche altre agenzie). Le pagine della stessa creator (IT, EN…) sono unite.</div>
           </Spiega>

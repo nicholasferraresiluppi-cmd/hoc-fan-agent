@@ -10,7 +10,8 @@ import { kv } from "@vercel/kv";
 import { bqQuery, bqProjects, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { splitCreators } from "@/lib/analisi-vendite";
 import { personOf } from "@/lib/analisi-vendite-diagnosi";
-import { txHourlySql, activityHourlySql, todaySql } from "@/lib/andamento-orario-sql";
+import { txHourlySql, activityHourlySql, todaySql, insideHourSql } from "@/lib/andamento-orario-sql";
+import { buildInsideHour } from "@/lib/andamento-ora-core";
 import { buildAndamento, buildToday, reading, normalizePeriod, romeNow, addDays, MAX_DAYS } from "@/lib/andamento-orario-core";
 export { MAX_DAYS };
 
@@ -22,6 +23,7 @@ const TABLES = {
   chat: ["onlyfans", "chat"],
   organicSubs: ["onlyfans", "organic_subscriptions"],
   shifts: ["onlyfans", "cache_members"],
+  subs: ["onlyfans", "subscriptions_intervals"],
 };
 function refsFor(source) {
   const { dataProject, billingProject } = bqProjects();
@@ -83,5 +85,25 @@ export async function getAndamento(ids, query = {}, { force = false, now = new D
   }
   const out = { ...base, today };
   out.reading = reading(out);
+  return out;
+}
+
+/**
+ * Dentro un'ora: da cosa è fatto l'incasso dell'ora `h` nei giorni del periodo (lib/andamento-ora-core).
+ * Legge lo storico dei fan dell'ora (~1,2 GB): cache 15 minuti, e per un periodo già chiuso 6 ore.
+ */
+export async function getInsideHour(ids, query = {}, h, { force = false, now = new Date() } = {}) {
+  const { cur } = normalizePeriod(query, now);
+  const hour = Number(h);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error("Ora non valida (0-23)");
+  const sorted = [...new Set(ids.map(Number))].sort((a, b) => a - b);
+  const key = `andamento:${VERSION}:ora:${cur.from}:${cur.to}:${hour}:${sorted.join(",")}`;
+  const hit = force ? null : await kv.get(key).catch(() => null);
+  if (hit) return hit;
+  const creators = await splitCreators();
+  const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
+  const { source, rows } = await run((refs) => [insideHourSql(refs, { ids: sorted, org: HOC_ORGANIZATION_ID, from: cur.from, to: cur.to, h: hour })]);
+  const out = { ...buildInsideHour(rows[0], { h: hour, from: cur.from, to: cur.to, names, personOf }), source, computed_at: new Date().toISOString() };
+  await kv.set(key, out, { ex: 6 * 3600 }).catch(() => {});
   return out;
 }
