@@ -312,22 +312,25 @@ export function uncoveredRun(hours) {
 export function reading(d) {
   const out = [];
   if (!d.gold || !(d.totals.net_day > 0)) return out;
-  out.push(`Le ore d'oro sono le ${d.gold.label}: in 4 ore entra il ${fmtPct(d.gold.share)} dell'incasso del giorno (${fmtUsd(d.gold.net)} su ${fmtUsd(d.totals.net_day)} al giorno). Le più deboli sono le ${d.weak.label}, con il ${fmtPct(d.weak.share)}.`);
+  // un giorno solo: niente «al giorno» né «ai 1 giorni prima» (20/11)
+  const one = d.range?.days === 1;
+  const perDay = one ? "" : " al giorno";
+  out.push(`Le ore d'oro sono le ${d.gold.label}: in 4 ore entra il ${fmtPct(d.gold.share)} dell'incasso del giorno (${fmtUsd(d.gold.net)} su ${fmtUsd(d.totals.net_day)}${perDay}). Le più deboli sono le ${d.weak.label}, con il ${fmtPct(d.weak.share)}.`);
 
   // si sposta = almeno ±10% E almeno $100 al giorno (su una pagina piccola il 10% è rumore)
   const pct = d.bands.filter((b) => b.delta != null && Math.abs(b.delta) >= 0.1);
   const moved = pct.filter((b) => Math.abs(b.net - b.net_prev) >= 100);
-  const prevLabel = `${d.range.prevDays} giorni prima`;
+  const prevLabel = d.range.prevDays === 1 ? "al giorno prima" : `ai ${d.range.prevDays} giorni prima`;
   if (moved.length) {
-    const parts = moved.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).map((b) => `la ${b.label} ${b.delta > 0 ? "cresce" : "cala"} del ${fmtPct(b.delta)} (${fmtUsd(b.net_prev)} → ${fmtUsd(b.net)} al giorno)`);
-    out.push(`Rispetto ai ${prevLabel}: ${parts.join(", ")}.`);
+    const parts = moved.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).map((b) => `la ${b.label} ${b.delta > 0 ? "cresce" : "cala"} del ${fmtPct(b.delta)} (${fmtUsd(b.net_prev)} → ${fmtUsd(b.net)}${perDay})`);
+    out.push(`Rispetto ${prevLabel}: ${parts.join(", ")}.`);
   } else if (d.totals.net_prev_day > 0 && !pct.length) {
-    out.push(`Rispetto ai ${prevLabel} la forma della giornata non cambia: nessuna fascia si sposta di più del 10%.`);
+    out.push(`Rispetto ${prevLabel} la forma della giornata non cambia: nessuna fascia si sposta di più del 10%.`);
   }
 
   const gap = uncoveredRun(d.hours);
   if (gap) {
-    const what = d.has.chat ? `i fan mandano ${Math.round(gap.fan_msgs).toLocaleString("it-IT")} messaggi e entrano ${fmtUsd(gap.net)} al giorno` : `entrano ${fmtUsd(gap.net)} al giorno`;
+    const what = d.has.chat ? `i fan mandano ${Math.round(gap.fan_msgs).toLocaleString("it-IT")} messaggi e entrano ${fmtUsd(gap.net)}${perDay}` : `entrano ${fmtUsd(gap.net)}${perDay}`;
     out.push(`${gap.len === 1 ? `Alle ${gap.from}` : `Dalle ${gap.from} alle ${(gap.from + gap.len) % 24}`} le pagine sono quasi scoperte (${gap.staff / gap.len < 0.1 ? "quasi mai qualcuno in turno" : `in media ${fmtX(gap.staff / gap.len)} operatori in turno`}) mentre ${what}.`);
   }
   if (d.has.staff && d.has.chat) {

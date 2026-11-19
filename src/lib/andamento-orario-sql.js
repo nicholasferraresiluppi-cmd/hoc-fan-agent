@@ -166,3 +166,77 @@ SELECT -1, NULL, NULL, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', MAX(created_at))
 FROM \`${refs.attributed}\`
 WHERE organization_id = ${org(o)} AND calendar_date >= DATE_SUB(${day(today)}, INTERVAL 1 DAY)`;
 }
+
+/**
+ * Dentro un'ora (20/11/2026): da cosa è fatto l'incasso di un'ora del giorno (ora italiana `h`) nei giorni del
+ * periodo. Domanda d'origine (Nicholas): «il picco delle 19 è un fan grosso o una massa che ha funzionato?».
+ * Righe `k` (JSON in `j`):
+ *   tot  → incasso, acquisti, fan paganti distinti (pagina×fan), giorni con almeno un acquisto
+ *   kind → per voce (chat, massivi, mance, post, abbonamenti): incasso, acquisti, fan
+ *   fan  → i primi 25 fan per incasso in quell'ora: acquisti in ordine di tempo (prezzo pagato dal fan e netto),
+ *          da quando è iscritto alla pagina, primo acquisto di sempre e quanto aveva speso PRIMA del periodo.
+ * Il nome che si mostra è l'handle OnlyFans preso dalla descrizione della transazione (mai il nome per esteso).
+ * La storia del fan legge tutto lo storico delle transazioni della pagina (~1,2 GB): la vista si mette in cache.
+ */
+export function insideHourSql(refs, { ids, org: o, from, to, h }) {
+  const list = idList(ids);
+  const hour = Number(h);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error("ora non valida");
+  return `
+WITH t AS (
+  SELECT id, creator_id, user_id, type, CAST(net AS FLOAT64) AS net, CAST(amount AS FLOAT64) AS amount, created_at, description
+  FROM \`${refs.attributed}\`
+  WHERE organization_id = ${org(o)} AND creator_id IN (${list})
+    AND calendar_date BETWEEN DATE_SUB(${day(from)}, INTERVAL 1 DAY) AND DATE_ADD(${day(to)}, INTERVAL 1 DAY)
+    AND created_at >= ${romeStart(from)} AND created_at < ${romeEnd(to)}
+    AND EXTRACT(HOUR FROM DATETIME(created_at, '${TZ}')) = ${hour}
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC) = 1
+),
+m AS (
+  SELECT DISTINCT id FROM \`${refs.mass}\`
+  WHERE organization_id = ${org(o)} AND creator_id IN (${list})
+    AND created_at >= ${romeStart(from)} AND created_at < ${romeEnd(to)}
+),
+x AS (
+  SELECT t.creator_id, t.user_id, t.net, t.amount, DATETIME(t.created_at, '${TZ}') AS dt,
+    CASE
+      WHEN t.type = 'message' AND m.id IS NOT NULL THEN 'mass'
+      WHEN t.type = 'message' THEN 'chat'
+      WHEN t.type = 'tip' THEN 'tip'
+      WHEN t.type = 'post' THEN 'post'
+      WHEN t.type LIKE '%subscription%' THEN 'subs'
+      ELSE 'other'
+    END AS kind,
+    REGEXP_EXTRACT(t.description, r'onlyfans\\.com/([A-Za-z0-9_.\\-]+)') AS handle
+  FROM t LEFT JOIN m USING (id)
+),
+f0 AS (
+  SELECT creator_id, user_id, ANY_VALUE(handle) AS handle, COUNT(*) AS tx, SUM(net) AS net,
+    COUNT(DISTINCT DATE(dt)) AS days,
+    ARRAY_AGG(STRUCT(FORMAT_DATETIME('%Y-%m-%dT%H:%M', dt) AS ts, ROUND(amount, 2) AS price, ROUND(net, 2) AS net, kind) ORDER BY dt LIMIT 30) AS buys
+  FROM x WHERE net > 0 GROUP BY 1, 2
+),
+f AS (SELECT * FROM f0 QUALIFY ROW_NUMBER() OVER (ORDER BY net DESC) <= 25),
+hist AS (
+  SELECT a.creator_id, a.user_id,
+    FORMAT_TIMESTAMP('%Y-%m-%d', MIN(a.created_at), '${TZ}') AS first_buy,
+    SUM(IF(a.created_at < ${romeStart(from)}, CAST(a.net AS FLOAT64), 0)) AS before_net
+  FROM \`${refs.attributed}\` a JOIN f USING (creator_id, user_id)
+  WHERE a.organization_id = ${org(o)} AND a.creator_id IN (${list}) AND a.type NOT LIKE '%subscription%'
+    AND a.created_at < ${romeEnd(to)}
+  GROUP BY 1, 2
+),
+sub AS (
+  SELECT s.creator_id, s.user_id, FORMAT_TIMESTAMP('%Y-%m-%d', MIN(s.started_at), '${TZ}') AS sub_from
+  FROM \`${refs.subs}\` s JOIN f USING (creator_id, user_id)
+  WHERE s.organization_id = ${org(o)} AND s.creator_id IN (${list})
+  GROUP BY 1, 2
+)
+SELECT 'tot' AS k, TO_JSON_STRING(STRUCT(SUM(net) AS net, COUNT(*) AS tx,
+  COUNT(DISTINCT IF(net > 0, CONCAT(creator_id, '|', user_id), NULL)) AS fans, COUNT(DISTINCT DATE(dt)) AS days)) AS j FROM x
+UNION ALL
+SELECT 'kind', TO_JSON_STRING(STRUCT(kind, SUM(net) AS net, COUNT(*) AS tx, COUNT(DISTINCT IF(net > 0, CONCAT(creator_id, '|', user_id), NULL)) AS fans)) FROM x GROUP BY kind
+UNION ALL
+SELECT 'fan', TO_JSON_STRING(STRUCT(f.creator_id, f.user_id, f.handle, f.tx, f.net, f.days, f.buys, hist.first_buy, hist.before_net, sub.sub_from))
+FROM f LEFT JOIN hist USING (creator_id, user_id) LEFT JOIN sub USING (creator_id, user_id)`;
+}
