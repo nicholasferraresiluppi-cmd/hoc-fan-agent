@@ -18,6 +18,13 @@ const price = (v) => {
   return `$${Number.isInteger(n) ? n.toLocaleString("it-IT", { useGrouping: "always" }) : n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 const pct = (v) => `${Math.round((Number(v) || 0) * 100)}%`;
+// numeri che si leggono con la vocale davanti (uno, otto, undici, ottanta…, ottocento…): «l'81%», «degli 8»
+export const vowelNumber = (n) => {
+  const x = String(Math.round(Math.abs(Number(n) || 0)));
+  return x === "1" || x === "11" || x.startsWith("8") || /^11\d{3}$/.test(x);
+};
+const ilPct = (v) => { const n = Math.round((Number(v) || 0) * 100); return `${vowelNumber(n) ? "l'" : "il "}${n}%`; };
+const deiN = (n) => `${vowelNumber(n) ? "degli" : "dei"} ${n}`;
 const hh = (h) => String(h).padStart(2, "0");
 const parseRows = (rows) => (rows || []).map((r) => {
   try { return { k: r.k, ...JSON.parse(r.j) }; } catch { return null; }
@@ -109,11 +116,11 @@ export function readInsideHour(d) {
   if (f && d.top1_share >= BIG_FAN) {
     const how = f.rising ? (one ? `${f.tx} acquisti a prezzo crescente (${ladder(f)})` : `${f.tx} acquisti, tra cui una scala di prezzi nella stessa ora (${ladder(f)})`) : `${f.tx} ${f.tx === 1 ? "acquisto" : "acquisti"}${f.buys.length > 1 && f.buys.length <= 8 ? ` (${ladder(f)})` : ""}`;
     const past = f.first_in_period ? (one ? "è il suo primo acquisto in assoluto su questa pagina" : "il suo primo acquisto in assoluto su questa pagina è di questo periodo") : f.first_buy ? `compra dal ${dayLabel(f.first_buy)} e prima ${one ? "di quel giorno" : "del periodo"} aveva speso ${usd(f.before_net)} in tutto` : null;
-    out.push(`È l'ora di un fan solo: ${fanName(f)} vale il ${pct(d.top1_share)} (${usd(f.net)}) con ${how}${!one && f.days > 1 ? `, in ${f.days} giorni diversi` : ""}${past ? `; ${past}` : ""}.`);
+    out.push(`È l'ora di un fan solo: ${fanName(f)} vale ${ilPct(d.top1_share)} (${usd(f.net)}) con ${how}${!one && f.days > 1 ? `, in ${f.days} giorni diversi` : ""}${past ? `; ${past}` : ""}.`);
   } else if (d.fans.length >= 3 && d.top3_share >= FEW_FANS) {
-    out.push(`La fanno pochi fan: i primi 3 valgono il ${pct(d.top3_share)}; il più grande, ${fanName(f)}, il ${pct(d.top1_share)}.`);
+    out.push(`La fanno pochi fan: i primi 3 valgono ${ilPct(d.top3_share)}; il più grande, ${fanName(f)}, ${ilPct(d.top1_share)}.`);
   } else if (f) {
-    out.push(`È distribuita: il fan più grande (${fanName(f)}) vale il ${pct(d.top1_share)}${d.fans.length >= 3 ? `, i primi 3 il ${pct(d.top3_share)}` : ""}.`);
+    out.push(`È distribuita: il fan più grande (${fanName(f)}) vale ${ilPct(d.top1_share)}${d.fans.length >= 3 ? `, i primi 3 ${ilPct(d.top3_share)}` : ""}.`);
   }
   const rising = d.fans.filter((x) => x.rising);
   if (rising.length && !(f && d.top1_share >= BIG_FAN && f.rising && rising.length === 1)) {
@@ -127,7 +134,7 @@ export function readInsideHour(d) {
     else if (k.share >= 0.8) out.push(`Viene quasi tutta da ${k.label.toLowerCase()} (${pct(k.share)}).`);
     else out.push(`Da dove viene: ${d.kinds.slice(0, 3).map((x) => `${x.label.toLowerCase()} ${pct(x.share)}`).join(", ")}.`);
     // la quota dei massivi si dice a parte solo se la riga «Da dove viene» non l'ha già detta
-    if (mass && k.key !== "mass" && mass.share >= 0.15 && k.share >= 0.8) out.push(`I massivi pesano il ${pct(mass.share)} (${mass.tx} acquisti).`);
+    if (mass && k.key !== "mass" && mass.share >= 0.15 && k.share >= 0.8) out.push(`I massivi pesano ${ilPct(mass.share)} (${mass.tx} acquisti).`);
   }
 
   if (d.fans.length) {
@@ -136,7 +143,7 @@ export function readInsideHour(d) {
     if (d.first_timers) bits.push(one ? `${d.first_timers} ${d.first_timers === 1 ? "compra" : "comprano"} per la prima volta` : `${d.first_timers} ${d.first_timers === 1 ? "ha fatto" : "hanno fatto"} il primo acquisto di sempre in questo periodo`);
     if (d.new_subs) bits.push(`${d.new_subs} ${d.new_subs === 1 ? "è iscritto" : "sono iscritti"} da meno di ${NEW_SUB_DAYS + 1} giorni`);
     if (old) bits.push(`${old} ${old === 1 ? "è cliente" : "sono clienti"} da più di un mese`);
-    if (bits.length) out.push(`Dei ${d.fans.length} fan più grandi: ${bits.join(", ")}.`);
+    if (bits.length) out.push(`${deiN(d.fans.length)[0].toUpperCase()}${deiN(d.fans.length).slice(1)} fan più grandi: ${bits.join(", ")}.`);
   }
   return out;
 }
