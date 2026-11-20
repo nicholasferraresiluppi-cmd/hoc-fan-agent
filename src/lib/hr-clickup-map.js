@@ -301,6 +301,25 @@ export function taskToPerson(task, { comuni = null } = {}) {
   };
 }
 
+/**
+ * Chiavi app il cui campo ClickUp NON esiste sul task (campo cancellato dalla lista).
+ * 20/11/2026: «HV Contract Status» cancellato da ClickUp. La base (cuBase) di quel campo
+ * sopravviveva: ricreato il campo vuoto, il vuoto sarebbe sembrato una cancellazione fatta
+ * su ClickUp e avrebbe azzerato lo stato del contratto in app per tutti. Campo assente ⇒
+ * la sua base non vale più: alla ricomparsa scatta la regola "campo mai visto" e vince l'app.
+ * Task senza `custom_fields` (letto a metà) → nessuna chiave: nel dubbio non si tocca niente.
+ */
+export function absentFieldKeys(task) {
+  if (!Array.isArray(task?.custom_fields)) return [];
+  const byName = fieldsByName(task.custom_fields);
+  const out = [];
+  for (const f of FIELDS) {
+    const name = f.mirror || (f.cu && !f.appOnly && f.type !== "fileRef" ? f.cu : null);
+    if (name && !byName.has(lc(name))) out.push(f.key);
+  }
+  return out;
+}
+
 // ── Persona → operazioni ClickUp ─────────────────────────────────────────────
 /**
  * Corpo per POST /task/{id}/field/{field_id}.

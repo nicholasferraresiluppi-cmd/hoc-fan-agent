@@ -12,7 +12,7 @@ import {
 import {
   decodeDropdown, decodeLabels, decodeCustomField, msToIsoDate, isoDateToMs, taskToPerson, personToClickup, clickupDrift,
   createTaskPayload, statusForCollaboration, parseHocBlock, withHocBlock, stripHocBlock, HOC_BLOCK_START,
-  encodeFieldValue, incomingTimestamps,
+  encodeFieldValue, incomingTimestamps, absentFieldKeys, expectedFieldNames,
 } from "../src/lib/hr-clickup-map.js";
 import { encryptHr, decryptHr, hrCryptoConfigured } from "../src/lib/hr-crypto.js";
 
@@ -1610,4 +1610,18 @@ console.log(`totale: ${n} asserzioni`);
   const back = taskToPerson({ name: "A", custom_fields: [{ ...meta[1], value: "01114601006" }] });
   t(back.fields.partitaIvaNumero === "01114601006", "e torna da ClickUp");
   n += m; console.log(`numero partita IVA: ${m} asserzioni OK`);
+}
+
+{
+  // 20/11/2026: campo cancellato su ClickUp → la sua base scade (poi il campo ricreato vuoto non azzera l'app)
+  let m = 0; const t = (c, msg) => { assert.ok(c, msg); m += 1; };
+  const all = [...new Set(expectedFieldNames().map((f) => f.name))];
+  const full = all.map((name, i) => ({ id: `f${i}`, name, type: "short_text" }));
+  t(absentFieldKeys({ custom_fields: full }).length === 0, "lista completa: nessun campo assente");
+  const senza = full.filter((f) => f.name !== "HV Contract Status");
+  t(JSON.stringify(absentFieldKeys({ custom_fields: senza })) === JSON.stringify(["hvContractStatus"]), "HV Contract Status cancellato → solo hvContractStatus");
+  t(absentFieldKeys({ custom_fields: senza.map((f) => ({ ...f, name: f.name.toUpperCase() })) }).join() === "hvContractStatus", "nomi indifferenti a maiuscole");
+  t(absentFieldKeys({ name: "x" }).length === 0, "task letto senza custom_fields: nel dubbio nessuna chiave");
+  t(absentFieldKeys(null).length === 0, "task nullo: nessuna chiave");
+  n += m; console.log(`campi cancellati su ClickUp: ${m} asserzioni OK`);
 }
