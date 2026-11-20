@@ -11,7 +11,7 @@ import { bqQuery, bqProjects, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { splitCreators } from "@/lib/analisi-vendite";
 import { personOf } from "@/lib/analisi-vendite-diagnosi";
 import { txHourlySql, activityHourlySql, todaySql, insideHourSql } from "@/lib/andamento-orario-sql";
-import { buildInsideHour } from "@/lib/andamento-ora-core";
+import { buildInsideHour, readInsideHour } from "@/lib/andamento-ora-core";
 import { buildAndamento, buildToday, reading, normalizePeriod, romeNow, addDays, MAX_DAYS } from "@/lib/andamento-orario-core";
 export { MAX_DAYS };
 
@@ -99,7 +99,8 @@ export async function getInsideHour(ids, query = {}, h, { force = false, now = n
   const sorted = [...new Set(ids.map(Number))].sort((a, b) => a - b);
   const key = `andamento:${VERSION}:ora:${cur.from}:${cur.to}:${hour}:${sorted.join(",")}`;
   const hit = force ? null : await kv.get(key).catch(() => null);
-  if (hit) return hit;
+  // la lettura in parole si rifà a ogni richiesta: una correzione del testo vale subito, non dopo la cache
+  if (hit) return { ...hit, reading: readInsideHour(hit) };
   const creators = await splitCreators();
   const names = Object.fromEntries(creators.map((c) => [c.id, c.name]));
   const { source, rows } = await run((refs) => [insideHourSql(refs, { ids: sorted, org: HOC_ORGANIZATION_ID, from: cur.from, to: cur.to, h: hour })]);

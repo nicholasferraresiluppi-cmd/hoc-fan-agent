@@ -2,7 +2,7 @@
 // Copre: lettura «un fan solo» sul caso vero (Alessandra 18/11 ore 19), scala di prezzi solo dentro lo stesso
 // giorno, ora/id validati nell'SQL, organizzazione HOC sempre filtrata, handle mai il nome per esteso.
 import assert from "node:assert/strict";
-import { buildInsideHour, isRising, peakHour } from "../src/lib/andamento-ora-core.js";
+import { buildInsideHour, isRising, peakHour, vowelNumber, readInsideHour } from "../src/lib/andamento-ora-core.js";
 import { insideHourSql } from "../src/lib/andamento-orario-sql.js";
 
 let n = 0;
@@ -58,5 +58,17 @@ ok(multi.reading[0].includes("$30 al giorno"), "media al giorno su più giorni")
 ok(buildInsideHour([J("tot", { net: 0, tx: 0, fans: 0, days: 0 })], { h: 3, from: "2026-11-18", to: "2026-11-18" }).reading[0].includes("non è entrato niente"), "ora vuota");
 ok(peakHour([{ h: 1, net: 5 }, { h: 19, net: 544 }, { h: 20, net: 45 }]) === 19, "ora di picco");
 ok(peakHour([{ h: 1, net: 0 }]) === null, "nessun picco senza incasso");
+
+// ── italiano: «l'81%», «degli 8» ──
+ok(vowelNumber(81) && vowelNumber(8) && vowelNumber(11) && vowelNumber(1) && !vowelNumber(18) && !vowelNumber(68), "numeri con la vocale");
+const eight = buildInsideHour([
+  J("tot", { net: 100, tx: 10, fans: 8, days: 1 }),
+  J("kind", { kind: "chat", net: 77, tx: 4, fans: 4 }), J("kind", { kind: "mass", net: 23, tx: 6, fans: 6 }),
+  ...[30, 27, 24, 4, 4, 4, 4, 3].map((v, i) => J("fan", { creator_id: 1, user_id: i, handle: `f${i}`, tx: 1, net: v, days: 1, buys: [{ ts: "2026-11-18T16:0" + i, price: v, net: v, kind: "chat" }], first_buy: "2026-11-18", before_net: 0 })),
+], { h: 16, from: "2026-11-18", to: "2026-11-18" });
+ok(eight.reading.some((x) => x.includes("valgono l'81%")), "l'81%");
+ok(eight.reading.some((x) => x.startsWith("Degli 8 fan")), "Degli 8");
+ok(eight.reading.filter((x) => x.includes("massivi")).length === 1, "massivi detti una volta sola");
+ok(readInsideHour(eight).join() === eight.reading.join(), "la lettura si rifà uguale dai dati");
 
 console.log(`andamento-ora: ${n} asserzioni ok`);
