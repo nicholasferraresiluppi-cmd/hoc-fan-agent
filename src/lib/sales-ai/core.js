@@ -205,7 +205,7 @@ export function buildPacks({ messages, shifts, buys, firstSeen = {}, captionStat
         min_da_ultimo_msg_fan: since == null ? null : Math.round(since * 10) / 10,
         caption_bassa_resa: lowCaption,
         caption_resa_creator: cs ? { invii_30g: cs.n, comprati_pct: Math.round(cs.rate * 1000) / 10 } : null,
-        chat: ctx.map((y) => ({ who: y.out ? "OPERATORE" : "FAN", hhmm: new Date(y.t).toISOString().slice(11, 16), text: String(y.text || "").slice(0, 240), ppv: y.price > 0 ? y.price : null })),
+        chat: ctx.map((y) => ({ who: y.out ? "OPERATORE" : "FAN", hhmm: new Date(y.t).toISOString().slice(11, 16), text: Array.from(String(y.text || "")).slice(0, 240).join(""), ppv: y.price > 0 ? y.price : null })),
       });
     }
   }
@@ -322,7 +322,7 @@ export function guard(fb, pack, { operatorNames = [] } = {}) {
   const problems = [];
   if (!fb || typeof fb !== "object") return { ok: false, problems: ["feedback mancante o non leggibile"] };
   if (fb.forza) {
-    if (!citationExists(pack, fb.forza.momento_id, fb.forza.citazione)) problems.push(`citazione non trovata nel momento ${fb.forza.momento_id}: "${String(fb.forza.citazione || "").slice(0, 60)}"`);
+    if (!citationExists(pack, fb.forza.momento_id, fb.forza.citazione)) problems.push(`citazione non trovata nel momento ${fb.forza.momento_id}: "${Array.from(String(fb.forza.citazione || "")).slice(0, 60).join("")}"`);
   } else problems.push("manca la cosa fatta bene");
   if (fb.regola && fb.regola.leva !== "nessuna") {
     const lev = LEVERS[fb.regola.leva];

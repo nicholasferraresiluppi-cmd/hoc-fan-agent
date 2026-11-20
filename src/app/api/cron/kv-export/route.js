@@ -10,10 +10,12 @@
  * dati scaricabili di nuovo dalle fonti): vedi SKIP.
  *
  * Auth: SOLO Bearer CRON_SECRET (route pubblica nel middleware, niente sessione).
- * GET ?cursor=<n>  → { keys: { [key]: { type, ttl, value } }, next_cursor, done }
+ * GET ?cursor=<n>  → { keys: { [key]: { type, ttl, value } }, next_cursor, done, repaired }
+ * `repaired` = chiavi con testo non ben formato (mezza emoji) corretto in uscita: vedi well-formed.js.
  */
 import { kv } from "@vercel/kv";
 import { isCronAuthorized } from "@/lib/cron-auth";
+import { wellFormedDeep } from "@/lib/well-formed";
 
 export const maxDuration = 60;
 const PAGE = 250;
@@ -25,6 +27,7 @@ export async function GET(request) {
   const [next, rawKeys] = await kv.scan(cursor, { count: PAGE });
   const keys = rawKeys.filter((k) => !SKIP.some((re) => re.test(k)));
   const out = {};
+  const repaired = [];
   if (keys.length) {
     const p1 = kv.pipeline();
     for (const k of keys) { p1.type(k); p1.ttl(k); }
@@ -40,8 +43,14 @@ export async function GET(request) {
       else p2.exists(k);
     });
     const vals = await p2.exec();
-    keys.forEach((k, i) => { out[k] = { type: meta[i * 2], ttl: meta[i * 2 + 1], value: vals[i] }; });
+    keys.forEach((k, i) => {
+      // testi con mezza emoji (surrogato solitario) → U+FFFD, altrimenti jq rifiuta la pagina
+      const hit = { n: 0 };
+      const value = wellFormedDeep(vals[i], hit);
+      if (hit.n) repaired.push(k);
+      out[k] = { type: meta[i * 2], ttl: meta[i * 2 + 1], value };
+    });
   }
   const nc = String(next);
-  return Response.json({ keys: out, next_cursor: nc, done: nc === "0", skipped: rawKeys.length - keys.length });
+  return Response.json({ keys: out, next_cursor: nc, done: nc === "0", skipped: rawKeys.length - keys.length, repaired });
 }

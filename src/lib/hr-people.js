@@ -50,7 +50,7 @@ import {
   FORM_UPLOAD_GRACE_MS, isOwnEcho, isEmptyValue, normalizeChoiceFields, PHASE_ENTRY, PHASE_ACTIVE, PHASE_EXITED,
   isIsoDate, matchPendingAssignment,
 } from "./hr-people-core.js";
-import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
+import { taskToPerson, personToClickup, createTaskPayload, incomingTimestamps, expectedFieldNames, fieldsByName, absentFieldKeys, msToIsoDate, statusForCollaboration, clickupDrift } from "./hr-clickup-map.js";
 import { notifyWhatsApp } from "./whatsapp-notify.js";
 import { mirrorIssueText, mirrorText, mirrorPrint } from "./hr-mirror.js";
 import {
@@ -543,7 +543,10 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   if (cfIncoming !== undefined && canCf && cfPrev !== undefined) { inc.codiceFiscale = cfIncoming || null; current.fields.codiceFiscale = cfPrev; }
 
   // campi che su ClickUp non sono cambiati dall'ultima sincronizzazione: non toccano l'app
-  const base = person.cuBase || {};
+  // base dei soli campi che esistono ancora sulla lista (campo cancellato su ClickUp ⇒ base scaduta)
+  const absent = absentFieldKeys(task);
+  const base = { ...(person.cuBase || {}) };
+  for (const k of absent) delete base[k];
   let { incoming: fresh } = dropUnchangedSinceBase(inc, base, prints);
   let echoes = [];
   let echo = {};
@@ -634,6 +637,7 @@ export async function ingestTask(task, { incomingAt, by = "clickup", useEcho = f
   person.clickupUrl = m.clickupUrl || person.clickupUrl;
   person.clickup = { ...(person.clickup || {}), ...clickupMeta };
   person.cuBase = { ...(person.cuBase || {}), ...nextBase };
+  for (const k of absent) delete person.cuBase[k];
   person.mirrorStale = [...stale];
   const changedAny = r.changed.length || "codiceFiscale" in apply;
   const readSnap = current;
