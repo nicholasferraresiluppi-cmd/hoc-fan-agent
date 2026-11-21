@@ -178,6 +178,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/hr",                       label: "Persone",      icon: BookUser },
       { href: "/admin/presenze-discord",         label: "Presenze Discord", icon: Headphones },
       { href: "/contabilita",                    label: "Contabilità",  icon: Landmark },
+      { href: "/contabilita/quadro",             label: "Conti dell'impresa", icon: Landmark },
       { href: "/admin/hr/contratti",             label: "Contratti",    icon: FileSignature },
       { href: "/admin/hr/sync",                  label: "Sincronizzazione ClickUp", icon: RefreshCw },
       { href: "/admin/referral",                 label: "Porta un amico", icon: Gift },

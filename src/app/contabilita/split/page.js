@@ -333,6 +333,7 @@ export default function SplitPage() {
           {docDirty && <button style={btn(true)} onClick={saveDoc} disabled={busy === "doc"}>{busy === "doc" ? <Loader2 size={14} /> : <Check size={14} />}Salva il mese</button>}
           {cfgDirty && <button style={btn(true)} onClick={saveCfg} disabled={busy === "cfg"}>{busy === "cfg" ? <Loader2 size={14} /> : <Check size={14} />}Salva accordi</button>}
           <button style={btn()} onClick={newMonth} disabled={busy === "new"}><Plus size={14} />Nuovo mese</button>
+          <a href="/contabilita/quadro" style={{ ...btn(), textDecoration: "none" }}>Conti dell&apos;impresa</a>
         </>}
       />
       {err && <Notice danger>{err}</Notice>}

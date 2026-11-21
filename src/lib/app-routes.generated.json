@@ -120,6 +120,7 @@
  "/assessment/[token]",
  "/cm-cockpit",
  "/contabilita",
+ "/contabilita/quadro",
  "/contabilita/split",
  "/content-pipeline",
  "/content-pipeline/creators",
