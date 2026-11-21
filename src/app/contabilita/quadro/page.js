@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Plus, Loader2, Lock, Trash2, Check } from "lucide-react";
+import { Plus, Loader2, Lock, Trash2, Check, Download } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { Modal } from "@/components/cp-style";
 import { PageHead, FilterChip, Notice, Tabs, DataTable, SectionTitle, Spiega, EmptyState, card } from "@/components/ds";
@@ -22,6 +22,7 @@ import { activeIn } from "@/lib/split-core";
 import { describeTiers } from "@/lib/creator-deals-core";
 import { monthLabel } from "@/lib/compensi-core";
 import { confirmDialog } from "@/components/AppDialogs";
+import { buildQuadroExport, exportFileName } from "@/lib/quadro-export";
 
 const fetcher = async (url) => {
   const r = await fetch(url, { cache: "no-store" });
@@ -132,6 +133,7 @@ export default function QuadroPage() {
   const [tab, setTab] = useState("quadro");
   const [month, setMonth] = useState(null);
   const [edit, setEdit] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => { if (data?.expenses && !dirty) setItems(data.expenses.items || []); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -182,6 +184,29 @@ export default function QuadroPage() {
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
+  // Scarica: gli stessi numeri della pagina in un .xlsx (per un foglio o per Claude). SheetJS al click.
+  const download = async () => {
+    setExporting(true); setErr(null);
+    try {
+      const XLSX = await import("xlsx"); // dep pesante: caricata solo qui
+      const wb = XLSX.utils.book_new();
+      for (const sh of buildQuadroExport(quadro, { today })) {
+        const ws = XLSX.utils.aoa_to_sheet(sh.rows);
+        for (let r = 1; r < sh.rows.length; r++) {
+          for (const [c, z] of Object.entries(sh.formats)) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c: Number(c) })];
+            if (cell && cell.t === "n") cell.z = z;
+          }
+        }
+        ws["!cols"] = sh.widths.map((wch) => ({ wch }));
+        if (sh.name !== "Leggimi") ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: sh.rows.length - 1, c: sh.rows[0].length - 1 } }) };
+        XLSX.utils.book_append_sheet(wb, ws, sh.name);
+      }
+      XLSX.writeFile(wb, exportFileName(today), { compression: true });
+      send("/api/contabilita/quadro", "POST", { event: "scaricato" }).catch(() => {});
+    } catch (e) { setErr(`Download non riuscito: ${e.message}`); } finally { setExporting(false); }
+  };
+
   const tabs = [["quadro", "Quadro"], ["spese", "Spese"], ["accordi", "Accordi"], ["sistemare", `Da sistemare${checks.length ? ` · ${checks.length}` : ""}`]];
   const delta = qm && prev ? qm.utileEur - prev.utileEur : null;
 
@@ -194,6 +219,11 @@ export default function QuadroPage() {
         subtitle="Il tuo split in una pagina: quanto entra dagli accordi con le creator, quanto costano persone, operatori e spese, quanto resta."
         actions={<>
           {dirty && <button style={btn(true)} onClick={save} disabled={busy}>{busy ? <Loader2 size={14} /> : <Check size={14} />}Salva spese</button>}
+          {months.length > 0 && (
+            <button style={{ ...btn(), opacity: dirty ? 0.5 : 1, cursor: dirty ? "not-allowed" : "pointer" }} onClick={download} disabled={dirty || exporting} title={dirty ? "Salva le spese prima di scaricare" : "Netti per progetto, mese per mese e totali in un file Excel: si apre in Fogli Google e si può dare a Claude"}>
+              {exporting ? <Loader2 size={14} /> : <Download size={14} />}Scarica
+            </button>
+          )}
           <a href="/contabilita/split" style={btn()}>Conto dello split</a>
         </>}
       />
