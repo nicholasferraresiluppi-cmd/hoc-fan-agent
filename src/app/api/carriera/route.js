@@ -82,7 +82,8 @@ export async function GET() {
     let squadra = await getSquadraData();
     if (!squadra) {
       const done = await computeSquadraOnce();
-      if (!done) return Response.json({ computing: true, me, version: CARRIERA_VERSION });
+      // anche mentre calcola le schede sono quelle del ruolo: la pagina non deve cambiarle dopo
+      if (!done) return Response.json({ computing: true, me, version: CARRIERA_VERSION, tabs: { quadro: me.admin || me.allCreators, profili: me.coach, revisioni: me.revisore } });
       squadra = done;
     }
     const [{ names, ok: namesOk }, reviews, exceptions, roundtables] = await Promise.all([pageNames(), listReviews(), listExceptions(), listRoundtables()]);
