@@ -13,6 +13,7 @@
  * Le review sono definitive: niente PUT/DELETE. Un errore di valutazione si
  * corregge con una nuova review e una nota — mai riscrivendo la storia.
  */
+import { getPerimetro, keepOurs } from "@/lib/perimetro";
 import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { createReview, listAllReviews, listReviewsForEmployee, QA_DIMENSIONS } from "@/lib/qa-reviews";
@@ -23,7 +24,8 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const employee = searchParams.get("employee");
-  const reviews = employee ? await listReviewsForEmployee(employee) : await listAllReviews();
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  const reviews = keepOurs(employee ? await listReviewsForEmployee(employee) : await listAllReviews(), (await getPerimetro()).inRoster, (r) => r.employee);
   return Response.json({ reviews, dimensions: QA_DIMENSIONS });
 }
 

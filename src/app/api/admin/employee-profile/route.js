@@ -21,6 +21,7 @@
  * POST    body { employee, start_date, note? }  → upsert
  * DELETE  ?employee=NAME         → rimuove
  */
+import { getPerimetro, keepOurs } from "@/lib/perimetro";
 import { kv } from "@vercel/kv";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 
@@ -51,7 +52,8 @@ export async function GET(request) {
   const names = (await kv.smembers(INDEX_KEY)) || [];
   if (names.length === 0) return Response.json({ profiles: [], count: 0 });
   const rows = await Promise.all(names.map((n) => kv.get(profileKey(n))));
-  const profiles = rows.filter(Boolean).sort((a, b) => (a.employee || "").localeCompare(b.employee || ""));
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  const profiles = keepOurs(rows.filter(Boolean), (await getPerimetro()).inRoster, (p) => p.employee).sort((a, b) => (a.employee || "").localeCompare(b.employee || ""));
   return Response.json({ profiles, count: profiles.length });
 }
 

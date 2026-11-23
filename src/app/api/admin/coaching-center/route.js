@@ -25,6 +25,7 @@
  *         → upsert (action="assign" | "complete" | "reject" | "set_note")
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry
  */
+import { getPerimetro } from "@/lib/perimetro";
 import { kv } from "@vercel/kv";
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped, allowsCreator, canActOnEmployee, scopeSummary } from "@/lib/creator-scope";
@@ -79,9 +80,11 @@ export async function GET(request) {
   const assignmentsAll = assignments || {};
 
   // Decora candidati con language/category dedotto dal group principale
-  const visible = candidates.filter((c) => allowsCreator(az.creatorScope, c.top_creator));
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  const per = await getPerimetro();
+  const visible = candidates.filter((c) => per.inRoster(c.employee) && allowsCreator(az.creatorScope, c.top_creator));
   const visibleEmp = new Set(visible.map((c) => c.employee));
-  const assignmentsObj = az.creatorScope.all ? assignmentsAll : Object.fromEntries(Object.entries(assignmentsAll).filter(([e]) => visibleEmp.has(e)));
+  const assignmentsObj = az.creatorScope.all && !per.ok ? assignmentsAll : Object.fromEntries(Object.entries(assignmentsAll).filter(([e]) => visibleEmp.has(e)));
   const decorated = visible.map((c) => {
     const lang = langOverrides?.[c.top_creator] || detectLanguage(c.top_creator || "");
     return {

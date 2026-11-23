@@ -564,6 +564,7 @@ export default function CarrieraPage() {
           <span>Resa sui 3 mesi fino a {monthName(months?.cur)}{months?.infloww_until ? ` (dati Infloww fino al ${fmtDate(months.infloww_until)})` : ""} · mesi chiusi: {monthName(months?.m2)} e {monthName(months?.m1)}</span>
           {data.stale && <span style={ATTN}>dati di più di 30 ore fa</span>}
           {data.names_missing && <span style={ATTN}>nomi dei profili non disponibili</span>}
+          {data.perimetro?.ok ? <span>Solo personale di {data.perimetro.split}</span> : data.perimetro && <span style={ATTN}>perimetro dello split non disponibile: mostro tutti</span>}
           <Spiega label="Come si calcola">
             <div>La resa è quanto vende la persona all&apos;ora diviso quanto venderebbero i colleghi sulla stessa modella e nella stessa fascia oraria (senza contare lei). 1,00 = come i colleghi.</div>
             <div>Fascia A da {fmtIdx(SOGLIE.A)} in su, C sotto {fmtIdx(SOGLIE.C)}. Un mese conta solo con abbastanza ore: altrimenti è «n/v», non valutabile, e non fa scattare niente.</div>

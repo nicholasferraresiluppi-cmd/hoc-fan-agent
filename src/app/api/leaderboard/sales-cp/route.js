@@ -17,6 +17,7 @@
  *   { ranking[], groupMeansCp, total, eligible_total, no_cp_count,
  *     cp_available, agency_stats, categories, language_counts, category_counts }
  */
+import { getPerimetro } from "@/lib/perimetro";
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped, allowsCreator, scopeSummary } from "@/lib/creator-scope";
 import { kv } from "@vercel/kv";
@@ -103,7 +104,11 @@ export async function GET(request) {
   const { ranking: scoredAll, groupMeansCp } = built;
   // visibilità per creator: lo score resta calcolato su tutti (percentili veri), si mostrano
   // solo gli operatori la cui creator PRINCIPALE è tra quelle assegnate
-  const scored = az.creatorScope.all ? scoredAll : scoredAll.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator));
+  // e solo il personale del nostro split (lib/perimetro, 23/11/2026): gli altri restano nei percentili, non in classifica
+  const per = await getPerimetro();
+  const scored = scoredAll
+    .filter((r) => per.inRoster(r.employee))
+    .filter((r) => az.creatorScope.all || allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator));
 
   // Filtri di vista (post-score per non perdere counts globali)
   let view = scored;

@@ -13,6 +13,7 @@
  *      fatta coi flussi tracciati (re-import / sync) — mai edit silenziosi:
  *      questa API registra l'esito, non riscrive i numeri.
  */
+import { getPerimetro, keepOurs } from "@/lib/perimetro";
 import { authorizeAllCreators } from "@/lib/creator-scope";
 import { authorizeAll, CAPABILITIES } from "@/lib/rbac";
 import { getDispute, saveDispute, listAllDisputes, CLOSED_STATUSES, OPEN_STATUS } from "@/lib/disputes";
@@ -26,7 +27,8 @@ export async function GET(request) {
   if (status && status !== OPEN_STATUS && !CLOSED_STATUSES.includes(status)) {
     return Response.json({ error: "status non valido." }, { status: 400 });
   }
-  const disputes = await listAllDisputes({ status: status || null });
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  const disputes = keepOurs(await listAllDisputes({ status: status || null }), (await getPerimetro()).inRoster, (d) => d.employee);
   return Response.json({ disputes });
 }
 
