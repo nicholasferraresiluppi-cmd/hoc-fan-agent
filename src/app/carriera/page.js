@@ -481,7 +481,7 @@ function RegoleTab() {
 // ── pagina ──────────────────────────────────────────────────────────────────
 
 export default function CarrieraPage() {
-  const { data, error, mutate, isLoading } = useSWR("/api/carriera", fetcher, { revalidateOnFocus: false });
+  const { data, error, mutate } = useSWR("/api/carriera", fetcher, { revalidateOnFocus: false });
   const [tab, setTab] = useState(null);
   const [excTarget, setExcTarget] = useState(null);
   const [rtProfile, setRtProfile] = useState(null);
@@ -524,6 +524,17 @@ export default function CarrieraPage() {
   const months = data?.months;
   const subtitle = "Livelli, fasce e revisioni: le stesse regole per tutti, scritte in un posto solo.";
 
+  // Finché la risposta non arriva non si sa chi sei: niente schede (prima si vedeva per un attimo
+  // la sola «Le regole», poi comparivano Quadro e Revisioni — 23/11/2026).
+  if (!data && !error) {
+    return (
+      <div style={{ padding: "28px 24px 64px", maxWidth: 1600, margin: "0 auto", fontFamily: FONTS.body }}>
+        <PageHead title="Carriera" subtitle={subtitle} />
+        <p style={P}>Caricamento…</p>
+      </div>
+    );
+  }
+
   // Senza permesso (operatori, scope own): niente dati e niente regole. Le regole arrivano agli
   // operatori da /me/percorso, quando l'avvocato avrà dato l'ok (decisione del 23/11/2026).
   if (data?.error && !data.tabs) {
@@ -546,7 +557,6 @@ export default function CarrieraPage() {
 
       <Tabs items={tabs} value={active} onChange={(k) => { setTab(k); setMsg(""); }} />
 
-      {active !== "regole" && (isLoading || (!data && !error)) && <p style={P}>Caricamento…</p>}
       {active !== "regole" && data?.computing && <Notice>Sto calcolando le fasce dai dati della Squadra: torna tra un minuto.</Notice>}
 
       {active !== "regole" && data?.quadro && (
