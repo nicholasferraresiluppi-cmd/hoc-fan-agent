@@ -127,6 +127,12 @@ t("quadro: filtro per profilo, aggancio di revisioni ed eccezioni, conteggi coer
   const gaja = q.profiles.find((p) => p.profile === "Gaja");
   assert.equal(gaja.roundtable, true);
   assert.equal(q.profiles.find((p) => p.profile === "Eva").roundtable, false); // quella della settimana scorsa non vale
+  // una revisione chiusa sugli stessi due mesi non si riaccende; su mesi diversi sì
+  const M = { m2: "2026-09", m1: "2026-10" };
+  const chiusa = [{ id: "r9", key: "bea", fase: "chiusa", trigger: { months: ["2026-09", "2026-10"] } }];
+  assert.equal(buildQuadro({ rows, names, reviews: chiusa, months: M, now: NOW }).operators.find((o) => o.name === "Bea").stato, "rivista");
+  assert.equal(buildQuadro({ rows, names, reviews: chiusa, months: { m2: "2026-10", m1: "2026-11" }, now: NOW }).operators.find((o) => o.name === "Bea").stato, "revisione_dovuta");
+  assert.equal(buildQuadro({ rows, names, reviews: chiusa, now: NOW }).operators.find((o) => o.name === "Bea").stato, "revisione_dovuta"); // senza mesi noti non si presume nulla
   const soloEva = buildQuadro({ rows, names, allow: (p) => p === "Eva", now: NOW });
   assert.deepEqual(soloEva.operators.map((o) => o.name).sort(), ["Cleo", "Dino"]);
 });

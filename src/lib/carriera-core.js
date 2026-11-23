@@ -38,7 +38,8 @@ export const STATI = {
   in_revisione: { label: "In revisione", order: 0 },
   revisione_dovuta: { label: "Revisione dovuta", order: 1 },
   eccezione: { label: "Eccezione del sales coach", order: 2 },
-  attenzione: { label: "Ultimo mese in C", order: 3 },
+  rivista: { label: "Già rivista su questi mesi", order: 3 },
+  attenzione: { label: "Ultimo mese in C", order: 3.5 },
   ok: { label: "Regolare", order: 4 },
   non_valutabile: { label: "Non valutabile", order: 5 },
 };
@@ -86,9 +87,11 @@ export function triggerOf({ m2, m1 }) {
   return null;
 }
 
-export function statoOperatore(row, { reviewOpen = false, exceptionActive = false } = {}) {
+export function statoOperatore(row, { reviewOpen = false, exceptionActive = false, alreadyReviewed = false } = {}) {
   if (reviewOpen) return "in_revisione";
   const trig = triggerOf(row || {});
+  // una revisione chiusa «consuma» i mesi su cui era stata aperta: la regola si riaccende solo con mesi nuovi
+  if (trig === "dovuta" && alreadyReviewed) return "rivista";
   if (trig === "dovuta") return exceptionActive ? "eccezione" : "revisione_dovuta";
   if (trig === "attenzione") return "attenzione";
   if (fasciaOf(row?.idx) == null && fasciaOf(row?.m1) == null) return "non_valutabile";
@@ -217,8 +220,11 @@ export function newRoundtable({ profile, presenti, visto, prova, by, now = Date.
  * Righe della Squadra → righe della Carriera, filtrate da `allow(nomeProfilo)`.
  * reviews/exceptions/roundtables: liste complete; qui si agganciano per operatore/profilo.
  */
-export function buildQuadro({ rows = [], names = {}, reviews = [], exceptions = [], roundtables = [], allow = () => true, now = Date.now() }) {
+export function buildQuadro({ rows = [], names = {}, reviews = [], exceptions = [], roundtables = [], allow = () => true, now = Date.now(), months = null }) {
   const openByKey = new Map(reviews.filter((r) => r.fase !== "chiusa").map((r) => [r.key, r]));
+  // mesi chiusi della regola di oggi (es. ["2026-09","2026-10"]): una revisione chiusa su questa coppia non si ripete
+  const pair = months?.m2 && months?.m1 ? `${months.m2}|${months.m1}` : null;
+  const reviewedKeys = new Set(pair ? reviews.filter((r) => r.fase === "chiusa" && Array.isArray(r.trigger?.months) && r.trigger.months.join("|") === pair).map((r) => r.key) : []);
   const excByKey = new Map();
   for (const e of exceptions) if (isExceptionActive(e, now)) excByKey.set(e.key, e);
   const week = isoWeek(now);
@@ -234,7 +240,7 @@ export function buildQuadro({ rows = [], names = {}, reviews = [], exceptions = 
     const key = nameKey(row.name);
     const review = openByKey.get(key) || null;
     const exc = excByKey.get(key) || null;
-    const stato = statoOperatore(row, { reviewOpen: Boolean(review), exceptionActive: Boolean(exc) });
+    const stato = statoOperatore(row, { reviewOpen: Boolean(review), exceptionActive: Boolean(exc), alreadyReviewed: reviewedKeys.has(key) });
     operators.push({
       name: row.name,
       key,

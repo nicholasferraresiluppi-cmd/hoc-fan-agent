@@ -87,7 +87,7 @@ export async function GET() {
     }
     const [{ names, ok: namesOk }, reviews, exceptions, roundtables] = await Promise.all([pageNames(), listReviews(), listExceptions(), listRoundtables()]);
     const now = Date.now();
-    const quadro = buildQuadro({ rows: squadra.rows || [], names, reviews, exceptions, roundtables, allow, now });
+    const quadro = buildQuadro({ rows: squadra.rows || [], names, reviews, exceptions, roundtables, allow, now, months: squadra.months });
     const visibleKeys = new Set(quadro.operators.map((o) => o.key));
     // revisioni: il revisore le vede tutte; il sales coach solo quelle dei suoi operatori (per sapere a che punto sono)
     const seeReview = (r) => me.revisore || allow(r.profile) || visibleKeys.has(r.key);
