@@ -26,6 +26,7 @@ import { isUserIdAdmin } from "@/lib/admin";
 import { getSquadraData, computeSquadraOnce, isSquadraStale } from "@/lib/squadra";
 import { getFasceData } from "@/lib/fasce";
 import { nameKey } from "@/lib/squadra-core";
+import { getPerimetro, perimetroInfo, keepOurs } from "@/lib/perimetro";
 import {
   CARRIERA_VERSION, buildQuadro, primaryProfile, newReview, applyReviewStep,
   newException, isExceptionActive, newRoundtable,
@@ -86,9 +87,11 @@ export async function GET() {
       if (!done) return Response.json({ computing: true, me, version: CARRIERA_VERSION, tabs: { quadro: me.admin || me.allCreators, profili: me.coach, revisioni: me.revisore } });
       squadra = done;
     }
-    const [{ names, ok: namesOk }, reviews, exceptions, roundtables] = await Promise.all([pageNames(), listReviews(), listExceptions(), listRoundtables()]);
+    const [{ names, ok: namesOk }, reviews, exceptions, roundtables, per] = await Promise.all([pageNames(), listReviews(), listExceptions(), listRoundtables(), getPerimetro()]);
     const now = Date.now();
-    const quadro = buildQuadro({ rows: squadra.rows || [], names, reviews, exceptions, roundtables, allow, now, months: squadra.months });
+    // solo il personale del nostro split (lib/perimetro): gli altri restano solo come colleghi nel calcolo dell'indice
+    const rows = keepOurs(squadra.rows || [], per.inRoster);
+    const quadro = buildQuadro({ rows, names, reviews, exceptions, roundtables, allow, now, months: squadra.months });
     const visibleKeys = new Set(quadro.operators.map((o) => o.key));
     // revisioni: il revisore le vede tutte; il sales coach solo quelle dei suoi operatori (per sapere a che punto sono)
     const seeReview = (r) => me.revisore || allow(r.profile) || visibleKeys.has(r.key);
@@ -100,6 +103,7 @@ export async function GET() {
       stale: isSquadraStale(squadra, now),
       months: squadra.months,
       names_missing: !namesOk,
+      perimetro: perimetroInfo(per),
       quadro,
       reviews: reviews.filter(seeReview),
       exceptions: exceptions.filter((e) => allow(e.profile) || visibleKeys.has(e.key)).map((e) => ({ ...e, active: isExceptionActive(e, now) })),
@@ -126,6 +130,7 @@ export async function POST(request) {
       const squadra = await getSquadraData();
       const row = (squadra?.rows || []).find((r) => nameKey(r.name) === nameKey(body.operator));
       if (!row) return fail("Operatore non trovato nei dati della Squadra.");
+      if (!(await getPerimetro()).inRoster(row.name)) return fail("Questa persona non lavora per il nostro split.", 403);
       const open = (await listReviews()).find((r) => r.key === nameKey(row.name) && r.fase !== "chiusa");
       if (open) return fail("C'è già una revisione aperta per questa persona.", 409);
       const { names } = await pageNames();

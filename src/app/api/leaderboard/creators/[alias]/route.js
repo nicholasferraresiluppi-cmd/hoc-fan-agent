@@ -7,6 +7,7 @@
  * Path param: alias = nome creator (es. "Bianca Rossi") — URL-encoded.
  * Query: ?period_id=YYYY-MM (required)
  */
+import { getPerimetro, keepOurs } from "@/lib/perimetro";
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped, allowsCreator } from "@/lib/creator-scope";
 import { getCreatorDrilldown } from "@/lib/creator-aggregates";
@@ -40,5 +41,7 @@ export async function GET(request, props) {
     return Response.json({ error: result.error, alias }, { status: 404 });
   }
 
-  return Response.json({ period_id, ...result });
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  const operators = keepOurs(result.operators, (await getPerimetro()).inRoster, (o) => o.employee);
+  return Response.json({ period_id, ...result, operators });
 }

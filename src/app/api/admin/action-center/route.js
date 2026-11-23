@@ -24,6 +24,7 @@
  *         → entry.agreement (cosa si è concordato nel colloquio, con by/at)
  * DELETE ?period_id=YYYY-MM&employee=N → rimuove entry (unmark)
  */
+import { getPerimetro } from "@/lib/perimetro";
 import { kv } from "@vercel/kv";
 import { CAPABILITIES } from "@/lib/rbac";
 import { authorizeScoped, allowsCreator, canActOnEmployee, scopeSummary } from "@/lib/creator-scope";
@@ -85,7 +86,10 @@ export async function GET(request) {
   });
 
   // Calcola score con buildCpLeaderboard (deriva da matrix v3)
-  const { ranking } = await buildCpLeaderboard(operatorsDecorated, period_id);
+  const { ranking: rankingAll } = await buildCpLeaderboard(operatorsDecorated, period_id);
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026): lo score resta calcolato su tutti
+  const per = await getPerimetro();
+  const ranking = rankingAll.filter((r) => per.inRoster(r.employee));
   // decisioni già prese: solo sugli operatori delle creator visibili
   const visibleEmp = new Set(ranking.filter((r) => allowsCreator(az.creatorScope, r.cp_breakdown?.top_creator)).map((r) => r.employee));
   const swapsObj = az.creatorScope.all ? swapsAll : Object.fromEntries(Object.entries(swapsAll).filter(([e]) => visibleEmp.has(e)));
@@ -105,7 +109,8 @@ export async function GET(request) {
 
   // Calcola suggerimenti SMART per ogni candidato (in parallelo)
   const suggestionsArr = await Promise.all(
-    rawCandidates.map((r) => computeSwapSuggestions(r.employee, period_id, { limit: 5 }))
+    // i sostituti proposti: solo persone del nostro split
+    rawCandidates.map((r) => computeSwapSuggestions(r.employee, period_id, { limit: 25 }).then((list) => (list || []).filter((c) => per.inRoster(c.employee)).slice(0, 5)))
   );
 
   // Contesto prima del giudizio (26/09/2026): per la creator principale di ogni

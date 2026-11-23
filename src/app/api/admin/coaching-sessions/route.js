@@ -12,6 +12,7 @@
  * PUT  { id, action: "close", closing_note } → chiude al follow-up (solo coach
  *      creatore o scope all). Le sessioni non si cancellano mai (audit).
  */
+import { getPerimetro, keepOurs } from "@/lib/perimetro";
 import { authorize, CAPABILITIES } from "@/lib/rbac";
 import { createSession, getSession, saveSession, listAllSessions, listSessionsForEmployee } from "@/lib/coaching-sessions";
 
@@ -30,6 +31,8 @@ export async function GET(request) {
   if (az.scope === "team") {
     sessions = sessions.filter((s) => s.coach_id === az.userId);
   }
+  // solo il personale del nostro split (lib/perimetro, 23/11/2026)
+  sessions = keepOurs(sessions, (await getPerimetro()).inRoster, (s) => s.employee);
   return Response.json({ sessions, scope: az.scope });
 }
 
