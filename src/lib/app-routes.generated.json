@@ -118,6 +118,7 @@
  "/admin/wage-audit",
  "/admin/warmup",
  "/assessment/[token]",
+ "/carriera",
  "/cm-cockpit",
  "/contabilita",
  "/contabilita/quadro",
