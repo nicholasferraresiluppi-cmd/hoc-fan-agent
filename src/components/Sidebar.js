@@ -174,6 +174,7 @@ const NAV_GROUPS_RAW = [
     label: "People",
     defaultOpen: false,
     items: [
+      { href: "/carriera",                       label: "Carriera",     icon: TrendingUp },
       { href: "/cm-cockpit",                     label: "Cockpit CM",   icon: Gauge },
       { href: "/admin/hr",                       label: "Persone",      icon: BookUser },
       { href: "/admin/presenze-discord",         label: "Presenze Discord", icon: Headphones },

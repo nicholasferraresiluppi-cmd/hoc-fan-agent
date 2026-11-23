@@ -147,6 +147,7 @@ const SHORTCUT_GROUPS_RAW = [
   {
     label: "People & Access",
     items: [
+      { href: "/carriera",                title: "Carriera", desc: "Livelli, fasce A/B/C e revisioni: il quadro per profilo, le revisioni dovute, le eccezioni e le roundtable dei sales coach, e le regole scritte", icon: TrendingUp },
       { href: "/cm-cockpit",              title: "Cockpit CM",    desc: "Turno di supervisione: team live, soglie, override shadow", icon: Gauge },
       { href: "/contabilita",             title: "Contabilità", desc: "Compensi del team per mese: fissi e gamification (minimo garantito o % sulle revenue, dollaro→euro), chi è pagato, dati di pagamento cifrati. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },
       { href: "/contabilita/quadro",      title: "Conti dell'impresa", desc: "Il tuo split in una pagina: quanto entra dagli accordi creator, quanto costano persone, operatori e spese (software, servizi, consulenti), quanto resta. Registro spese, tutti gli accordi in parole, cose da sistemare. Visibile solo a chi ha l'accesso contabilità", icon: Landmark },

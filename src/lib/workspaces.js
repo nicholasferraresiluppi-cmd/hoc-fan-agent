@@ -41,6 +41,7 @@ export const WORKSPACES = {
       ] },
       { title: "Operatori", items: [
         { href: "/leaderboard/sales-cp", label: "Classifica vendite" },
+        { href: "/carriera", label: "Carriera", desc: "Fasce A/B/C, revisioni dovute e in corso, regole scritte" },
       ] },
       { title: "Persone e decisioni", items: [
         { href: "/admin/hr", label: "Persone" },
@@ -66,6 +67,7 @@ export const WORKSPACES = {
         { href: "/admin/settimana", label: "Da seguire" },
         { href: "/admin/action-center", label: "Sotto soglia" },
         { href: "/admin/coaching-center", label: "Da far crescere" },
+        { href: "/carriera", label: "Carriera", desc: "I tuoi profili: fasce degli operatori, chi si avvicina alla revisione, eccezioni e roundtable della settimana" },
         { href: "/admin/alerts", label: "Alert operativi", badge: true },
       ] },
       { title: "Vendite", items: [
