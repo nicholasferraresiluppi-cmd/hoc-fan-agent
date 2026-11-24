@@ -6,6 +6,8 @@
  * POST { action: "import" }           → import completo adesso
  * POST { action: "pending_assign", items? } → assegnazioni in attesa (creator/fase/mansione per chi
  *        non ha ancora la scheda): con `items` sostituisce l'elenco e lo prova sulle schede esistenti
+ * POST { action: "anagrafica_sheet", dryRun? } → aggiunge al foglio «Anagrafica Operatori» chi del
+ *        CRM non c'è (17/11/2026, solo aggiunta in fondo); con dryRun dice solo chi aggiungerebbe
  * POST { action: "register_webhook" } → registra (o sostituisce) il webhook
  *        verso l'URL di produzione (APP_BASE_URL o il dominio custom), mai
  *        verso localhost: ClickUp deve poterlo raggiungere.
@@ -17,6 +19,7 @@ import { stripContractLinks } from "@/lib/hr-block-cleanup";
 import { getSyncStatus, importFromClickup, registerWebhook, showViewColumns, getPendingAssignments, setPendingAssignments } from "@/lib/hr-people";
 import { internalOrigin } from "@/lib/cron-chain";
 import { uploadQueueStatus } from "@/lib/hr-uploads";
+import { syncAnagraficaSheet, anagraficaSheetStatus } from "@/lib/hr-anagrafica-sheet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,7 +32,7 @@ export async function GET(request) {
   const az = await authorize(CAPABILITIES.PEOPLE_MANAGE);
   if (!az.ok) return Response.json({ error: az.message }, { status: az.status });
   const [status, uploads] = await Promise.all([getSyncStatus(), uploadQueueStatus().catch(() => null)]);
-  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport(), milestones: await milestoneStatus().catch(() => null) });
+  return Response.json({ ...status, uploads, webhookEndpoint: webhookEndpoint(request), views: await lastViewsReport(), milestones: await milestoneStatus().catch(() => null), anagraficaSheet: await anagraficaSheetStatus().catch(() => null) });
 }
 
 export async function POST(request) {
@@ -52,6 +55,10 @@ export async function POST(request) {
     if (body?.action === "strip_contract_link") {
       const r = await stripContractLinks({ budgetMs: 45_000 });
       return Response.json(r.ok ? r : { ...r, error: `Non fatto: ${r.reason}.` }, { status: r.ok ? 200 : 409 });
+    }
+    if (body?.action === "anagrafica_sheet") {
+      const r = await syncAnagraficaSheet({ dryRun: body.dryRun === true });
+      return Response.json(r.ok ? r : { ...r, error: `Non aggiornato: ${r.reason}.` }, { status: r.ok ? 200 : 409 });
     }
     if (body?.action === "contract_milestones") {
       const r = await syncContractMilestones({ by: az.userId, waitMs: 15_000 });

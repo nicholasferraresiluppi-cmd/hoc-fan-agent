@@ -24,6 +24,7 @@
 import { after } from "next/server";
 import { getFormContext, submitForm, isSharedFormToken, pushPersonSafe, getPerson } from "@/lib/hr-people";
 import { formSubmitted } from "@/lib/hr-form-notify";
+import { syncAnagraficaSheet } from "@/lib/hr-anagrafica-sheet";
 import { drainHrBackground } from "@/lib/hr-uploads";
 import { checkRateLimit, tooMany } from "@/lib/rate-limit";
 
@@ -72,6 +73,8 @@ export async function POST(request, props) {
       // (o dopo 45 minuti senza), non all'invio dei dati (lib/hr-form-notify, mai bloccante)
       if (p) await formSubmitted(p.id, { waitForDocument: Boolean(out.uploadsEnabled) }).catch(() => {});
       if (p) await pushPersonSafe(p, p.clickupTaskId ? p.pendingKeys || [] : null, { actor: "modulo" });
+      // anche nel foglio «Anagrafica Operatori» (17/11/2026); se non riesce la recupera la notte
+      if (p) await syncAnagraficaSheet({ onlyIds: [p.id] }).catch(() => {});
     } catch { /* resta in hr:sync:retry: la riprende il giro dopo o la notte */ }
     await drainHrBackground({ budgetMs: 8000 }).catch(() => {});
   });

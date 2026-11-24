@@ -192,6 +192,8 @@ export async function POST(request) {
   // posto, dopo la riconciliazione HR: «Contratti da recuperare» nella lista Milestone dell'Area
   // Partner (un sottotask per chi non ha il contratto firmato, chiuso quando arriva «Firmato»).
   out.hr_milestones = await kickEndpoint(request, "/api/cron/hr-milestones");
+  // 17/11/2026: chi è nel CRM e non nel foglio «Anagrafica Operatori» dell'Area Partner va in fondo
+  out.hr_anagrafica_sheet = await kickEndpoint(request, "/api/cron/hr-anagrafica-sheet");
 
   // Esito dei kick nel heartbeat: un 401 dei figli deve lasciare traccia
   // (per 2 mesi sono falliti tutti senza che nessuno lo vedesse).
