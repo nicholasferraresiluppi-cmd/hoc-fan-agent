@@ -60,6 +60,12 @@ export const LIMITS = {
   numeri_form:     [{ window: 60, max: 60 }, { window: 86400, max: 3000 }],  // per link
   numeri_upload:   [{ window: 3600, max: 150 }],                             // per link
   numeri_ip:       [{ window: 60, max: 300 }],                               // per IP, solo freno ai loop
+  // Richieste alla modella (26/11/2026): link personale pubblico. La pagina si rilegge dopo ogni
+  // caricamento; ogni file = 3 richieste (slot, token, conferma). I video si guardano con link firmati
+  // direttamente dal Blob, quindi non passano da qui.
+  richiesta_form:   [{ window: 60, max: 90 }, { window: 86400, max: 4000 }], // per link
+  richiesta_upload: [{ window: 3600, max: 240 }],                            // per link
+  richiesta_ip:     [{ window: 60, max: 300 }],                              // per IP, solo freno ai loop
 };
 
 /**

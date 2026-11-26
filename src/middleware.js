@@ -48,6 +48,10 @@ const isPublicRoute = createRouteMatcher([
   // difendono da sole col token del link (lib/creator-numeri: validità, scadenza, stato) +
   // tetti per link e per IP; gli screenshot si leggono solo se appartengono a quel link.
   '/numeri/(.*)', '/api/numeri/(.*)',
+  // Richieste alla modella (26/11/2026): la modella non ha un account. Pagina e API si difendono
+  // da sole col token del link (lib/richieste: validità, scadenza) + tetti per link e per IP; i suoi
+  // file si caricano solo su slot concessi a quel link e si guardano con link firmati a scadenza.
+  '/richiesta/(.*)', '/api/richiesta/(.*)',
 ]);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
