@@ -141,6 +141,17 @@ export function growthPct(hist, back = 1) {
   return Math.round(((last - prev) / prev) * 1000) / 10;
 }
 
+/**
+ * Giro settimanale (26/11/2026): si lancia UNA volta per settimana ISO, la prima notte utile.
+ * Prima era «6,5 giorni dall'ultimo giro COMPLETATO»: la raccolta avviene il giorno dopo il lancio,
+ * quindi il ciclo era di 8 giorni e ogni ~7 giri una settimana restava senza lettura (oltre ai
+ * buchi di pausa e chiave Apify). `runWeek` = settimana dell'ultimo giro lanciato; i vecchi stati
+ * hanno solo `lastWeek`.
+ */
+export function weeklyRunDue(st, now = new Date()) {
+  return weekKey(now) !== (st?.runWeek || st?.lastWeek || null);
+}
+
 /** "2026-W41" → numero progressivo della settimana (differenze = settimane di calendario); null se non è una chiave. */
 export function weekNum(key) {
   const m = /^(\d{4})-W(\d{2})$/.exec(String(key || ""));

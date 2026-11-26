@@ -17,7 +17,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash, randomUUID } from "node:crypto";
 import { bqQuery, bqProjects, bigQueryConfigured, HOC_ORGANIZATION_ID } from "@/lib/bigquery-api";
 import { apify, apifyConfigured } from "@/lib/scouting-refresh";
-import { parseRefreshItem, weekKey } from "@/lib/scouting-core";
+import { parseRefreshItem, weekKey, weeklyRunDue } from "@/lib/scouting-core";
 import {
   DEFAULT_TALENTS, DAYS, SEARCH_KINDS, MONTHLY_CAP_USD, monthKey,
   buildOurModels, buildManualModels, applyRead, parseCandidates, normHandle, validHandle, slug,
@@ -36,7 +36,6 @@ const SPEND = (m) => `salradar:spend:${m}`;
 const WH_TTL = 6 * 3600;
 const PROFILE_ACTOR = "afanasenko~instagram-profile-scraper";
 const PRICE_PER_PROFILE = 0.012;
-const MIN_DAYS = 6.5;
 const MAX_ADD = 25;
 
 const GZ = "gz1:";
@@ -264,14 +263,15 @@ export async function salaryRadarTick({ force = false } = {}) {
     const run = (await apify(`/actor-runs/${st.runId}`)).data;
     if (["READY", "RUNNING"].includes(run.status)) return { running: st.runId };
     if (run.status !== "SUCCEEDED") {
-      await kv.set(REFRESH, { ...st, runId: null, lastError: `giro ${run.status}`, lastErrorAt: Date.now() });
+      await kv.set(REFRESH, { ...st, runId: null, runWeek: null, lastError: `giro ${run.status}`, lastErrorAt: Date.now() });
       return { error: `giro ${run.status}` };
     }
     const items = await apify(`/datasets/${st.datasetId}/items?clean=1&format=json&limit=5000`);
     const by = new Map();
     for (const it of items || []) { const p = parseRefreshItem(it); if (p) by.set(p.h, p); }
     const store = await getStore();
-    const week = weekKey(new Date());
+    // settimana del lancio (i numeri si leggono lì), non della raccolta — come il Radar creator
+    const week = weekKey(new Date(st.startedAt || Date.now()));
     let updated = 0;
     for (const h of st.handles || []) {
       if (!store.accounts[h]) continue;
@@ -280,18 +280,20 @@ export async function salaryRadarTick({ force = false } = {}) {
     }
     await saveStore(store);
     await addSpend(run.usageTotalUsd || 0);
-    const done = { lastCompletedAt: Date.now(), lastUpdated: updated, lastCount: (st.handles || []).length, lastCostUsd: run.usageTotalUsd ?? null };
+    const done = { lastCompletedAt: Date.now(), lastWeek: week, runWeek: st.runWeek || week, lastUpdated: updated, lastCount: (st.handles || []).length, lastCostUsd: run.usageTotalUsd ?? null };
     await kv.set(REFRESH, done);
     return { completed: done };
   }
-  const since = st.lastCompletedAt ? (Date.now() - st.lastCompletedAt) / 86400000 : Infinity;
-  if (!force && since < MIN_DAYS) return { idle: true, nextInDays: Math.round((MIN_DAYS - since) * 10) / 10 };
+  // una volta per settimana ISO (26/11/2026; prima 6,5 giorni dall'ultimo completato = ciclo di 8 giorni).
+  // Stati vecchi senza runWeek: si ricava dalla data dell'ultimo giro completato.
+  const legacy = !st.runWeek && !st.lastWeek && st.lastCompletedAt ? { lastWeek: weekKey(new Date(st.lastCompletedAt)) } : null;
+  if (!force && !weeklyRunDue(legacy || st)) return { idle: true, week: st.runWeek || st.lastWeek || legacy?.lastWeek };
   const handles = Object.keys((await getStore()).accounts);
   if (!handles.length) return { skip: "nessun account" };
   const budget = Math.ceil(handles.length * PRICE_PER_PROFILE * 1.15 * 100) / 100 + 0.1;
   await checkBudget(budget);
   const res = await apify(`/acts/${PROFILE_ACTOR}/runs?maxTotalChargeUsd=${budget + 0.3}&timeout=3600`, { method: "POST", body: JSON.stringify(profileInput(handles, budget)) });
-  await kv.set(REFRESH, { ...st, runId: res.data.id, datasetId: res.data.defaultDatasetId, startedAt: Date.now(), handles, lastError: null });
+  await kv.set(REFRESH, { ...st, runId: res.data.id, datasetId: res.data.defaultDatasetId, startedAt: Date.now(), runWeek: weekKey(new Date()), handles, lastError: null });
   return { started: res.data.id, count: handles.length };
 }
 
