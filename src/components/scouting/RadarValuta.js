@@ -13,7 +13,7 @@
 // parallelo si pesterebbero i piedi).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { reviewQueue, whyLines, hookLine, agencies, RATINGS, RATING_LABEL, RANGE_FILTERS, QUEUE_SORTS, activeRanges } from "@/lib/scouting-core";
+import { reviewQueue, whyLines, hookLine, agencies, GROWTH_PERIODS, RATINGS, RATING_LABEL, RANGE_FILTERS, QUEUE_SORTS, activeRanges } from "@/lib/scouting-core";
 import { FilterChip } from "@/components/ds";
 import { SERIF, NUM, fmtFull, fmtN, fmtDate, fmtEr, btn, btnQuiet, input, igProfile, Initials, LinkChip, Growth, rateStyle, useIsPhone } from "./radar-ui";
 import RadarReels from "./RadarReels";
@@ -57,6 +57,7 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
   const knownAg = useMemo(() => agencies(creators).map((a) => a.name).filter((n) => n !== "Indipendente"), [creators]);
   const [scope, setScope] = useState("paid");
   const [sort, setSort] = useState("auto");
+  const [growth, setGrowth] = useState("4"); // periodo della crescita (GROWTH_PERIODS)
   const [ranges, setRanges] = useState({});
   const [mode, setMode] = useState("one"); // one | list
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -74,13 +75,16 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
     const p = readPrefs();
     if (SCOPES.some((s) => s.id === p.scope)) setScope(p.scope);
     if (QUEUE_SORTS.some((s) => s.id === p.sort)) setSort(p.sort);
+    if (GROWTH_PERIODS.some((g) => g.id === p.growth)) setGrowth(p.growth);
     if (p.ranges && typeof p.ranges === "object") setRanges(p.ranges);
     if (p.mode === "list" || p.mode === "one") setMode(p.mode);
     loaded.current = true;
   }, []);
-  useEffect(() => { if (loaded.current) writePrefs({ scope, sort, ranges, mode }); }, [scope, sort, ranges, mode]);
+  useEffect(() => { if (loaded.current) writePrefs({ scope, sort, ranges, mode, growth }); }, [scope, sort, ranges, mode, growth]);
 
-  const opts = useMemo(() => ({ newCut, sort, ranges }), [newCut, sort, ranges]);
+  const opts = useMemo(() => ({ newCut, sort, ranges, growth }), [newCut, sort, ranges, growth]);
+  // si offrono solo i periodi che lo storico copre per qualcuna (le letture partono da ottobre 2026)
+  const periods = useMemo(() => GROWTH_PERIODS.filter((g) => g.id === "4" || creators.some((c) => c.gp?.[g.id])), [creators]);
   const queue = useMemo(() => reviewQueue(creators, { ...opts, scope }).filter((c) => !done.has(c.id)), [creators, opts, scope, done]);
   const counts = useMemo(() => Object.fromEntries(SCOPES.map((s) => [s.id, reviewQueue(creators, { ...opts, scope: s.id }).filter((c) => !done.has(c.id)).length])), [creators, opts, done]);
   const reviewedTotal = creators.filter((c) => c.reviewedAt).length + [...done.keys()].filter((id) => !creators.find((c) => c.id === id)?.reviewedAt).length;
@@ -181,6 +185,10 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
         <select id="rv-sort" value={sort} onChange={(e) => { setSort(e.target.value); setFocusId(null); }} style={{ ...input, padding: "7px 10px", fontSize: phone ? 16 : 14 }}>
           {QUEUE_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
+        <label htmlFor="rv-growth" style={{ fontSize: 13, color: CP.textMuted, marginLeft: phone ? 0 : 6 }}>Crescita su</label>
+        <select id="rv-growth" value={growth} onChange={(e) => setGrowth(e.target.value)} style={{ ...input, padding: "7px 10px", fontSize: phone ? 16 : 14 }}>
+          {periods.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+        </select>
         <button onClick={() => setFiltersOpen((x) => !x)} aria-expanded={filtersOpen} style={{ ...btn, minHeight: 36, padding: "6px 14px", borderColor: nFilters ? CP.gold : CP.border }}>
           Filtri{nFilters ? ` · ${nFilters}` : ""}
         </button>
@@ -254,7 +262,7 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
     const list = (
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {queue.slice(0, 300).map((c) => (
-          <ListRow key={c.id} c={c} active={split && c.id === cur?.id} phone={phone}
+          <ListRow key={c.id} c={c} growth={growth} active={split && c.id === cur?.id} phone={phone}
             onSelect={() => { setFocusId(c.id); if (!split) setMode("one"); }} onRate={(id) => rate(id, c)} />
         ))}
         {queue.length > 300 && <li style={{ padding: "12px 0", fontSize: 13, color: CP.textMuted }}>Le prime 300: usa i filtri per stringere.</li>}
@@ -267,7 +275,7 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.15fr)", gap: 28, alignItems: "start" }}>
             <div className="rv-list" style={{ position: "sticky", top: 12, maxHeight: "calc(100vh - 24px)", overflowY: "auto", paddingRight: 6 }}>{list}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} />
+              <Card key={cur.id} c={cur} growth={growth} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} />
               {bar}
             </div>
           </div>
@@ -279,13 +287,14 @@ export default function RadarValuta({ creators: base, newCut, me, onOpen, onChan
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}>
       {controls}
-      {!cur ? empty : <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} onSwipe={phone ? (dir) => rate(dir > 0 ? "si" : "no") : null} />}
+      {!cur ? empty : <Card key={cur.id} c={cur} growth={growth} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} onSwipe={phone ? (dir) => rate(dir > 0 ? "si" : "no") : null} />}
       {bar}
     </div>
   );
 }
 
-function Card({ c, newCut, onOpen, onSwipe, knownAg, onAgency }) {
+function Card({ c, growth, newCut, onOpen, onSwipe, knownAg, onAgency }) {
+  const gp = growthOf(c, growth);
   const why = whyLines(c, { newCut });
   const hook = hookLine(c, { newCut });
   const [dx, setDx] = useState(0);
@@ -333,7 +342,7 @@ function Card({ c, newCut, onOpen, onSwipe, knownAg, onAgency }) {
         <Fig v={fmtFull(c.fol)} l="follower" />
         <Fig v={fmtFull(c.medv)} l="view per reel" />
         <Fig v={fmtEr(c.er)} l="engagement" />
-        <Fig v={<Growth v={c.g4} />} l="in 4 settimane" />
+        <Fig v={<Growth v={gp.pct} />} l={gp.label} />
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -355,7 +364,8 @@ function Card({ c, newCut, onOpen, onSwipe, knownAg, onAgency }) {
   );
 }
 
-function ListRow({ c, active, phone, onSelect, onRate }) {
+function ListRow({ c, growth, active, phone, onSelect, onRate }) {
+  const gp = growthOf(c, growth);
   return (
     <li style={{ borderBottom: `1px solid ${CP.borderSoft || CP.border}`, background: active ? alpha(CP.gold, "14") : "transparent", borderLeft: `2px solid ${active ? CP.gold : "transparent"}`, display: "flex", flexDirection: phone ? "column" : "row", alignItems: phone ? "stretch" : "center", gap: phone ? 8 : 12, padding: phone ? "12px 0" : "10px 8px" }}>
       <button onClick={onSelect} aria-current={active || undefined} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", flex: "1 1 auto", minWidth: 0, display: "grid", gridTemplateColumns: "40px minmax(0,1fr)", gap: 10, alignItems: "center" }}>
@@ -369,7 +379,7 @@ function ListRow({ c, active, phone, onSelect, onRate }) {
             <span>{fmtN(c.fol)} follower</span>
             <span>{fmtN(c.medv)} view</span>
             <span>ER {fmtEr(c.er)}</span>
-            {c.g4 != null && <span title="Variazione dei follower tra l'ultima lettura settimanale e quella di 4 settimane prima"><Growth v={c.g4} /> in 4 sett.</span>}
+            {gp.pct != null && <span title={gp.title}><Growth v={gp.pct} /> {gp.short}</span>}
           </span>
         </span>
       </button>
@@ -386,6 +396,23 @@ function ListRow({ c, active, phone, onSelect, onRate }) {
       </div>
     </li>
   );
+}
+
+/**
+ * Crescita nel periodo scelto, con le settimane DAVVERO coperte (un giro saltato può allungarle
+ * di una; «da quando la seguiamo» dipende da quando è entrata nel radar).
+ */
+function growthOf(c, period) {
+  const g = GROWTH_PERIODS.find((x) => x.id === period) || GROWTH_PERIODS[1];
+  const v = c.gp?.[g.id];
+  const w = v?.[1] ?? g.weeks;
+  const weeks = w == null ? "" : w === 1 ? "1 settimana" : `${w} settimane`;
+  return {
+    pct: v ? v[0] : null,
+    label: v ? `in ${weeks}${g.weeks == null ? " (da quando la seguiamo)" : ""}` : g.weeks == null ? "da quando la seguiamo" : `in ${g.label}`,
+    short: w == null ? "" : `in ${w} sett.`,
+    title: v ? `Follower: variazione tra l'ultima lettura settimanale e quella di ${weeks} prima` : "Storico troppo corto per questo periodo",
+  };
 }
 
 /** Etichetta dell'agenzia nell'elenco: «Indipendente» più tenue (non è un'agenzia). */

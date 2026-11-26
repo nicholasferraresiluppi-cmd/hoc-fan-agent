@@ -7,7 +7,7 @@
 //   - "cancella su richiesta" toglie l'account anche dalle proposte scartate
 import assert from "node:assert/strict";
 import {
-  weekKey, normHandle, parseRefreshItem, appendHistory, growthPct, sumHistories,
+  weekKey, normHandle, parseRefreshItem, appendHistory, growthPct, sumHistories, weekNum, growthOver, growthIn, GROWTH_PERIODS, reviewQueue,
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
@@ -262,6 +262,32 @@ eq(hlRereadCandidates(candP, crmR, new Set(["cancellata"])), ["segn", "base"], "
   const ps = [{ h: "mara.back", url: "https://onlyfans.com/maraxx" }, { h: "mara.main", url: "https://onlyfans.com/maraxx" }, { h: "altra", url: "" }];
   eq(sameAsSuggestions(ps, { creators: {} }, "mara.back").map((x) => x.h), ["mara.main"], "proposta: stessa persona di un altro account");
   eq(sameAsSuggestions(ps, { creators: {}, dismissed: ["mara.back|mara.main"] }, "mara.back"), [], "proposta scartata non torna");
+}
+
+
+// crescita su settimane di CALENDARIO (26/11/2026): il caso vero — giri saltati in W42/W43/W46,
+// «4 letture fa» copriva 7 settimane e la pagina diceva «in 4 settimane»
+eq(weekNum("2026-W48") - weekNum("2026-W44"), 4, "W44→W48 = 4 settimane");
+eq(weekNum("2027-W01") - weekNum("2026-W53"), 1, "a cavallo d'anno conta giusto");
+eq(weekNum("boh"), null, "chiave non valida → null");
+const hb = [["2026-W41", 2874, 1], ["2026-W44", 7538, 1], ["2026-W45", 10361, 1], ["2026-W47", 20730, 1], ["2026-W48", 22448, 1]];
+eq(growthPct(hb, 4), 681.1, "il vecchio calcolo: 4 letture fa = W41, cioè 7 settimane");
+eq(growthOver(hb, 4), { pct: 197.8, weeks: 4 }, "4 settimane vere: da W44");
+eq(growthOver(hb, 1), { pct: 8.3, weeks: 1 }, "1 settimana: W47→W48");
+eq(growthOver(hb, 8), null, "storico più corto del periodo → null, non un numero su meno tempo");
+eq(growthOver(hb, null), { pct: 681.1, weeks: 7 }, "da quando la seguiamo: dichiara le settimane coperte");
+eq(growthOver([["2026-W40", 100, 1], ["2026-W44", 150, 1]], 1), null, "base troppo lontana per «1 settimana» → null");
+eq(growthOver([["2026-W43", 100, 1], ["2026-W45", 110, 1]], 1), { pct: 10, weeks: 2 }, "un giro saltato è tollerato (1 settimana di scarto), e lo dichiara");
+eq(growthOver([["2026-W48", 100, 1]], null), null, "una lettura sola: niente crescita");
+eq(GROWTH_PERIODS.map((g) => g.id), ["1", "4", "8", "all"], "periodi del selettore");
+const cg = { g4: 5, gp: { "1": [2, 1], "4": [5, 4], all: [30, 7] } };
+eq([growthIn(cg, "1"), growthIn(cg, "4"), growthIn(cg, "all"), growthIn(cg, "8")], [2, 5, 30, null], "growthIn legge il periodo scelto");
+{
+  const base = { ours: false, stage: DEFAULT_STAGE, reviewedAt: null, sig: "forte" };
+  const a = { ...base, id: "a", g4: 50, gp: { "1": [1, 1] } };
+  const b = { ...base, id: "b", g4: 10, gp: { "1": [9, 1] } };
+  eq(reviewQueue([a, b], { sort: "g4" }).map((c) => c.id), ["a", "b"], "Crescita senza periodo = 4 settimane");
+  eq(reviewQueue([a, b], { sort: "g4", growth: "1" }).map((c) => c.id), ["b", "a"], "Crescita ordina sul periodo scelto");
 }
 
 console.log(`scouting: ${n} asserzioni ok`);
