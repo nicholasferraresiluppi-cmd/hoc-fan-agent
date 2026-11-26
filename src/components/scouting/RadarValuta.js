@@ -351,14 +351,20 @@ function ListRow({ c, active, phone, onSelect, onRate }) {
             <span>{fmtN(c.fol)} follower</span>
             <span>{fmtN(c.medv)} view</span>
             <span>ER {fmtEr(c.er)}</span>
-            {c.g4 != null && <Growth v={c.g4} />}
+            {c.g4 != null && <span title="Variazione dei follower tra l'ultima lettura settimanale e quella di 4 settimane prima"><Growth v={c.g4} /> in 4 sett.</span>}
           </span>
         </span>
       </button>
-      <div role="group" aria-label={`Voto per ${c.name}`} style={{ display: "grid", gridTemplateColumns: phone ? "1fr 1fr 1fr 1.6fr" : "repeat(4, auto)", gap: 5, flexShrink: 0 }}>
-        {RATINGS.map((r) => (
-          <button key={r.v} onClick={() => onRate(r.id)} style={{ ...rateStyle(r.v), minHeight: phone ? 36 : 30, padding: phone ? "0 4px" : "0 9px" }}>{r.label}</button>
-        ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {c.handles?.[0] && (
+          <a href={igProfile(c.handles[0])} target="_blank" rel="noopener noreferrer" aria-label={`Apri @${c.handles[0]} su Instagram`} title={`Apri @${c.handles[0]} su Instagram`}
+            style={{ ...btn, minHeight: phone ? 36 : 30, padding: phone ? "0 12px" : "0 10px", fontSize: 13 }}>IG ↗</a>
+        )}
+        <div role="group" aria-label={`Voto per ${c.name}`} style={{ display: "grid", gridTemplateColumns: phone ? "1fr 1fr 1fr 1.6fr" : "repeat(4, auto)", gap: 5, flex: phone ? "1 1 auto" : "0 0 auto" }}>
+          {RATINGS.map((r) => (
+            <button key={r.v} onClick={() => onRate(r.id)} style={{ ...rateStyle(r.v), minHeight: phone ? 36 : 30, padding: phone ? "0 4px" : "0 9px" }}>{r.label}</button>
+          ))}
+        </div>
       </div>
     </li>
   );
