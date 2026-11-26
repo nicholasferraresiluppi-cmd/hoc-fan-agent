@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Send } from "lucide-react";
+import { Plus, Send, Copy } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { PageHead, HeroMetric, Metric, FilterChip, DataTable, Notice, SectionTitle, Disclosure, Tabs, BTN_PRIMARY } from "@/components/ds";
 import { Modal } from "@/components/cp-style";
@@ -79,12 +79,19 @@ function ReferrerModal({ initial, onClose, onDone }) {
   const run = async (fn) => { setBusy(true); setErr(null); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const save = async (data = f) => { const j = await post({ action: "saveReferrer", id: rec?.id, data }); setRec(j.result); return j.result; };
-  const invite = async (id, force = false) => {
-    const j = await post({ action: "invite", id, force });
+  // 26/11/2026: «Manda di nuovo» rimanda davvero (prima: Bad Request); «Copia il link» per WhatsApp
+  const invite = async (id, force = false, linkOnly = false) => {
+    const j = await post({ action: "invite", id, force, linkOnly });
     if (j.otherAccount) { setOther(j.otherAccount); setInviteMsg(null); onDone(false); return; }
     setOther(null);
-    setInviteMsg(j.exists ? "Ha già un account HOC Pro: entrando con questa email vede la pagina, nessun invito serve." : j.url ? `Invito mandato. Link da girare se la mail non arriva: ${j.url}` : "Invito mandato.");
-    if (!j.exists) setRec((r) => ({ ...r, invitedAt: Date.now() }));
+    if (j.exists) setInviteMsg("Ha già un account HOC Pro: entrando con questa email vede la pagina, nessun invito serve.");
+    else if (linkOnly || j.otherRoles) {
+      let copied = false;
+      if (j.url) { try { await navigator.clipboard.writeText(j.url); copied = true; } catch { /* lo copia a mano */ } }
+      const lead = j.otherRoles ? "C'è già un invito in attesa fatto da Membri, con altri ruoli: non lo tocco. " : "";
+      setInviteMsg(j.url ? { text: `${lead}${copied ? "Link copiato: giralo su WhatsApp." : "Ecco il link da girare su WhatsApp:"} Vale una volta sola e scade dopo 30 giorni.`, url: j.url } : `${lead}Clerk non ha restituito il link: riprova tra poco.`);
+    } else setInviteMsg(j.renewed ? "Invito rimandato: è partita una mail nuova e il link di prima non vale più. Se non arriva neanche questa, usa «Copia il link»." : "Invito mandato. Se la mail non arriva, usa «Copia il link».");
+    if (!j.exists) setRec((r) => ({ ...r, invitedAt: r.invitedAt || Date.now() }));
     onDone(false);
   };
   const useOther = () => run(async () => {
@@ -121,7 +128,8 @@ function ReferrerModal({ initial, onClose, onDone }) {
           {!rec.userId && !other && (
             <div style={{ marginTop: 8 }}>
               <button type="button" style={btn} disabled={busy || !rec.email} onClick={() => run(() => invite(rec.id))}><Send size={14} /> {rec.invitedAt ? "Manda di nuovo l'invito" : "Invita in HOC Pro"}</button>
-              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Con il solo ruolo Referente: vede soltanto «Porta un amico».</div>
+              <button type="button" style={{ ...btn, marginLeft: 8 }} disabled={busy || !rec.email} onClick={() => run(() => invite(rec.id, false, true))}><Copy size={14} /> Copia il link</button>
+              <div style={{ fontSize: 12, color: CP.textMuted, marginTop: 4 }}>Con il solo ruolo Referente: vede soltanto «Porta un amico». Il link fa entrare senza aspettare la mail.</div>
             </div>
           )}
           {other && (
@@ -133,7 +141,10 @@ function ReferrerModal({ initial, onClose, onDone }) {
               </div>
             </div>
           )}
-          {inviteMsg && <div style={{ marginTop: 8, color: CP.textPrimary, wordBreak: "break-all" }}>{inviteMsg}</div>}
+          {inviteMsg && (typeof inviteMsg === "string"
+            ? <div style={{ marginTop: 8, color: CP.textPrimary }}>{inviteMsg}</div>
+            : <div style={{ marginTop: 8, color: CP.textPrimary }}>{inviteMsg.text}
+                <input readOnly value={inviteMsg.url} onFocus={(e) => e.target.select()} style={{ ...inp, marginTop: 6, fontSize: 12 }} /></div>)}
         </div>
       )}
       <Actions busy={busy} error={err}

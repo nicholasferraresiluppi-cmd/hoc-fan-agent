@@ -562,7 +562,7 @@ export async function referrerDashboard(referrer, { now = Date.now() } = {}) {
  * e si restituisce `otherAccount`: l'HR sceglie se usare quella (nessun invito
  * serve) o invitare comunque (`force`). Evita il secondo account della stessa persona.
  */
-export async function inviteReferrer(referrerId, actor, origin, { force = false } = {}) {
+export async function inviteReferrer(referrerId, actor, origin, { force = false, linkOnly = false } = {}) {
   const ref = await readOne(K.referrers, referrerId);
   if (!ref) throw new Error("Referente non trovato");
   if (!ref.email) throw new Error("Serve l'email del referente per invitarlo");
@@ -570,12 +570,13 @@ export async function inviteReferrer(referrerId, actor, origin, { force = false 
     const other = await otherAccountEmail(ref).catch(() => null);
     if (other) return { ok: false, otherAccount: other };
   }
-  const { createInvitation } = await import("@/lib/invitations");
+  // 26/11/2026: un invito già in attesa si rimanda (o se ne dà il link) invece di finire in Bad Request
+  const { referenteInvitation } = await import("@/lib/invitations");
   try {
-    const inv = await createInvitation({ email: ref.email, roles: ["referente"], inviterId: actor.id, inviterName: actor.name, origin });
-    await writeOne(K.referrers, referrerId, { ...ref, invitedAt: Date.now() });
-    await audit(actor, "referrer.invite", { id: referrerId });
-    return { ok: true, url: inv.url || null };
+    const inv = await referenteInvitation({ email: ref.email, inviterId: actor.id, inviterName: actor.name, origin, linkOnly });
+    if (!ref.invitedAt || !inv.reused) await writeOne(K.referrers, referrerId, { ...ref, invitedAt: Date.now() });
+    await audit(actor, linkOnly ? "referrer.invite_link" : "referrer.invite", { id: referrerId });
+    return { ok: true, url: inv.url || null, linkOnly, renewed: !!inv.renewed, otherRoles: !!inv.otherRoles };
   } catch (e) {
     // ha già un account: vedrà la pagina accedendo con questa email, nessun invito serve
     if (e.code === "exists") return { ok: true, exists: true };
