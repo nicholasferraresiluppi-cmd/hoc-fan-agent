@@ -454,6 +454,44 @@ const CHECKS = [
     },
   },
   {
+    // Giri settimanali Apify fermi (26/11/2026): dal 11 al 16/11 la chiave Apify ruotata ha fermato
+    // Radar creator e Radar salary e l'errore stava solo nel heartbeat; a ottobre una pausa e il
+    // ciclo di 8 giorni avevano già lasciato settimane senza lettura (la crescita «in 4 settimane»
+    // ne copriva 7). Qui: niente giro completato da 9 giorni, o l'ultimo tentativo è finito in errore.
+    id: "weekly-reads-stale",
+    severity: "warning",
+    label: "Letture settimanali ferme",
+    async run() {
+      const giri = [
+        { id: "scouting", name: "Radar creator", state: "scouting:refresh", beat: "cron:heartbeat:scouting-refresh", href: "/admin/scouting" },
+        { id: "salary", name: "Radar salary", state: "salradar:refresh", beat: "cron:heartbeat:salary-radar", href: "/admin/salary-radar" },
+      ];
+      const out = [];
+      const day = (t) => new Date(t).toLocaleDateString("it-IT", { day: "numeric", month: "short", timeZone: "Europe/Rome" });
+      for (const g of giri) {
+        const [st, beat] = await Promise.all([kv.get(g.state).catch(() => null), kv.get(g.beat).catch(() => null)]);
+        if (!st?.lastCompletedAt) continue; // mai partito: niente da dire
+        if (st.pausedUntil && Date.now() < st.pausedUntil) continue; // pausa decisa da un admin
+        const days = (Date.now() - st.lastCompletedAt) / 86400000;
+        const errAfter = st.lastError && (st.lastErrorAt || 0) > st.lastCompletedAt;
+        const beatErr = beat?.error && (beat.at || 0) > st.lastCompletedAt;
+        if (days <= 9 && !errAfter && !beatErr) continue;
+        out.push({
+          fingerprint: `weekly-reads-stale:${g.id}`,
+          title: `${g.name}: numeri settimanali fermi dal ${day(st.lastCompletedAt)}`,
+          detail: [
+            `Ultimo giro completato ${Math.floor(days)} giorni fa: le crescite perdono settimane.`,
+            errAfter ? `Ultimo errore: ${String(st.lastError).slice(0, 120)}` : null,
+            beatErr ? `Ultima notte: ${String(beat.result || "errore").slice(0, 120)}` : null,
+          ].filter(Boolean).join(" · "),
+          value: `${Math.floor(days)}g`,
+          cta: { href: g.href, label: `Apri ${g.name}` },
+        });
+      }
+      return out;
+    },
+  },
+  {
     // Doppioni nel warehouse (15/10/2026, lib/warehouse-duplicates): lo stesso account OnlyFans con due record creator
     // attivi scrive ogni vendita due volte. Ogni notte si ricalcolano le coppie e si aggiorna lo scudo di HOC Pro;
     // l'alert dice che il doppione esiste a monte (HOC Pro lo neutralizza già, chi legge il warehouse no).

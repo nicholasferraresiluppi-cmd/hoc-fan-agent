@@ -7,7 +7,7 @@
 //   - "cancella su richiesta" toglie l'account anche dalle proposte scartate
 import assert from "node:assert/strict";
 import {
-  weekKey, normHandle, parseRefreshItem, appendHistory, growthPct, sumHistories, weekNum, growthOver, growthIn, GROWTH_PERIODS, reviewQueue,
+  weekKey, weeklyRunDue, normHandle, parseRefreshItem, appendHistory, growthPct, sumHistories, weekNum, growthOver, growthIn, GROWTH_PERIODS, reviewQueue,
   handleStem, linkKey, suggestLinks, buildCreators, stageCounts,
   creatorIdOf, setStage, addNote, setField, linkHandles, unlinkHandle, dismissSuggestion, forgetHandle,
   HISTORY_MAX, DEFAULT_STAGE, applyRefresh, scrubContacts,
@@ -288,6 +288,26 @@ eq([growthIn(cg, "1"), growthIn(cg, "4"), growthIn(cg, "all"), growthIn(cg, "8")
   const b = { ...base, id: "b", g4: 10, gp: { "1": [9, 1] } };
   eq(reviewQueue([a, b], { sort: "g4" }).map((c) => c.id), ["a", "b"], "Crescita senza periodo = 4 settimane");
   eq(reviewQueue([a, b], { sort: "g4", growth: "1" }).map((c) => c.id), ["b", "a"], "Crescita ordina sul periodo scelto");
+}
+
+
+// giro settimanale una volta per settimana ISO (26/11/2026): col vecchio «6,5 giorni dall'ultimo
+// completato» il ciclo era di 8 giorni (raccolta il giorno dopo il lancio) e saltava settimane
+{
+  const d = (s) => new Date(`${s}T03:00:00Z`);
+  eq(weeklyRunDue({}, d("2026-11-30")), true, "mai lanciato → si lancia");
+  eq(weeklyRunDue({ lastWeek: "2026-W48" }, d("2026-11-29")), false, "stato vecchio: W48 già letta, domenica 29/11 no");
+  eq(weeklyRunDue({ lastWeek: "2026-W48" }, d("2026-11-30")), true, "lunedì 30/11 = W49 → si lancia (col vecchio calcolo: 3 dicembre)");
+  eq(weeklyRunDue({ runWeek: "2026-W49", lastWeek: "2026-W48" }, d("2026-12-01")), false, "lanciato lunedì, martedì si raccoglie e non si rilancia");
+  eq(weeklyRunDue({ runWeek: null, lastWeek: "2026-W48" }, d("2026-12-01")), true, "giro fallito (runWeek tolta) → si rilancia nella stessa settimana");
+  // simulazione: 10 settimane di notti, lancio + raccolta il giorno dopo → nessuna settimana vuota
+  let st = { lastWeek: "2026-W48" }; const weeks = new Set();
+  for (let t = Date.UTC(2026, 10, 27, 3); t < Date.UTC(2027, 1, 5, 3); t += 86400000) {
+    const now = new Date(t);
+    if (st.runId) { weeks.add(weekKey(new Date(st.startedAt))); st = { ...st, runId: null, lastWeek: weekKey(new Date(st.startedAt)) }; continue; }
+    if (weeklyRunDue(st, now)) st = { ...st, runId: "r", startedAt: t, runWeek: weekKey(now) };
+  }
+  eq(weeks.size, 10, "10 settimane di calendario, 10 letture: nessun buco");
 }
 
 console.log(`scouting: ${n} asserzioni ok`);

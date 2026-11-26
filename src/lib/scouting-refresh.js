@@ -2,7 +2,8 @@
 // creator ogni settimana, ~1 centesimo a profilo → ~12 $/settimana con ~1.200 profili).
 //
 // Macchina a stati in KV `scouting:refresh`, mossa una volta al giorno dal dispatcher:
-//   1. nessun giro in corso e ultimo completato da più di 6,5 giorni → LANCIA un run Apify
+//   1. nessun giro in corso e nessun giro ancora lanciato in questa settimana ISO → LANCIA un run Apify
+//      (dal 26/11/2026; prima «6,5 giorni dall'ultimo completato» = ciclo di 8 giorni, settimane saltate)
 //      (asincrono: un giro su 1.200 profili dura ~20 minuti, più della vita di una funzione)
 //   2. run in corso → non fa niente (si riguarda domani)
 //   3. run finito → scarica i risultati a pagine, aggiorna numeri e storico, chiude il giro
@@ -10,13 +11,12 @@
 // Strumento: afanasenko/instagram-profile-scraper (legge anche i profili con limite d'età,
 // a differenza di apify/instagram-profile-scraper — verificato il 9/10/2026).
 import { getProfiles, commitProfiles, getRefreshState, setRefreshState, getForgotten } from "@/lib/scouting-store";
-import { applyRefresh, applyPartialRefresh, weekKey } from "@/lib/scouting-core";
+import { applyRefresh, applyPartialRefresh, weekKey, weeklyRunDue } from "@/lib/scouting-core";
 import { savePics } from "@/lib/scouting-pics";
 
 const ACTOR = "afanasenko~instagram-profile-scraper";
 const API = "https://api.apify.com/v2";
 const PRICE_PER_PROFILE = 0.01;
-const MIN_DAYS = 6.5;
 const FIELDS = ["Account", "Followers Count", "Median Views", "Views.Followers Ratio", "Median ER", "Avg Likes", "Avg Comments", "External URL", "Biography", "Analysis Status", "Profile Picture"].join(",");
 
 export const apifyConfigured = () => Boolean(process.env.APIFY_TOKEN);
@@ -80,16 +80,19 @@ export async function scoutingTick({ force = false } = {}) {
     const run = (await apify(`/actor-runs/${st.runId}`)).data;
     if (["READY", "RUNNING"].includes(run.status)) return { running: st.runId, since: st.startedAt };
     if (run.status !== "SUCCEEDED") {
-      await setRefreshState({ ...st, runId: null, lastError: `giro ${run.status}`, lastErrorAt: Date.now() });
+      // runWeek tolta: il giro si rilancia la notte dopo, nella stessa settimana
+      await setRefreshState({ ...st, runId: null, runWeek: null, lastError: `giro ${run.status}`, lastErrorAt: Date.now() });
       return { error: `giro ${run.status}` };
     }
     const items = await collect(st.datasetId);
     const orig = await getProfiles();
-    const res = applyRefresh(orig, items);
+    // i numeri si leggono al lancio: la settimana dello storico è quella del lancio, non della raccolta
+    const readAt = new Date(st.startedAt || Date.now());
+    const res = applyRefresh(orig, items, readAt);
     // foto: si salvano subito quelle nuove; quelle che non stanno nel tempo, ai tick dopo (sotto)
     const sp = await savePics(res.profiles, { budgetMs: 60000 });
     await commitProfiles(orig, sp.profiles);
-    const done = { lastCompletedAt: Date.now(), lastWeek: weekKey(new Date()), lastUpdated: res.updated, lastMissing: res.missing, lastCostUsd: run.usageTotalUsd ?? null };
+    const done = { lastCompletedAt: Date.now(), lastWeek: weekKey(readAt), runWeek: st.runWeek || weekKey(readAt), lastUpdated: res.updated, lastMissing: res.missing, lastCostUsd: run.usageTotalUsd ?? null };
     await setRefreshState({ ...done, runId: null, pausedUntil: st.pausedUntil ?? null });
     return { completed: done };
   }
@@ -101,12 +104,11 @@ export async function scoutingTick({ force = false } = {}) {
   }
   // Pausa decisa da un admin (budget Apify dirottato sulla ricerca): il bottone "Aggiorna ora" la scavalca.
   if (!force && st.pausedUntil && Date.now() < st.pausedUntil) return { paused: true, until: st.pausedUntil };
-  const daysSince = st.lastCompletedAt ? (Date.now() - st.lastCompletedAt) / 86400000 : Infinity;
-  if (!force && daysSince < MIN_DAYS) return { idle: true, nextInDays: Math.round((MIN_DAYS - daysSince) * 10) / 10 };
+  if (!force && !weeklyRunDue(st)) return { idle: true, week: st.runWeek || st.lastWeek };
   const forgotten = await getForgotten();
   const handles = (await getProfiles()).map((p) => p.h).filter((h) => !forgotten.has(h));
   if (!handles.length) return { skip: "nessun profilo" };
   const run = await startRun(handles);
-  await setRefreshState({ ...st, ...run, startedAt: Date.now(), count: handles.length, lastError: null });
+  await setRefreshState({ ...st, ...run, startedAt: Date.now(), runWeek: weekKey(new Date()), count: handles.length, lastError: null });
   return { started: run.runId, count: handles.length, budget: run.budget };
 }
