@@ -24,7 +24,7 @@ import { Headphones,
   BookMarked,
   LineChart,
   FileSignature,
-  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen, Footprints, Clock } from "lucide-react";
+  Landmark, Repeat, Gift, CalendarDays, ListChecks, MailOpen, Footprints, Clock, Route } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import { canSee, isPrivateHref } from "@/lib/nav-access";
 import { useRouter } from "next/navigation";
@@ -133,6 +133,7 @@ const SHORTCUT_GROUPS_RAW = [
       { href: "/admin/scouting", title: "Radar creator", desc: "Le creator italiane trovate su Instagram: una scheda per persona, fasi dello scouting, crescita settimana per settimana", icon: Radar },
       { href: "/admin/schede-numeri", title: "Schede numeri", desc: "Un link per la creator che vuoi valutare: racconta chi è e cosa fa e carica gli screenshot delle sue statistiche accanto a un esempio. Qui leggi la scheda", icon: ClipboardList },
       { href: "/admin/salary-radar", title: "Radar salary", desc: "Le reti di account Instagram delle salary: le nostre ogni giorno dal magazzino (view, reel, account spariti), quelle delle altre agenzie che troviamo, e la ricerca per trovarne altre", icon: Network },
+      { href: "/admin/salary-modelle", title: "Modelle salary", desc: "Il percorso di una modella salary dalla prima chat alla prima paga: dove si trova ognuna (dalla lista ClickUp Candidate), cosa si fa a ogni passo e i messaggi pronti da copiare", icon: Route },
       { href: "/admin/ads", title: "Studio bio-funnel", desc: "Come lavorano gli altri sulla landing-ponte OF e cosa converte meglio: 112 landing reali analizzate + template per le creator", icon: Megaphone },
       { href: "/admin/creator-ai", title: "Creator AI", desc: "Studi su Fanvue e mappa delle creator AI italiane con i loro profili. Sezione privata.", icon: Bot },
       { href: "/admin/editing", title: "Editing", desc: "Una scrivania per creator: la squadra che produce i reel, dal girato al reel misurato, con la cosa che blocca adesso", icon: Scissors },

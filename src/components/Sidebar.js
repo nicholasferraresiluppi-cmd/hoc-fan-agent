@@ -38,7 +38,7 @@ import { Headphones,
   History, Signpost, ListChecks, Bell, ListTree, Inbox, Film, Clapperboard, Scissors, TrendingUp, UserSearch, UserCheck, Rocket, HandCoins, Footprints, MessageCircle, Sun, Moon, Snowflake,
 Megaphone, Share2, Shield, BookUser, Sunrise, UserPlus,
   LineChart,
-  FileSignature, Repeat, Gift, MailOpen, Clock } from "lucide-react";
+  FileSignature, Repeat, Gift, MailOpen, Clock, Route } from "lucide-react";
 import { CP, FONTS } from "@/lib/brand";
 import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
@@ -159,6 +159,7 @@ const NAV_GROUPS_RAW = [
       { href: "/admin/scouting",                 label: "Radar creator", icon: Radar },
       { href: "/admin/schede-numeri",            label: "Schede numeri", icon: ClipboardList },
       { href: "/admin/salary-radar",             label: "Radar salary",  icon: Network },
+      { href: "/admin/salary-modelle",           label: "Modelle salary", icon: Route },
       { href: "/admin/ads",                      label: "Studio bio-funnel", icon: Megaphone },
       { href: "/admin/creator-ai",               label: "Creator AI",      icon: Bot },
       { href: "/admin/editing",                  label: "Editing",         icon: Scissors },
