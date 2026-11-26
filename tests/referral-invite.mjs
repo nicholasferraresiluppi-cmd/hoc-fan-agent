@@ -14,6 +14,9 @@ registerHooks({
       export const CAPABILITIES = { ACCESS_MGMT: "a", USERS_INVITE: "u", SEED: "s" };
       export const ROLE_CAPABILITIES = { operator: { "x": "own" }, referente: { "referral.self": "own" }, admin: { a: "all" } };
       export const listCustomRoles = async () => []; export const getEffectiveCapabilities = async () => ({ "referral.self": "own", "referral.manage": "all" });`);
+    // invio email finto: globalThis.__mail = { ready, fail, sent: [] }
+    if (specifier === "@/lib/welcome-store") return mod(`export const mailStatus = () => ({ ready: !!globalThis.__mail?.ready });
+      export const sendMail = async (m) => { if (globalThis.__mail.fail) throw new Error("resend giù"); globalThis.__mail.sent.push(m); return "id"; };`);
     if (specifier.startsWith("@/")) return next(pathToFileURL(path.join(SRC, specifier.slice(2)) + ".js").href, context);
     return next(specifier, context);
   },
@@ -64,5 +67,33 @@ assert.equal(e.otherRoles, true); assert.equal(e.url, "https://x/op"); assert.eq
 users.add("helena@gmail.com");
 await assert.rejects(referenteInvitation({ ...base, email: "helena@gmail.com" }), (err) => err.code === "exists"); n++;
 await assert.rejects(referenteInvitation({ ...base, email: "non-una-mail" }), /Email non valida/); n++;
+
+// Email italiana nostra (26/11/2026): con mittente verificato l'invito su Clerk è muto e
+// l'email la mandiamo noi, col link dentro
+globalThis.__mail = { ready: true, fail: false, sent: [] };
+const f = await referenteInvitation({ ...base, email: "sofia@gmail.com" });
+const fi = invs.find((i) => i.emailAddress === "sofia@gmail.com");
+assert.equal(fi.notify, false, "Clerk non manda la sua email inglese");
+assert.equal(globalThis.__mail.sent.length, 1);
+const m = globalThis.__mail.sent[0];
+assert.equal(m.to, "sofia@gmail.com"); assert.equal(m.subject, "Il tuo invito a HOC Pro");
+assert.ok(m.html.includes(f.url) && m.text.includes(f.url), "il link d'invito è nell'email");
+assert.ok(m.text.includes("Claudia ti ha invitato"), "dice chi invita"); n += 6;
+
+// «Manda di nuovo» con mittente verificato: anche il rinnovo parte in italiano
+await referenteInvitation({ ...base, email: "sofia@gmail.com" });
+assert.equal(globalThis.__mail.sent.length, 2); assert.equal(invs.filter((i) => i.emailAddress === "sofia@gmail.com" && i.status === "pending").length, 1); n += 2;
+
+// la nostra email non parte → l'invito muto si annulla e riparte quello standard di Clerk
+globalThis.__mail = { ready: true, fail: true, sent: [] };
+await referenteInvitation({ ...base, email: "giada@gmail.com" });
+const gi = invs.filter((i) => i.emailAddress === "giada@gmail.com");
+assert.equal(gi.length, 2); assert.equal(gi[0].notify, false); assert.equal(gi[0].status, "revoked");
+assert.equal(gi[1].notify, true); assert.equal(gi[1].status, "pending"); n += 5;
+
+// «Copia il link» resta senza nessuna email, neanche la nostra
+globalThis.__mail = { ready: true, fail: false, sent: [] };
+await referenteInvitation({ ...base, email: "nora@gmail.com", linkOnly: true });
+assert.equal(globalThis.__mail.sent.length, 0); assert.equal(invs.at(-1).notify, false); n += 2;
 
 console.log(`ok — ${n} asserzioni`);
