@@ -141,6 +141,50 @@ export function growthPct(hist, back = 1) {
   return Math.round(((last - prev) / prev) * 1000) / 10;
 }
 
+/** "2026-W41" → numero progressivo della settimana (differenze = settimane di calendario); null se non è una chiave. */
+export function weekNum(key) {
+  const m = /^(\d{4})-W(\d{2})$/.exec(String(key || ""));
+  if (!m) return null;
+  const jan4 = Date.UTC(+m[1], 0, 4);
+  const mon1 = jan4 - ((new Date(jan4).getUTCDay() || 7) - 1) * 86400000;
+  return Math.round((mon1 + (+m[2] - 1) * 7 * 86400000) / (7 * 86400000));
+}
+
+/**
+ * Periodi della crescita (26/11/2026, richiesta Nicholas: «in che periodo? posso sceglierlo?»).
+ * Le letture sono settimanali da ottobre 2026: un periodo più lungo dello storico dà «—».
+ */
+export const GROWTH_PERIODS = [
+  { id: "1", label: "1 settimana", short: "1 sett.", weeks: 1 },
+  { id: "4", label: "4 settimane", short: "4 sett.", weeks: 4 },
+  { id: "8", label: "8 settimane", short: "8 sett.", weeks: 8 },
+  { id: "all", label: "Da quando la seguiamo", short: null, weeks: null },
+];
+
+/**
+ * Crescita % dei follower su `weeks` settimane di CALENDARIO (non «N letture fa»: se una settimana
+ * il giro salta, N letture coprirebbero più tempo di quanto dice l'etichetta).
+ * Base = l'ultima lettura fatta almeno `weeks` settimane prima dell'ultima; si accetta una settimana
+ * di scarto (giro saltato), oltre → null. weeks=null → dalla prima lettura.
+ * → { pct, weeks } (weeks = settimane davvero coperte) oppure null.
+ */
+export function growthOver(hist, weeks) {
+  const pts = (hist || []).filter((p) => p[1] != null && p[1] > 0 && weekNum(p[0]) != null);
+  if (pts.length < 2) return null;
+  const last = pts[pts.length - 1];
+  const lw = weekNum(last[0]);
+  let base = null;
+  if (weeks == null) base = pts[0];
+  else {
+    for (let i = pts.length - 2; i >= 0; i--) if (weekNum(pts[i][0]) <= lw - weeks) { base = pts[i]; break; }
+    if (base && weekNum(base[0]) < lw - weeks - 1) base = null;
+  }
+  if (!base) return null;
+  const span = lw - weekNum(base[0]);
+  if (span < 1) return null;
+  return { pct: Math.round(((last[1] - base[1]) / base[1]) * 1000) / 10, weeks: span };
+}
+
 /** Somma degli storici di più account per settimana (per la scheda della creator). */
 export function sumHistories(hists) {
   const by = new Map();
@@ -316,8 +360,11 @@ export function buildCreators(profiles, crm) {
       vf: main.vf ?? null,
       // engagement dell'account principale (il più seguito), in percento
       er: main.er ?? null,
-      g1: growthPct(hist, 1),
-      g4: growthPct(hist, 4),
+      // dal 26/11/2026 su settimane di calendario (prima: «N letture fa»), come il selettore del periodo
+      g1: growthOver(hist, 1)?.pct ?? null,
+      g4: growthOver(hist, 4)?.pct ?? null,
+      // crescita per ogni periodo del selettore: { "1": [pct, settimane], … } (solo quelli calcolabili)
+      gp: Object.fromEntries(GROWTH_PERIODS.map((g) => [g.id, growthOver(hist, g.weeks)]).filter(([, v]) => v).map(([k, v]) => [k, [v.pct, v.weeks]])),
       sig,
       hl: ps.some((p) => p.hl),
       fmt: fmts[0] || "nessuno",
@@ -487,16 +534,24 @@ export const QUEUE_SORTS = [
   { id: "g4", label: "Crescita" },
 ];
 
+/** Crescita % di una creator nel periodo scelto (null se lo storico non basta). */
+export function growthIn(c, period) {
+  if (!period || period === "4") return c?.g4 ?? null;
+  return c?.gp?.[period]?.[0] ?? null;
+}
+
 /** La coda: non ancora valutate, non nostre, ancora «da valutare», ordinate e filtrate. */
-export function reviewQueue(creators, { scope = "paid", newCut, sort = "auto", ranges } = {}) {
+export function reviewQueue(creators, { scope = "paid", newCut, sort = "auto", ranges, growth } = {}) {
   const key = QUEUE_SORTS.some((s) => s.id === sort) && sort !== "auto" ? sort : null;
+  // «Crescita» ordina sul periodo scelto (growth = id di GROWTH_PERIODS), altrimenti 4 settimane
+  const val = (c) => (key === "g4" && growth ? growthIn(c, growth) : c[key]);
   return creators
     // «forse» = la coda da rivedere: chi ha avuto Forse ed è ancora da valutare
     .filter((c) => !c.ours && c.stage === DEFAULT_STAGE && (scope === "forse" ? c.rating === 2 : !c.reviewedAt))
     .filter((c) => scope === "all" || scope === "forse" || (scope === "paid" ? c.sig === "forte" : c.sig === "debole"))
     .filter((c) => passRanges(c, ranges))
     .map((c) => ({ c, s: attentionScore(c, newCut) }))
-    .sort((a, b) => (key ? (b.c[key] ?? -Infinity) - (a.c[key] ?? -Infinity) : 0) || b.s - a.s)
+    .sort((a, b) => (key ? (val(b.c) ?? -Infinity) - (val(a.c) ?? -Infinity) : 0) || b.s - a.s)
     .map(({ c }) => c);
 }
 
