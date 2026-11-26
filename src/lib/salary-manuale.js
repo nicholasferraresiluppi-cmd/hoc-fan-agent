@@ -71,16 +71,16 @@ export const STEPS = [
     who: ["Asja", "Davide per il template"],
     does: [
       "Gruppo WhatsApp finance: Gaia, Asja, Nicholas",
-      "Documento fronte e retro, prova di residenza, dati",
+      "Documento d'identità, indirizzo, email e prova di residenza",
       "Contratto letto con calma e firmato online",
     ],
-    ask: ["Richiesta documenti di Asja"],
-    messages: ["m4"],
+    ask: ["Benvenuto di Nicholas, poi richiesta documenti di Asja"],
+    messages: ["m4", "m5"],
     watch: [
       "Template di Davide, art. 4.4: social a nome suo, da correggere prima della firma",
       "Fisso garantito: manca il parere di Davide",
     ],
-    now: "Raccogliere i documenti nel gruppo finance (messaggio 4) e farle firmare il contratto",
+    now: "Aprire il gruppo finance col benvenuto (messaggio 4), raccogliere i documenti (messaggio 5) e farle firmare il contratto",
   },
   {
     key: "conti", status: "conti aperti", n: 5, title: "Conti aperti",
@@ -105,9 +105,9 @@ export const STEPS = [
       "PED ogni lunedì in 2 parti, 2–4 set sexting a settimana",
     ],
     ask: ["Presentazioni di Christian e Sara"],
-    messages: ["m5"],
+    messages: ["m6"],
     watch: ["Gli account social li apriamo noi e restano all'agenzia"],
-    now: "Presentazioni nel gruppo team (messaggio 5) e call con Gaia per il primo PED",
+    now: "Presentazioni nel gruppo team (messaggio 6) e call con Gaia per il primo PED",
   },
   {
     key: "attiva", status: "attiva", n: 7, title: "Attiva",
@@ -166,19 +166,29 @@ Does that work for you? 🍀`,
     note: "Le cifre seguono la scala di livelli della sua pagina: se la scala cambia, cambia anche qui.",
   },
   {
-    id: "m4", n: 4, step: "contratto", title: "Gruppo finance", from: "Asja", where: "WhatsApp · <nome> × HOC · Contrato y pagos (Gaia, Asja, Nicholas)", lang: "ES",
-    text: `¡Hola <nome>! Soy Asja 🍀 Aquí vemos juntas el contrato, la cuenta bancaria y los pagos. Para preparar el contrato y abrir tu cuenta a tu nombre necesito:
+    id: "m4", n: 4, step: "contratto", title: "Benvenuto nel gruppo finance", from: "Nicholas", where: "WhatsApp · <nome> × HOC · Contrato y pagos (Gaia, Asja, Nicholas)", lang: "ES",
+    text: `¡Hola <nome>! 🤍 Soy Nicholas, de House of Creators. ¡Bienvenida oficialmente a HOC! Gaia y Asja me contaron de la llamada y estamos muy felices de empezar a trabajar contigo ✨
 
-- una foto de tu documento (frente y dorso)
-- un comprobante de domicilio (una factura de luz o gas, o un extracto bancario; no de teléfono)
-- tu nombre completo, fecha de nacimiento y dirección
+Este grupo es para la parte práctica: el contrato, tu cuenta bancaria y los pagos. Aquí te acompaña Asja, que en un momento te escribe lo que necesitamos para empezar. Vamos paso a paso y con calma: si algo no te queda claro, pregunta sin problema 🍀
 
-Cuando lo tengas, mándalo aquí. ¡Gracias! 🤍`,
-    it: "Ciao! Sono Asja. Qui vediamo insieme contratto, conto e pagamenti. Mi servono: foto del documento fronte e retro, una prova di residenza (bolletta luce o gas, o estratto conto; non del telefono), nome completo, data di nascita, indirizzo. Mandali qui quando li hai.",
-    note: null,
+En los próximos días te vamos a agregar también al grupo con el equipo que va a trabajar contigo todos los días.
+
+¡Bienvenida otra vez! 🥰`,
+    it: "Ciao! Sono Nicholas, di House of Creators. Benvenuta ufficialmente in HOC! Gaia e Asja mi hanno raccontato della chiamata e siamo molto felici di iniziare a lavorare con te. Questo gruppo serve per la parte pratica: contratto, conto bancario e pagamenti. Qui ti segue Asja, che tra poco ti scrive cosa ci serve per iniziare. Andiamo passo dopo passo e con calma: se qualcosa non ti è chiaro, chiedi pure. Nei prossimi giorni ti aggiungiamo anche al gruppo con il team che lavorerà con te ogni giorno. Benvenuta di nuovo!",
+    note: "Va per primo, appena aperto il gruppo. Se Asja scrive ore dopo, «en un momento» diventa «te va a escribir».",
   },
   {
-    id: "m5", n: 5, step: "lancio", title: "Gruppo team", from: "Gaia, Christian, Sara", where: "WhatsApp · <nome> × House of Creators (Gaia, Christian, Sara, Nicholas)", lang: "ES",
+    id: "m5", n: 5, step: "contratto", title: "Documenti per contratto e conto", from: "Asja", where: "WhatsApp · <nome> × HOC · Contrato y pagos (Gaia, Asja, Nicholas)", lang: "ES",
+    text: `Hola <nome>, cómo estás? 🫶🏻
+
+Para poder enviarte el contrato, necesitaría que me facilitaras un documento de identidad, tu dirección de residencia y tu correo electrónico.
+
+Por otro lado, para abrirte la cuenta bancaria de Cosmo, donde recibirás los ingresos generados a través de OnlyFans, quería preguntarte si tienes algún comprobante de domicilio, como una factura de la luz o un extracto bancario.`,
+    it: "Ciao, come stai? Per mandarti il contratto avrei bisogno di un documento d'identità, del tuo indirizzo di residenza e della tua email. Poi, per aprirti il conto bancario Cosmo, dove riceverai gli incassi di OnlyFans, volevo chiederti se hai una prova di residenza, come una bolletta della luce o un estratto conto.",
+    note: "Il testo è quello che usa Asja (26/11, Sol). Arriva dopo il benvenuto di Nicholas.",
+  },
+  {
+    id: "m6", n: 6, step: "lancio", title: "Gruppo team", from: "Gaia, Christian, Sara", where: "WhatsApp · <nome> × House of Creators (Gaia, Christian, Sara, Nicholas)", lang: "ES",
     parts: [
       { from: "Gaia", text: "¡Hola <nome>! 🤍 Este es tu grupo con el equipo que va a trabajar contigo todos los días. Aquí están Christian y Sara, que ahora se presentan, y también Nicholas. Cualquier cosa, escríbenos aquí ✨" },
       { from: "Christian", text: "¡Hola! Soy Christian, tu social media manager 🤍 Cada lunes te voy a mandar tu PED, el plan de fotos y videos de la semana, con ejemplos para que sea fácil. En los próximos días organizamos una llamada con Gaia y Sara para presentarte todo y empezar juntos ✨" },
