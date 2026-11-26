@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
 import { pickToday, movers, whyLines, reviewQueue, RATINGS } from "@/lib/scouting-core";
 import HeroHead, { BigNum as HeroNum } from "@/components/HeroHead";
-import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, Initials, LinkChip, Growth, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
+import { SERIF, NUM, fmtFull, fmtDate, btn, btnPrimary, btnQuiet, igProfile, Initials, LinkChip, Growth, Spark, H2, STAGE_LABEL, RatingChips } from "./radar-ui";
 import { SignalRow } from "./RadarSegnala";
 import { FilterChip } from "@/components/ds";
 
@@ -72,6 +72,7 @@ export default function RadarOggi({ me, newCut, data, creators, profilesBy, onOp
                   <LinkChip link={c.link} sig={c.sig} />
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button style={btnPrimary} onClick={() => onOpen(c)}>Apri la scheda</button>
+                    {c.handles?.[0] && <a href={igProfile(c.handles[0])} target="_blank" rel="noopener noreferrer" style={btn} aria-label={`Apri @${c.handles[0]} su Instagram`}>Instagram ↗</a>}
                   </div>
                   <RatingChips value={c.rating} disabled={busy} onRate={(id) => act({ action: "review", id: c.id, decision: id }, `${c.name}: ${RATINGS.find((r) => r.id === id).label}.`)} />
                 </article>
