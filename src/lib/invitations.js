@@ -4,6 +4,9 @@
 // custom) invita una persona scegliendo i ruoli: Clerk manda l'email da
 // houseofcreators.app, la persona si registra dal link e al primo accesso ha già
 // i ruoli (publicMetadata.roles/role dell'invito → letti da getUserRoles).
+// Dal 26/11/2026, con il mittente verificato (HOC_MAIL_FROM) l'email d'invito la
+// mandiamo noi, in italiano (lib/invite-email): quella di Clerk è in inglese e sul
+// piano gratuito non si traduce. Vedi createAndNotify.
 //
 // ANTI-ESCALATION (rivista dopo l'audit set 2026): chi non è admin può dare
 // SOLO ruoli i cui permessi sono già tutti suoi, con scope non più ampio
@@ -14,6 +17,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { isUserIdAdmin } from "@/lib/admin";
 import { ROLES, ROLE_META, ROLE_CAPABILITIES, CAPABILITIES, listCustomRoles, getEffectiveCapabilities } from "@/lib/rbac";
+import { inviteEmailContent, inviteEmailHtml, inviteEmailText } from "@/lib/invite-email";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const POWER_CAPS = [CAPABILITIES.ACCESS_MGMT, CAPABILITIES.USERS_INVITE, CAPABILITIES.SEED];
@@ -54,6 +58,37 @@ function shape(inv) {
     created_at: inv.createdAt,
     updated_at: inv.updatedAt,
   };
+}
+
+/**
+ * Crea l'invito su Clerk e fa partire l'email (26/11/2026).
+ * Con notify e mittente verificato: invito muto su Clerk + email italiana nostra col link.
+ * Se la nostra email non parte, l'invito muto si annulla e si ricrea con l'email standard
+ * di Clerk: mai un invito che non arriva a nessuno. Senza mittente verificato (o con
+ * notify:false, es. l'attestato degli operatori) si comporta esattamente come prima.
+ */
+async function createAndNotify(cc, params) {
+  if (!params.notify) return cc.invitations.createInvitation(params);
+  const { mailStatus, sendMail } = await import("@/lib/welcome-store");
+  if (!mailStatus().ready) return cc.invitations.createInvitation(params);
+  const inv = await cc.invitations.createInvitation({ ...params, notify: false });
+  try {
+    if (!inv.url) throw new Error("link d'invito non disponibile");
+    const pm = params.publicMetadata || {};
+    const roleIds = pm.roles || (pm.role ? [pm.role] : []);
+    const roleLabel = roleIds.length === 1 ? ROLE_META[roleIds[0]]?.label || null : null;
+    const content = inviteEmailContent({ email: params.emailAddress, inviterName: pm.invited_by_name, roleLabel });
+    await sendMail({ to: params.emailAddress, subject: content.subject, html: inviteEmailHtml(content, inv.url), text: inviteEmailText(content, inv.url) });
+    return inv;
+  } catch (e) {
+    console.error("[invitations] email italiana non partita, ripiego sull'email di Clerk:", e?.message);
+    try {
+      await cc.invitations.revokeInvitation(inv.id);
+    } catch {
+      return inv; // non annullabile: resta valido, il link si gira a mano dalla pagina
+    }
+    return cc.invitations.createInvitation({ ...params, notify: true });
+  }
 }
 
 export async function listInvitations() {
@@ -113,7 +148,7 @@ export async function createInvitation({ email, roles, creators, workspace, invi
   }
   // ruolo principale = il più alto tra i predefiniti scelti (admin prima di tutto)
   const primary = [...ROLES].reverse().find((r) => wanted.includes(r)) || "operator";
-  const inv = await cc.invitations.createInvitation({
+  const inv = await createAndNotify(cc, {
     emailAddress: mail,
     redirectUrl: `${origin}/sign-up`,
     // notify:false = l'email la mandiamo noi (attestato di benvenuto) col link inv.url
@@ -142,7 +177,7 @@ export async function resendInvitation(id, actorId, origin) {
   const admin = await isUserIdAdmin(actorId).catch(() => false);
   if (!admin && old.publicMetadata?.invited_by !== actorId) throw new Error("Puoi rimandare solo gli inviti che hai mandato tu");
   const redirectUrl = origin ? `${origin}/sign-up` : null;
-  const inv = await cc.invitations.createInvitation({
+  const inv = await createAndNotify(cc, {
     emailAddress: old.emailAddress,
     ...(redirectUrl ? { redirectUrl } : {}),
     notify: true,
@@ -191,7 +226,7 @@ export async function referenteInvitation({ email, inviterId, inviterName, origi
     const roles = old.publicMetadata?.roles || (old.publicMetadata?.role ? [old.publicMetadata.role] : []);
     const onlyReferente = roles.length === 1 && roles[0] === "referente";
     if (linkOnly || !onlyReferente) return { ...shape(old), url: old.url || null, reused: true, otherRoles: !onlyReferente };
-    const inv = await cc.invitations.createInvitation({
+    const inv = await createAndNotify(cc, {
       emailAddress: mail,
       redirectUrl: `${origin}/sign-up`,
       notify: true,
