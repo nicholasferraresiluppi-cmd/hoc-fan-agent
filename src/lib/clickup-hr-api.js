@@ -145,6 +145,8 @@ export async function listAllTasks(listId, { maxPages = 50 } = {}) {
   return out;
 }
 
+/** GET generico (altre liste lette in sola lettura, es. Candidate salary): stesso rate limit e retry. */
+export const clickupGet = (path) => cu(path);
 export const getTask = (taskId) => cu(`/task/${encodeURIComponent(taskId)}`);
 export const createTask = (listId, payload) => cu(`/list/${listId}/task`, { method: "POST", json: payload });
 export const updateTask = (taskId, payload) => cu(`/task/${encodeURIComponent(taskId)}`, { method: "PUT", json: payload });
