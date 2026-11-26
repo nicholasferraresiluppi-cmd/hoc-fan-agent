@@ -166,7 +166,7 @@ Does that work for you? 🍀`,
     note: "Le cifre seguono la scala di livelli della sua pagina: se la scala cambia, cambia anche qui.",
   },
   {
-    id: "m4", n: 4, step: "contratto", title: "Benvenuto nel gruppo finance", from: "Nicholas", where: "WhatsApp · <nome> × HOC · Contrato y pagos (Gaia, Asja, Nicholas)", lang: "ES",
+    id: "m4", n: 4, step: "contratto", title: "Benvenuto nel gruppo finance", from: "Nicholas", where: "WhatsApp · HOC Finance - <nome> (Gaia, Asja, Nicholas)", lang: "ES",
     text: `¡Hola <nome>! 🤍 Soy Nicholas, de House of Creators. ¡Bienvenida oficialmente a HOC! Gaia y Asja me contaron de la llamada y estamos muy felices de empezar a trabajar contigo ✨
 
 Este grupo es para la parte práctica: el contrato, tu cuenta bancaria y los pagos. Aquí te acompaña Asja, que en un momento te escribe lo que necesitamos para empezar. Vamos paso a paso y con calma: si algo no te queda claro, pregunta sin problema 🍀
@@ -178,7 +178,7 @@ En los próximos días te vamos a agregar también al grupo con el equipo que va
     note: "Va per primo, appena aperto il gruppo. Se Asja scrive ore dopo, «en un momento» diventa «te va a escribir».",
   },
   {
-    id: "m5", n: 5, step: "contratto", title: "Documenti per contratto e conto", from: "Asja", where: "WhatsApp · <nome> × HOC · Contrato y pagos (Gaia, Asja, Nicholas)", lang: "ES",
+    id: "m5", n: 5, step: "contratto", title: "Documenti per contratto e conto", from: "Asja", where: "WhatsApp · HOC Finance - <nome> (Gaia, Asja, Nicholas)", lang: "ES",
     text: `Hola <nome>, cómo estás? 🫶🏻
 
 Para poder enviarte el contrato, necesitaría que me facilitaras un documento de identidad, tu dirección de residencia y tu correo electrónico.
