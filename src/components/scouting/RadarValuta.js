@@ -13,7 +13,7 @@
 // parallelo si pesterebbero i piedi).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CP, alpha } from "@/lib/brand";
-import { reviewQueue, whyLines, hookLine, RATINGS, RATING_LABEL, RANGE_FILTERS, QUEUE_SORTS, activeRanges } from "@/lib/scouting-core";
+import { reviewQueue, whyLines, hookLine, agencies, RATINGS, RATING_LABEL, RANGE_FILTERS, QUEUE_SORTS, activeRanges } from "@/lib/scouting-core";
 import { FilterChip } from "@/components/ds";
 import { SERIF, NUM, fmtFull, fmtN, fmtDate, fmtEr, btn, btnQuiet, input, igProfile, Initials, LinkChip, Growth, rateStyle, useIsPhone } from "./radar-ui";
 import RadarReels from "./RadarReels";
@@ -49,7 +49,12 @@ function useWide() {
   return wide;
 }
 
-export default function RadarValuta({ creators, newCut, me, onOpen, onChanged }) {
+export default function RadarValuta({ creators: base, newCut, me, onOpen, onChanged }) {
+  // agenzia scritta qui (26/11/2026, richiesta Nicholas: etichettarle con l'agenzia mentre si valuta):
+  // si vede subito, il radar si ricarica all'uscita dalla vista
+  const [agEdits, setAgEdits] = useState(() => new Map()); // id → agenzia ("" = tolta)
+  const creators = useMemo(() => (agEdits.size ? base.map((c) => (agEdits.has(c.id) ? { ...c, agency: agEdits.get(c.id) || null } : c)) : base), [base, agEdits]);
+  const knownAg = useMemo(() => agencies(creators).map((a) => a.name).filter((n) => n !== "Indipendente"), [creators]);
   const [scope, setScope] = useState("paid");
   const [sort, setSort] = useState("auto");
   const [ranges, setRanges] = useState({});
@@ -90,6 +95,14 @@ export default function RadarValuta({ creators, newCut, me, onOpen, onChanged })
     }).catch((e) => setErr(`${e.message}: riprova.`));
     return chain.current;
   }, [me]);
+
+  const saveAgency = useCallback((c, v) => {
+    const x = String(v || "").trim().slice(0, 120);
+    if (x === (c.agency || "")) return;
+    setErr(null);
+    setAgEdits((m) => new Map(m).set(c.id, x));
+    send({ action: "field", id: c.id, field: "agency", value: x });
+  }, [send]);
 
   const rate = useCallback((ratingId, target) => {
     const c = target || cur;
@@ -254,7 +267,7 @@ export default function RadarValuta({ creators, newCut, me, onOpen, onChanged })
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.15fr)", gap: 28, alignItems: "start" }}>
             <div className="rv-list" style={{ position: "sticky", top: 12, maxHeight: "calc(100vh - 24px)", overflowY: "auto", paddingRight: 6 }}>{list}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} />
+              <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} />
               {bar}
             </div>
           </div>
@@ -266,13 +279,13 @@ export default function RadarValuta({ creators, newCut, me, onOpen, onChanged })
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}>
       {controls}
-      {!cur ? empty : <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} onSwipe={phone ? (dir) => rate(dir > 0 ? "si" : "no") : null} />}
+      {!cur ? empty : <Card key={cur.id} c={cur} newCut={newCut} onOpen={onOpen} knownAg={knownAg} onAgency={saveAgency} onSwipe={phone ? (dir) => rate(dir > 0 ? "si" : "no") : null} />}
       {bar}
     </div>
   );
 }
 
-function Card({ c, newCut, onOpen, onSwipe }) {
+function Card({ c, newCut, onOpen, onSwipe, knownAg, onAgency }) {
   const why = whyLines(c, { newCut });
   const hook = hookLine(c, { newCut });
   const [dx, setDx] = useState(0);
@@ -333,6 +346,8 @@ function Card({ c, newCut, onOpen, onSwipe }) {
         <button style={btnQuiet} onClick={() => onOpen(c)}>Scheda completa</button>
       </div>
 
+      {onAgency && <AgencyField c={c} known={knownAg || []} onSave={(v) => onAgency(c, v)} />}
+
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <RadarReels c={c} compact />
       </section>
@@ -346,7 +361,10 @@ function ListRow({ c, active, phone, onSelect, onRate }) {
       <button onClick={onSelect} aria-current={active || undefined} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", flex: "1 1 auto", minWidth: 0, display: "grid", gridTemplateColumns: "40px minmax(0,1fr)", gap: 10, alignItems: "center" }}>
         <Initials name={c.name} size={40} gold={c.sig === "forte"} pic={c.pic} />
         <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-          <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 500, color: CP.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+            {c.agency && <AgencyTag name={c.agency} />}
+          </span>
           <span style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 12.5, color: CP.textMuted, ...NUM }}>
             <span>{fmtN(c.fol)} follower</span>
             <span>{fmtN(c.medv)} view</span>
@@ -367,6 +385,38 @@ function ListRow({ c, active, phone, onSelect, onRate }) {
         </div>
       </div>
     </li>
+  );
+}
+
+/** Etichetta dell'agenzia nell'elenco: «Indipendente» più tenue (non è un'agenzia). */
+function AgencyTag({ name }) {
+  const ind = name === "Indipendente";
+  return (
+    <span title={ind ? "Verificata senza agenzia" : `Gestita da ${name}`}
+      style={{ flex: "0 1 auto", minWidth: 0, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, padding: "1px 8px", borderRadius: 999, border: `1px solid ${CP.border}`, color: ind ? CP.textMuted : CP.textSecondary }}>
+      {ind ? "indipendente" : name}
+    </span>
+  );
+}
+
+/** «Agenzia che la gestisce» dentro la valutazione: le agenzie già scritte a un tocco, «Indipendente», «Non lo so». */
+function AgencyField({ c, known, onSave }) {
+  const [v, setV] = useState(c.agency || "");
+  useEffect(() => { setV(c.agency || ""); }, [c.agency]);
+  const chip = { ...btn, minHeight: 30, padding: "4px 11px", fontSize: 12.5 };
+  const pick = (x) => { setV(x); onSave(x); };
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <label htmlFor={`rv-ag-${c.id}`} style={{ fontSize: 13, color: CP.textSecondary }}>Agenzia che la gestisce</label>
+      <input id={`rv-ag-${c.id}`} list={`rv-agl-${c.id}`} value={v} onChange={(e) => setV(e.target.value)} onBlur={() => onSave(v)}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} placeholder="Se la sai: nome dell'agenzia" style={{ ...input, maxWidth: 360 }} />
+      <datalist id={`rv-agl-${c.id}`}>{known.map((n) => <option key={n} value={n} />)}</datalist>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {known.filter((n) => n !== v).slice(0, 4).map((n) => <button key={n} type="button" onClick={() => pick(n)} style={chip}>{n}</button>)}
+        {v !== "Indipendente" && <button type="button" onClick={() => pick("Indipendente")} style={chip}>Indipendente</button>}
+        {v && <button type="button" onClick={() => pick("")} style={{ ...btnQuiet, minHeight: 30, padding: "4px 6px", fontSize: 12.5 }}>Non lo so</button>}
+      </div>
+    </div>
   );
 }
 
