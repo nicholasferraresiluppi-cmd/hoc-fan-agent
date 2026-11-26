@@ -58,7 +58,7 @@ export async function POST(request) {
   const actor = await actorOf(az);
   try {
     if (body.action === "invite") {
-      return Response.json(await inviteReferrer(body.id, actor, internalOrigin(request), { force: body.force === true }));
+      return Response.json(await inviteReferrer(body.id, actor, internalOrigin(request), { force: body.force === true, linkOnly: body.linkOnly === true }));
     }
     const fn = ACTIONS[body.action];
     if (!fn) return Response.json({ error: "Azione sconosciuta" }, { status: 400 });

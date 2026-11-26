@@ -163,3 +163,43 @@ export async function revokeInvitation(id, actorId) {
   }
   return shape(await cc.invitations.revokeInvitation(id));
 }
+
+/**
+ * Invito col solo ruolo «Referente» per «Porta un amico» (26/11/2026, segnalazione Claudia:
+ * «Manda di nuovo l'invito» rispondeva Bad Request e, se la mail non arriva, serve il link).
+ * Chi lo manda ha referral.manage (People Partner), non è admin: createInvitation non
+ * sostituisce un invito in attesa (ignoreExisting solo per gli admin) e Clerk rifiuta il
+ * doppione → 400. Qui l'invito in attesa si gestisce senza dare poteri nuovi:
+ * - è un invito «referente» e basta → se ne crea uno identico (mail nuova, link nuovo) e si
+ *   annulla il vecchio;
+ * - porta altri ruoli (fatto da Membri) → non si tocca: si restituisce il suo link.
+ * linkOnly: nessuna mail, solo il link da girare su WhatsApp (riusa quello in attesa se c'è).
+ */
+export async function referenteInvitation({ email, inviterId, inviterName, origin, linkOnly = false }) {
+  const mail = String(email || "").trim().toLowerCase();
+  if (!EMAIL_RE.test(mail)) throw new Error("Email non valida");
+  const arr = (x) => (Array.isArray(x) ? x : x?.data || []);
+  const cc = await clerkClient();
+  if (arr(await cc.users.getUserList({ emailAddress: [mail] })).length) {
+    const err = new Error("Questa persona ha già un account");
+    err.code = "exists";
+    throw err;
+  }
+  const pending = arr(await cc.invitations.getInvitationList({ status: "pending", query: mail, limit: 20 }));
+  const old = pending.find((x) => String(x.emailAddress || "").toLowerCase() === mail);
+  if (old) {
+    const roles = old.publicMetadata?.roles || (old.publicMetadata?.role ? [old.publicMetadata.role] : []);
+    const onlyReferente = roles.length === 1 && roles[0] === "referente";
+    if (linkOnly || !onlyReferente) return { ...shape(old), url: old.url || null, reused: true, otherRoles: !onlyReferente };
+    const inv = await cc.invitations.createInvitation({
+      emailAddress: mail,
+      redirectUrl: `${origin}/sign-up`,
+      notify: true,
+      ignoreExisting: true,
+      publicMetadata: old.publicMetadata || {},
+    });
+    await cc.invitations.revokeInvitation(old.id).catch(() => {});
+    return { ...shape(inv), url: inv.url || null, renewed: true };
+  }
+  return createInvitation({ email: mail, roles: ["referente"], inviterId, inviterName, origin, notify: !linkOnly });
+}
