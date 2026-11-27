@@ -22,10 +22,20 @@ t("ogni passo ha periodo, titolo e capitolo", () => {
   assert.equal(new Set(SHOT_STEPS.map((s) => s.id)).size, SHOT_STEPS.length);
 });
 
-t("i fan che spendono di più: periodo dichiarato con da sempre e 30 giorni", () => {
-  const s = SHOT_STEPS.find((x) => x.id === "of_topfans");
-  assert.match(s.period, /sempre/i);
-  assert.match(s.period, /30/);
+t("i fan che spendono di più: due caricamenti separati, da sempre e 30 giorni", () => {
+  const all = SHOT_STEPS.find((x) => x.id === "of_topfans");
+  const last = SHOT_STEPS.find((x) => x.id === "of_topfans_30");
+  assert.match(all.period, /sempre/i);
+  assert.match(last.period, /30/);
+  assert.ok(!all.optional && !last.optional, "nessuno dei due si salta senza segnarlo");
+  assert.ok(SHOT_STEPS.indexOf(last) === SHOT_STEPS.indexOf(all) + 1, "uno dopo l'altro");
+});
+
+t("la reach della pagina è chiesta, nello stesso periodo dei fan", () => {
+  const reach = SHOT_STEPS.find((x) => x.id === "of_reach");
+  const fans = SHOT_STEPS.find((x) => x.id === "of_fans");
+  assert.equal(reach.chapter, "pagina");
+  assert.equal(reach.period, fans.period);
 });
 
 t("sanitize: solo campi noti, testo tagliato, scelte ammesse", () => {
