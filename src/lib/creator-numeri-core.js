@@ -39,6 +39,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Overview"], period: "Ultimi 12 mesi",
     look: ["Imposta il periodo sugli ultimi 12 mesi (o da quando hai aperto, se è meno).", "Deve vedersi la divisione: abbonamenti, messaggi, mance, post, dirette."],
     tip: "È il dato più importante: ci dice se guadagni soprattutto dagli abbonamenti o dalla chat. Se in Overview non trovi la divisione, guarda nella scheda Statements.",
+    manual: "Es. 4.000 $ al mese, di cui 2.500 dai messaggi",
     mock: "earnings",
   },
   {
@@ -46,6 +47,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Fans"], period: "Ultimi 12 mesi",
     look: ["Stesso periodo: ultimi 12 mesi.", "Devono vedersi fan attivi, nuovi iscritti e il grafico mese per mese."],
     tip: "Se vedi anche quanti hanno il rinnovo automatico attivo, mettilo nello screenshot: ci dice quanti fan restano.",
+    manual: "Es. 300 nuovi iscritti in un mese normale",
     mock: "fans",
   },
   {
@@ -53,6 +55,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Fans"], period: "Ultimi 30 giorni",
     look: ["Stessa schermata di prima, ma cambia il periodo su «Last 30 days».", "Devono vedersi i nuovi iscritti e i fan attivi."],
     tip: "È un secondo screenshot, diverso dal precedente: i 12 mesi dicono com'è andata, gli ultimi 30 giorni come sta andando adesso.",
+    manual: "Es. 280 negli ultimi 30 giorni",
     mock: "fans_30",
   },
   {
@@ -60,6 +63,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Reach"], period: "Ultimi 12 mesi",
     look: ["Stesso periodo: ultimi 12 mesi.", "Devono vedersi le visite al profilo (visitatori e utenti) e il grafico mese per mese."],
     tip: "Ci dice quanta gente arriva sulla tua pagina e, insieme ai nuovi iscritti, quanti di loro si abbonano. Se in Reach non trovi le visite al profilo, guarda in Overview.",
+    manual: "Es. 15.000 visite al profilo in un mese",
     mock: "reach",
   },
   {
@@ -67,6 +71,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Overview", "Top fans"], period: "Da sempre",
     look: ["Imposta il periodo su «All time» (da sempre): devono vedersi i primi 10 e quanto ha speso ciascuno.", "Copri i nomi dei fan prima di caricare: ci servono solo le cifre."],
     tip: "Ci dice se i tuoi guadagni dipendono da pochissime persone. Se la lista non è in Overview, prova nella scheda Fans.",
+    manual: "Es. il primo ha speso 3.000 $, il decimo 400 $",
     mock: "topfans",
   },
   {
@@ -74,6 +79,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Overview", "Top fans"], period: "Ultimi 30 giorni",
     look: ["Stessa schermata di prima, ma cambia il periodo su «Last 30 days».", "Copri i nomi dei fan prima di caricare: ci servono solo le cifre."],
     tip: "È un secondo screenshot, diverso dal precedente: ci dice se chi spendeva tanto spende ancora oggi.",
+    manual: "Es. il primo 600 $, il decimo 50 $",
     mock: "topfans_30",
   },
   {
@@ -81,6 +87,7 @@ export const SHOT_STEPS = [
     path: ["Menu", "Statistics", "Reach", "Tracking links"], period: "Da sempre",
     look: ["Devono vedersi tutti i link che usi (Instagram, TikTok, Telegram, Reddit…).", "Per ognuno: clic, iscritti e guadagno."],
     tip: "L'elenco si trova anche in Settings › Profile › Tracking links. Se non li hai mai creati segna «Non ce l'ho»: va bene lo stesso.",
+    manual: "Es. Instagram 200 iscritti, TikTok 50",
     mock: "links",
   },
   {
@@ -152,16 +159,21 @@ export const PLATFORM_OPTIONS = ["OnlyFans", "Fanvue", "Altra piattaforma", "Non
 export const PAGE_KIND_OPTIONS = ["A pagamento", "Gratuita", "Ne ho una per tipo"];
 export const EARN_BANDS = ["Meno di 500 $", "500 – 2.000 $", "2.000 – 5.000 $", "5.000 – 10.000 $", "10.000 – 25.000 $", "Più di 25.000 $", "Preferisco non dirlo"];
 export const YES_NO = ["Sì", "No"];
+export const VIEW_BANDS = ["Meno di 100.000", "100.000 – 500.000", "500.000 – 3 milioni", "3 – 10 milioni", "Più di 10 milioni", "Non lo so"];
+export const HOURS_OPTIONS = ["Meno di 2 ore", "2–4 ore", "4–6 ore", "Più di 6 ore"];
+export const START_OPTIONS = ["Subito", "Entro una settimana", "Entro un mese", "Più avanti"];
+export const MANUAL_MAX = 160;
 
 // Campi di testo: chiave → lunghezza massima. Tutto il resto viene scartato.
 export const TEXT_FIELDS = {
   stageName: 80, realName: 80, city: 80, contact: 120,
   ig: 200, tiktok: 200, x: 200, telegram: 200, onlyfans: 200, fanvue: 200, otherSocial: 300,
-  subPrice: 40, since: 40, languages: 120,
+  subPrice: 40, since: 40, languages: 120, subsPerDay: 30,
   readyContent: 400, perWeek: 400, chatToday: 600, agency: 1000, timeGoal: 1000, banDetail: 600, notes: 2000,
 };
 const CHOICE_FIELDS = {
   face: FACE_OPTIONS, platform: PLATFORM_OPTIONS, pageKind: PAGE_KIND_OPTIONS, earnBand: EARN_BANDS, banned: YES_NO,
+  viewsBand: VIEW_BANDS, hours: HOURS_OPTIONS, start: START_OPTIONS,
 };
 const BOOL_FIELDS = ["adult", "privacy"];
 
@@ -181,7 +193,53 @@ export function sanitizeAnswers(raw) {
   const skip = {};
   for (const s of SHOT_STEPS) if (a.skip?.[s.id] === true) skip[s.id] = true;
   if (Object.keys(skip).length) out.skip = skip;
+  // Numeri scritti a mano quando lo screenshot non c'è (idea del vecchio «Audit modella»).
+  const manual = {};
+  for (const s of SHOT_STEPS) {
+    const v = a.manual?.[s.id];
+    if (s.manual && v != null && String(v).trim()) manual[s.id] = clip(v, MANUAL_MAX);
+  }
+  if (Object.keys(manual).length) out.manual = manual;
   return out;
+}
+
+// ── Prima lettura (27/11/2026) ──────────────────────────────────────────────
+// Soglie riprese dal vecchio «Audit modella» di ClickUp (26/03/2026): oltre queste la scheda
+// proponeva subito una chiamata. Sono regole a occhio, non una stima di quanto può rendere:
+// servono solo a mettere in cima le schede da guardare per prime. Il potenziale vero si legge
+// dai numeri (visite → iscritti → incasso per iscritto) confrontati con creator simili.
+export const FIRST_READ = {
+  subsPerDayPaid: 20,      // pagina a pagamento (e «una per tipo»: soglia più bassa, più prudente)
+  subsPerDayFree: 80,      // pagina gratuita: gli iscritti costano zero, servono molti di più
+  viewsBandFrom: "3 – 10 milioni",
+  earnBandFrom: "5.000 – 10.000 $",
+};
+
+/** Primo numero in un testo libero: «15», «1.200», «circa 20», «10-20» (prende il più basso). */
+export function parseCount(v) {
+  const t = String(v ?? "").replace(/(\d)[.\s'](?=\d{3}(?!\d))/g, "$1");
+  const m = t.match(/\d+(?:,\d+)?/);
+  return m ? Number(m[0].replace(",", ".")) : null;
+}
+
+/** @returns {{ call: boolean, reasons: string[], notes: string[] }} */
+export function firstRead(answers) {
+  const a = answers || {};
+  const reasons = [];
+  const notes = [];
+  if (a.platform !== "Non ho ancora una pagina") {
+    const subs = parseCount(a.subsPerDay);
+    const free = a.pageKind === "Gratuita";
+    const th = free ? FIRST_READ.subsPerDayFree : FIRST_READ.subsPerDayPaid;
+    if (subs != null && subs >= th) reasons.push(`${subs} nuovi iscritti al giorno su una pagina ${free ? "gratuita" : "a pagamento"} (soglia ${th})`);
+    const ei = EARN_BANDS.indexOf(a.earnBand);
+    if (ei >= EARN_BANDS.indexOf(FIRST_READ.earnBandFrom) && a.earnBand !== "Preferisco non dirlo") reasons.push(`Guadagna ${a.earnBand} in un mese normale (soglia 5.000 $)`);
+  }
+  const vi = VIEW_BANDS.indexOf(a.viewsBand);
+  if (vi >= VIEW_BANDS.indexOf(FIRST_READ.viewsBandFrom) && a.viewsBand !== "Non lo so") reasons.push(`${a.viewsBand} di visualizzazioni al mese sui social (soglia 3 milioni)`);
+  if (a.hours === "Meno di 2 ore") notes.push("Ha meno di 2 ore al giorno");
+  if (a.start === "Più avanti") notes.push("Non può iniziare entro un mese");
+  return { call: reasons.length > 0, reasons, notes };
 }
 
 export const SOCIAL_KEYS = ["ig", "tiktok", "x", "telegram", "onlyfans", "fanvue", "otherSocial"];
