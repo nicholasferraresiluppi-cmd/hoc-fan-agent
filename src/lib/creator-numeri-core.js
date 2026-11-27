@@ -49,6 +49,13 @@ export const SHOT_STEPS = [
     mock: "fans",
   },
   {
+    id: "of_fans_30", read: 'Nuovi iscritti degli ultimi 30 giorni: il ritmo di oggi, da confrontare con la media mensile dei 12 mesi (se è molto sotto, la crescita si sta fermando).', chapter: "pagina", title: "Quanti nuovi iscritti negli ultimi 30 giorni",
+    path: ["Menu", "Statistics", "Fans"], period: "Ultimi 30 giorni",
+    look: ["Stessa schermata di prima, ma cambia il periodo su «Last 30 days».", "Devono vedersi i nuovi iscritti e i fan attivi."],
+    tip: "È un secondo screenshot, diverso dal precedente: i 12 mesi dicono com'è andata, gli ultimi 30 giorni come sta andando adesso.",
+    mock: "fans_30",
+  },
+  {
     id: "of_reach", read: 'Visite alla pagina rispetto ai nuovi iscritti dello stesso periodo: dice quanto la pagina converte chi arriva. Molte visite e pochi iscritti = pagina o prezzo da sistemare.', chapter: "pagina", title: "Quanta gente visita la tua pagina",
     path: ["Menu", "Statistics", "Reach"], period: "Ultimi 12 mesi",
     look: ["Stesso periodo: ultimi 12 mesi.", "Devono vedersi le visite al profilo (visitatori e utenti) e il grafico mese per mese."],

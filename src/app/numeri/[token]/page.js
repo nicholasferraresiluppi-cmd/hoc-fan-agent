@@ -524,20 +524,24 @@ function Mock({ kind }) {
         </Phone>
       );
     case "fans":
+    case "fans_30": {
+      const last = kind === "fans_30";
+      const v = last ? ["1.284", "342", "527", "211"] : ["1.284", "3.906", "527", "2.622"];
       return (
         <Phone title="Statistics" tabs={["Reach", "Fans", "Engagement"]} on="Fans">
-          <Hl n={1} className="sel">Last 12 months ▾</Hl>
+          <Hl n={1} className="sel">{last ? "Last 30 days ▾" : "Last 12 months ▾"}</Hl>
           <Hl n={2} style={{ display: "grid", gap: 8 }}>
             <div className="cards">
-              <div className="mcard"><span className="k">Active fans</span><span className="v">1.284</span></div>
-              <div className="mcard"><span className="k">New subscribers</span><span className="v">3.906</span></div>
-              <div className="mcard"><span className="k">Renew on</span><span className="v">527</span></div>
-              <div className="mcard"><span className="k">Expired</span><span className="v">2.622</span></div>
+              <div className="mcard"><span className="k">Active fans</span><span className="v">{v[0]}</span></div>
+              <div className="mcard"><span className="k">New subscribers</span><span className="v">{v[1]}</span></div>
+              <div className="mcard"><span className="k">Renew on</span><span className="v">{v[2]}</span></div>
+              <div className="mcard"><span className="k">Expired</span><span className="v">{v[3]}</span></div>
             </div>
-            <Bars h={[55, 60, 42, 66, 71, 58, 62, 80, 76, 85, 90, 94]} />
+            <Bars h={last ? [30, 45, 38, 52, 47, 61, 55, 49, 66, 58, 72, 64] : [55, 60, 42, 66, 71, 58, 62, 80, 76, 85, 90, 94]} />
           </Hl>
         </Phone>
       );
+    }
     case "reach":
       return (
         <Phone title="Statistics" tabs={["Overview", "Reach", "Fans"]} on="Reach">
