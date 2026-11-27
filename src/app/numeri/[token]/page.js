@@ -538,17 +538,36 @@ function Mock({ kind }) {
           </Hl>
         </Phone>
       );
+    case "reach":
+      return (
+        <Phone title="Statistics" tabs={["Overview", "Reach", "Fans"]} on="Reach">
+          <Hl n={1} className="sel">Last 12 months ▾</Hl>
+          <Hl n={2} style={{ display: "grid", gap: 8 }}>
+            <div className="cards">
+              <div className="mcard"><span className="k">Profile visitors</span><span className="v">184.300</span></div>
+              <div className="mcard"><span className="k">Guests</span><span className="v">121.000</span></div>
+              <div className="mcard"><span className="k">Users</span><span className="v">63.300</span></div>
+              <div className="mcard"><span className="k">Subscribed</span><span className="v">3.906</span></div>
+            </div>
+            <Bars h={[48, 52, 46, 60, 64, 57, 61, 72, 70, 79, 86, 92]} />
+          </Hl>
+        </Phone>
+      );
     case "topfans":
+    case "topfans_30": {
+      const last = kind === "topfans_30";
+      const vals = last ? ["$640", "$410", "$380", "$220", "$150", "$90"] : ["$3.420", "$2.180", "$1.960", "$1.340", "$990", "$870"];
       return (
         <Phone title="Top fans">
-          <Hl n={1} className="sel">All time ▾</Hl>
+          <Hl n={1} className="sel">{last ? "Last 30 days ▾" : "All time ▾"}</Hl>
           <div className="rows">
-            {["$3.420", "$2.180", "$1.960", "$1.340", "$990", "$870"].map((v, i) => (
-              <div className="fan" key={v}><span className="av" />{i === 0 ? <Hl n={3} className="covered" /> : <span className="covered" />}<span>{v}</span></div>
+            {vals.map((v, i) => (
+              <div className="fan" key={v}><span className="av" />{i === 0 ? <Hl n={2} className="covered" /> : <span className="covered" />}<span>{v}</span></div>
             ))}
           </div>
         </Phone>
       );
+    }
     case "links":
       return (
         <Phone title="Tracking links">
