@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   CHAPTERS, SHOT_STEPS, CONTENT_TYPES, CONTENT_LEVELS, FACE_OPTIONS, PLATFORM_OPTIONS, PAGE_KIND_OPTIONS,
-  EARN_BANDS, YES_NO, MAX_FILES_PER_STEP, missingForSubmit, shotProgress, groupFiles,
+  EARN_BANDS, YES_NO, VIEW_BANDS, HOURS_OPTIONS, START_OPTIONS, MANUAL_MAX, MAX_FILES_PER_STEP, missingForSubmit, shotProgress, groupFiles,
 } from "@/lib/creator-numeri-core";
 import { shrinkImage } from "@/lib/hr-upload-client";
 
@@ -143,13 +143,19 @@ export default function SchedaNumeri() {
               {answers.platform !== "Non ho ancora una pagina" && SHOT_STEPS.filter((s) => s.chapter === "pagina").map((s, i) => (
                 <ShotStep key={s.id} n={i + 1} step={s} token={token} files={byStep[s.id] || []} setFiles={setFiles}
                   skipped={answers.skip?.[s.id] === true} onSkip={(v) => setIn("skip", s.id, v)} readOnly={readOnly} uploads={load.uploads}
-                  fanvue={answers.platform === "Fanvue"} />
+                  fanvue={answers.platform === "Fanvue"}
+                  manual={answers.manual?.[s.id] || ""} onManual={(v) => setIn("manual", s.id, v || undefined)} />
               ))}
             </ChapterPagina>
           )}
           {chIdx === 3 && (
             <section className="chapter">
               <ChapterHead n={4} title="Instagram e TikTok" text="Quanta gente ti vede e chi è. Se un social non lo usi, segna «Non lo uso» e vai avanti." />
+              <div className="card form">
+                <Field label="Quante visualizzazioni fai in un mese, sommando tutti i tuoi social?" hint="Anche a occhio: lo vediamo poi meglio dagli screenshot">
+                  <select value={answers.viewsBand || ""} onChange={(e) => set("viewsBand", e.target.value || undefined)}><option value="">Scegli…</option>{VIEW_BANDS.map((b) => <option key={b}>{b}</option>)}</select>
+                </Field>
+              </div>
               {SHOT_STEPS.filter((s) => s.chapter === "social").map((s, i) => (
                 <ShotStep key={s.id} n={i + 1} step={s} token={token} files={byStep[s.id] || []} setFiles={setFiles}
                   skipped={answers.skip?.[s.id] === true} onSkip={(v) => setIn("skip", s.id, v)} readOnly={readOnly} uploads={load.uploads} />
@@ -365,6 +371,7 @@ function ChapterPagina({ a, set, children }) {
             <Field label="Da quando hai la pagina" hint="Mese e anno, anche a occhio" id="since"><Text a={a} set={set} k="since" placeholder="Es. marzo 2024" /></Field>
             <Field label="La pagina è…"><Chips label="Tipo di pagina" options={PAGE_KIND_OPTIONS} value={a.pageKind} onChange={(v) => set("pageKind", v)} /></Field>
             <Field label="Quanto guadagni in un mese normale" hint="Più o meno, in dollari"><select value={a.earnBand || ""} onChange={(e) => set("earnBand", e.target.value || undefined)}><option value="">Scegli…</option>{EARN_BANDS.map((b) => <option key={b}>{b}</option>)}</select></Field>
+            <Field label="Quanti nuovi iscritti fai al giorno, in media?" hint="Un numero, anche a occhio" id="subsPerDay"><Text a={a} set={set} k="subsPerDay" placeholder="Es. 15" inputMode="numeric" /></Field>
           </div>
         )}
         {none && <p className="muted small">Nessun problema: salta pure questa parte e passa a Instagram e TikTok.</p>}
@@ -383,7 +390,9 @@ function ChapterDomande({ a, set, errOf, children }) {
         <Field label="Quanti contenuti nuovi riesci a fare in una settimana?" id="perWeek"><Area a={a} set={set} k="perWeek" rows={2} /></Field>
         <Field label="Chi risponde oggi ai messaggi dei fan, e per quante ore al giorno?" id="chatToday"><Area a={a} set={set} k="chatToday" rows={2} /></Field>
         <Field label="Hai già lavorato con un'agenzia? Com'è andata, e hai ancora vincoli di contratto?" id="agency"><Area a={a} set={set} k="agency" /></Field>
-        <Field label="Quanto tempo puoi dedicarci a settimana, e che obiettivo hai?" id="timeGoal"><Area a={a} set={set} k="timeGoal" /></Field>
+        <Field label="Quante ore al giorno puoi dedicarci?"><Chips label="Ore al giorno" options={HOURS_OPTIONS} value={a.hours} onChange={(v) => set("hours", v)} /></Field>
+        <Field label="Quando potresti iniziare?"><Chips label="Quando inizi" options={START_OPTIONS} value={a.start} onChange={(v) => set("start", v)} /></Field>
+        <Field label="Che obiettivo hai? C'è altro sul tuo tempo che dobbiamo sapere?" id="timeGoal"><Area a={a} set={set} k="timeGoal" /></Field>
         <Field label="Ti hanno mai bloccato o limitato un profilo?"><Chips label="Profili bloccati" options={YES_NO} value={a.banned} onChange={(v) => set("banned", v)} /></Field>
         {a.banned === "Sì" && <Field label="Quale, e quando?" id="banDetail"><Area a={a} set={set} k="banDetail" rows={2} /></Field>}
         <Field label="Che lingue parli?" id="languages"><Text a={a} set={set} k="languages" placeholder="Es. italiano, inglese" /></Field>
@@ -398,7 +407,7 @@ function ChapterDomande({ a, set, errOf, children }) {
 }
 
 // ── Uno screenshot: spiegazione, esempio e caricamento di fianco ───────────
-function ShotStep({ n, step, token, files, setFiles, skipped, onSkip, readOnly, uploads, fanvue }) {
+function ShotStep({ n, step, token, files, setFiles, skipped, onSkip, readOnly, uploads, fanvue, manual, onManual }) {
   const [busy, setBusy] = useState(null); // { progress } | null
   const [err, setErr] = useState(null);
   const [local, setLocal] = useState({}); // pathname → objectURL (anteprima appena caricata)
@@ -486,7 +495,13 @@ function ShotStep({ n, step, token, files, setFiles, skipped, onSkip, readOnly, 
           <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
           {err && <p className="ferr" role="alert">{err}</p>}
           {!step.optional && onSkip && files.length === 0 && !readOnly && (
-            <label className="skip"><input type="checkbox" checked={!!skipped} onChange={(e) => onSkip(e.target.checked || undefined)} /> {step.chapter === "social" ? "Non lo uso" : "Non ce l'ho"}</label>
+            <label className="skip"><input type="checkbox" checked={!!skipped} onChange={(e) => onSkip(e.target.checked || undefined)} /> {step.chapter === "social" ? "Non lo uso" : "Non ce l'ho o non riesco a farlo"}</label>
+          )}
+          {skipped && step.manual && onManual && files.length === 0 && (
+            <label className="field manual">
+              <span className="fhint">Se il numero lo sai, scrivilo qui (anche a occhio):</span>
+              <input type="text" value={manual || ""} maxLength={MANUAL_MAX} placeholder={step.manual} disabled={readOnly} onChange={(e) => onManual(e.target.value)} />
+            </label>
           )}
         </div>
       </div>
@@ -756,6 +771,7 @@ body { background: #F5F4F0; }
 .numeri .thumb .x{ position:absolute; top:6px; right:6px; width:30px; height:30px; border-radius:50%; border:0; background:rgba(0,0,0,.6); color:#fff; font-size:18px; line-height:1; cursor:pointer; }
 .numeri .skip{ display:flex; gap:8px; align-items:center; font-size:.9rem; color:var(--muted); cursor:pointer; }
 .numeri .skip input{ width:18px; height:18px; accent-color:var(--ink); margin:0; }
+.numeri .manual{ margin-top:4px; }
 .numeri .pager{ display:flex; justify-content:space-between; gap:12px; padding-top:8px; }
 .numeri .foot{ font-size:.8rem; color:var(--muted); text-align:center; max-width:60ch; justify-self:center; padding-top:24px; }
 

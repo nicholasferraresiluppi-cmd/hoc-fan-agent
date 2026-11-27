@@ -14,7 +14,7 @@ import { Plus, X, Copy, Check, ExternalLink, Trash2, RotateCcw } from "lucide-re
 import { CP, FONTS } from "@/lib/brand";
 import { fmtInt } from "@/lib/format";
 import { PageHead, Metric, Notice, DataTable, SectionTitle, EmptyState, card, BTN, BTN_PRIMARY } from "@/components/ds";
-import { CHAPTERS, SHOT_STEPS, CONTENT_TYPES, CONTENT_LEVELS, groupFiles } from "@/lib/creator-numeri-core";
+import { CHAPTERS, SHOT_STEPS, CONTENT_TYPES, CONTENT_LEVELS, groupFiles, firstRead } from "@/lib/creator-numeri-core";
 
 const API = "/api/admin/schede-numeri";
 const fetcher = async (url) => {
@@ -69,6 +69,7 @@ export default function SchedeNumeriPage() {
   const columns = [
     { key: "name", label: "Creator", render: (l) => <span style={{ fontWeight: 500 }}>{l.stageName || l.name}{l.stageName && l.stageName !== l.name ? <span style={{ color: CP.textMuted, fontWeight: 400 }}> · {l.name}</span> : null}</span> },
     { key: "state", label: "Stato", sort: (l) => STATE[l.state]?.order ?? 0, render: (l) => <span style={{ color: l.state === "submitted" ? CP.textPrimary : CP.textSecondary }}>{stateLabel(l)}</span> },
+    { key: "call", label: "Prima lettura", sort: (l) => (l.call ? 1 : 0), render: (l) => l.call ? <span style={{ color: CP.accent, fontWeight: 500 }}>Da chiamare</span> : <span style={{ color: CP.textMuted }}>—</span> },
     { key: "files", label: "Screenshot", align: "right", render: (l) => fmtInt(l.files) },
     { key: "updatedAt", label: "Ultima modifica", align: "right", sort: (l) => l.submittedAt || l.updatedAt || 0, render: (l) => <span style={{ color: CP.textSecondary }}>{fmtDate(l.submittedAt || l.updatedAt)}</span> },
     { key: "createdAt", label: "Creato", align: "right", render: (l) => <span style={{ color: CP.textSecondary }}>{fmtDate(l.createdAt)}</span> },
@@ -176,6 +177,8 @@ function Detail({ token, origin, onClose, onChanged }) {
       </div>
       <CopyLink label="Link della creator" link={`${origin}/numeri/${token}`} />
 
+      <FirstRead r={firstRead(a)} />
+
       <Block title="Chi è">
         <Pairs rows={[["Nome con cui lavora", a.stageName], ["Nome vero", a.realName], ["Città", a.city], ["Dove scriverle", a.contact], ["Maggiorenne", a.adult ? "Confermato" : "Non confermato"], ["Lingue", a.languages]]} />
         {socials.length > 0 && <Pairs rows={socials.map(([k, v]) => [k, <SocialLink key={k} v={v} />])} />}
@@ -186,7 +189,7 @@ function Detail({ token, origin, onClose, onChanged }) {
       </Block>
 
       <Block title="La sua pagina">
-        <Pairs rows={[["Piattaforma", a.platform], ["Abbonamento", a.subPrice], ["Tipo di pagina", a.pageKind], ["Da quando", a.since], ["Guadagno di un mese normale (dichiarato)", a.earnBand]]} />
+        <Pairs rows={[["Piattaforma", a.platform], ["Abbonamento", a.subPrice], ["Tipo di pagina", a.pageKind], ["Da quando", a.since], ["Guadagno di un mese normale (dichiarato)", a.earnBand], ["Nuovi iscritti al giorno (dichiarati)", a.subsPerDay], ["Visualizzazioni al mese sui social (dichiarate)", a.viewsBand]]} />
       </Block>
 
       {CHAPTERS.filter((c) => SHOT_STEPS.some((s) => s.chapter === c.id)).map((c) => (
@@ -203,6 +206,7 @@ function Detail({ token, origin, onClose, onChanged }) {
                     <span style={{ fontSize: 12.5, color: CP.textMuted }}>{s.period}</span>
                     {!fs.length && <span style={{ fontSize: 12.5, color: CP.textMuted }}>{skipped ? "· dice di non averlo" : "· non caricato"}</span>}
                   </div>
+                  {!fs.length && a.manual?.[s.id] && <div style={{ fontSize: 14, color: CP.textPrimary }}><span style={{ color: CP.textSecondary }}>Scritto a mano: </span>{a.manual[s.id]}</div>}
                   {s.read && <div style={{ fontSize: 13, color: CP.textSecondary, lineHeight: 1.5, maxWidth: 760 }}>{s.read}</div>}
                   {fs.length > 0 && (
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -225,7 +229,7 @@ function Detail({ token, origin, onClose, onChanged }) {
       <Block title="Le sue risposte">
         <Pairs rows={[
           ["Contenuti già pronti", a.readyContent], ["Contenuti nuovi a settimana", a.perWeek], ["Chi risponde in chat oggi", a.chatToday],
-          ["Agenzie precedenti e vincoli", a.agency], ["Tempo e obiettivo", a.timeGoal],
+          ["Agenzie precedenti e vincoli", a.agency], ["Ore al giorno", a.hours], ["Quando può iniziare", a.start], ["Tempo e obiettivo", a.timeGoal],
           ["Profili bloccati o limitati", a.banned ? `${a.banned}${a.banDetail ? `: ${a.banDetail}` : ""}` : null], ["Altro", a.notes],
         ]} />
       </Block>
@@ -241,6 +245,18 @@ function Detail({ token, origin, onClose, onChanged }) {
             </>}
       </div>
     </section>
+  );
+}
+
+function FirstRead({ r }) {
+  if (!r.reasons.length && !r.notes.length) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, padding: "12px 14px", borderRadius: 10, background: CP.surfaceAlt, border: `1px solid ${CP.border}` }}>
+      <div style={{ fontSize: 14.5, fontWeight: 500, color: r.call ? CP.accent : CP.textPrimary }}>{r.call ? "Prima lettura: da chiamare" : "Prima lettura"}</div>
+      {r.reasons.map((x) => <div key={x} style={{ fontSize: 13.5, color: CP.textPrimary }}>{x}</div>)}
+      {r.notes.map((x) => <div key={x} style={{ fontSize: 13.5, color: CP.textSecondary }}>Da sapere: {x.charAt(0).toLowerCase() + x.slice(1)}</div>)}
+      <div style={{ fontSize: 12.5, color: CP.textMuted, lineHeight: 1.5 }}>Soglie del vecchio «Audit modella» su numeri che scrive lei: dicono chi guardare per prima, non quanto può rendere. Confrontali con gli screenshot.</div>
+    </div>
   );
 }
 

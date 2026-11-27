@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import {
   SHOT_STEPS, CONTENT_TYPES, sanitizeAnswers, missingForSubmit, linkState, stepDone, shotProgress, groupFiles,
-  newUploadPathname, isUploadPathname, checkUploadRequest, sniffImage, MAX_FILES_PER_STEP, UPLOAD_MAX_BYTES, TEXT_FIELDS,
+  newUploadPathname, isUploadPathname, checkUploadRequest, sniffImage, MAX_FILES_PER_STEP, UPLOAD_MAX_BYTES, TEXT_FIELDS, firstRead, parseCount, MANUAL_MAX,
 } from "../src/lib/creator-numeri-core.js";
 
 let n = 0;
@@ -38,6 +38,52 @@ t("nuovi iscritti: 12 mesi e ultimi 30 giorni in due caricamenti separati", () =
   assert.match(last.period, /30/);
   assert.ok(!last.optional);
   assert.ok(SHOT_STEPS.indexOf(last) === SHOT_STEPS.indexOf(year) + 1, "uno dopo l'altro");
+});
+
+t("numeri a mano: solo per i passi che li prevedono, testo tagliato", () => {
+  const out = sanitizeAnswers({ manual: { of_reach: "  15.000 visite ", ig_overview: "2 milioni", boh: "x", of_fans: "9".repeat(500) } });
+  assert.deepEqual(Object.keys(out.manual).sort(), ["of_fans", "of_reach"]);
+  assert.equal(out.manual.of_fans.length, MANUAL_MAX);
+  assert.equal(sanitizeAnswers({ manual: { of_reach: "   " } }).manual, undefined);
+  for (const s of SHOT_STEPS.filter((x) => x.chapter === "pagina")) assert.ok(s.manual, `${s.id} ha il ripiego a mano`);
+});
+
+t("domande veloci: solo le scelte ammesse", () => {
+  const out = sanitizeAnswers({ viewsBand: "3 – 10 milioni", hours: "boh", start: "Subito", subsPerDay: "circa 25" });
+  assert.equal(out.viewsBand, "3 – 10 milioni");
+  assert.equal(out.hours, undefined);
+  assert.equal(out.start, "Subito");
+  assert.equal(out.subsPerDay, "circa 25");
+});
+
+t("parseCount: il primo numero di un testo libero", () => {
+  assert.equal(parseCount("15"), 15);
+  assert.equal(parseCount("1.200"), 1200);
+  assert.equal(parseCount("circa 20 al giorno"), 20);
+  assert.equal(parseCount("10-20"), 10);
+  assert.equal(parseCount("boh"), null);
+  assert.equal(parseCount(undefined), null);
+});
+
+t("prima lettura: soglie del vecchio audit, gratuita più alta", () => {
+  assert.equal(firstRead({ subsPerDay: "20", pageKind: "A pagamento" }).call, true);
+  assert.equal(firstRead({ subsPerDay: "19", pageKind: "A pagamento" }).call, false);
+  assert.equal(firstRead({ subsPerDay: "40", pageKind: "Gratuita" }).call, false);
+  assert.equal(firstRead({ subsPerDay: "80", pageKind: "Gratuita" }).call, true);
+  assert.equal(firstRead({ viewsBand: "3 – 10 milioni" }).call, true);
+  assert.equal(firstRead({ viewsBand: "Non lo so" }).call, false);
+  assert.equal(firstRead({ earnBand: "5.000 – 10.000 $" }).call, true);
+  assert.equal(firstRead({ earnBand: "Preferisco non dirlo" }).call, false);
+  assert.equal(firstRead({ earnBand: "2.000 – 5.000 $" }).call, false);
+});
+
+t("prima lettura: senza pagina contano solo i social; avvisi a parte", () => {
+  const none = firstRead({ platform: "Non ho ancora una pagina", subsPerDay: "500", earnBand: "Più di 25.000 $" });
+  assert.equal(none.call, false);
+  const r = firstRead({ hours: "Meno di 2 ore", start: "Più avanti" });
+  assert.equal(r.call, false);
+  assert.equal(r.notes.length, 2);
+  assert.deepEqual(firstRead(null), { call: false, reasons: [], notes: [] });
 });
 
 t("la reach della pagina è chiesta, nello stesso periodo dei fan", () => {

@@ -17,7 +17,7 @@ import { kv } from "@vercel/kv";
 import { randomBytes } from "node:crypto";
 import {
   TOKEN_RE, LINK_TTL_DAYS, MAX_FILES_PER_TOKEN, MAX_SLOTS_PER_TOKEN, UPLOAD_MAX_BYTES, UPLOAD_SLOT_TTL_S,
-  sanitizeAnswers, missingForSubmit, linkState, newUploadPathname, isUploadPathname, checkUploadRequest, sniffImage,
+  sanitizeAnswers, missingForSubmit, linkState, firstRead, newUploadPathname, isUploadPathname, checkUploadRequest, sniffImage,
 } from "./creator-numeri-core.js";
 
 const K = {
@@ -72,6 +72,7 @@ export async function listLinks() {
       token: t, name: r.name, note: r.note, createdBy: r.createdBy, createdAt: r.createdAt, expiresAt: r.expiresAt,
       openedAt: r.openedAt, updatedAt: r.updatedAt, submittedAt: r.submittedAt,
       stageName: r.answers?.stageName || null, state: linkState(r), files: Number(counts[i] || 0),
+      call: firstRead(r.answers).call,
     };
   }).filter(Boolean);
 }
