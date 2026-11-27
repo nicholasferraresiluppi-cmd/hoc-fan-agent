@@ -31,6 +31,15 @@ t("i fan che spendono di più: due caricamenti separati, da sempre e 30 giorni",
   assert.ok(SHOT_STEPS.indexOf(last) === SHOT_STEPS.indexOf(all) + 1, "uno dopo l'altro");
 });
 
+t("nuovi iscritti: 12 mesi e ultimi 30 giorni in due caricamenti separati", () => {
+  const year = SHOT_STEPS.find((x) => x.id === "of_fans");
+  const last = SHOT_STEPS.find((x) => x.id === "of_fans_30");
+  assert.match(year.period, /12 mesi/);
+  assert.match(last.period, /30/);
+  assert.ok(!last.optional);
+  assert.ok(SHOT_STEPS.indexOf(last) === SHOT_STEPS.indexOf(year) + 1, "uno dopo l'altro");
+});
+
 t("la reach della pagina è chiesta, nello stesso periodo dei fan", () => {
   const reach = SHOT_STEPS.find((x) => x.id === "of_reach");
   const fans = SHOT_STEPS.find((x) => x.id === "of_fans");
