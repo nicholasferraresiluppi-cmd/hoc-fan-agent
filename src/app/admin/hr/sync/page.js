@@ -128,6 +128,7 @@ export default function HrSyncPage() {
           {c.isRealList && <Notice danger>La lista configurata è il <b>CRM vecchio</b> (901212383318), non «✅ New CRM»: dal 03/10/2026 il CRM attivo è New CRM e il vecchio resta solo come archivio. Ogni salvataggio e ogni import toccherebbero i task del vecchio.</Notice>}
 
           {c.enabled && <MilestonesCard status={data.milestones} onDone={mutate} />}
+          <AnagraficaSheetCard status={data.anagraficaSheet} onDone={mutate} />
           {c.enabled && <ViewsCard last={data.views} onDone={mutate} />}
 
           <section style={{ ...card, padding: "6px 16px 8px", marginBottom: 14 }}>
@@ -250,6 +251,45 @@ function ViewsCard({ last, onDone }) {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/** Foglio «Anagrafica Operatori» dell'Area Partner (17/11/2026): chi è nel CRM e non nel foglio va in fondo. */
+function AnagraficaSheetCard({ status, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState(null);
+  const go = async (dryRun) => {
+    setBusy(dryRun ? "dry" : "go"); setErr(null); setRes(null);
+    try { setRes({ ...(await postJson("/api/admin/hr/sync", { action: "anagrafica_sheet", dryRun })), at: Date.now() }); await onDone?.(); }
+    catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const last = status?.last;
+  const when = (ms) => new Date(ms).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return (
+    <section style={{ ...card, padding: "14px 16px", marginBottom: 14 }} aria-labelledby="hr-sheet-h">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+          <h2 id="hr-sheet-h" style={{ margin: 0, fontSize: 15, fontWeight: 500, color: CP.textPrimary }}>Foglio «Anagrafica Operatori»</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: CP.textMuted }}>
+            Chi compila il modulo finisce anche in fondo al foglio, subito dopo l'invio; ogni notte si recupera chi manca. Le righe già nel foglio non si toccano mai, e chi è stato aggiunto una volta non torna se la riga viene cancellata.
+            {status?.sheetUrl ? <> · <a href={status.sheetUrl} target="_blank" rel="noopener noreferrer" style={{ color: CP.accentSoftText }}>apri il foglio</a></> : null}
+          </p>
+          {last?.error ? <p style={{ margin: "6px 0 0", fontSize: 13.5, color: CP.accentRed }}>Ultimo giro ({when(last.at)}) non riuscito: {last.error}</p>
+            : last ? <p style={{ margin: "6px 0 0", fontSize: 13.5, color: CP.textSecondary }}>Ultimo giro {when(last.at)}: {last.added ? `aggiunte ${last.added} persone` : "nessuno da aggiungere"}</p> : null}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={() => go(true)} disabled={Boolean(busy)} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy === "dry" ? "Controllo…" : "Chi manca?"}</button>
+          <button type="button" onClick={() => go(false)} disabled={Boolean(busy)} style={{ ...btnGhost, opacity: busy ? 0.5 : 1 }}>{busy === "go" ? "Aggiungo…" : "Aggiungi adesso"}</button>
+        </div>
+      </div>
+      {err && <div style={{ marginTop: 10 }}><Notice danger>{err}</Notice></div>}
+      {res && <div role="status" style={{ marginTop: 10, fontSize: 13.5, color: CP.textSecondary }}>
+        {res.dryRun
+          ? (res.wouldAdd?.length ? <>Da aggiungere ({res.wouldAdd.length}): {res.wouldAdd.join(", ")}</> : "Nel foglio c'è già tutto il CRM.")
+          : (res.added ? <>Aggiunte {res.added}: {res.names.join(", ")}</> : "Nessuno da aggiungere: nel foglio c'è già tutto il CRM.")}
+      </div>}
     </section>
   );
 }
