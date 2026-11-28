@@ -24,6 +24,8 @@
  * questi array, niente logica.
  */
 
+import { isHiddenHref } from "./hidden-pages.js";
+
 const SCOPE_RANK = { own: 1, team: 2, all: 3 };
 
 /** true se il capability `cap` ha scope >= `min` nell'oggetto capabilities di whoami. */
@@ -304,9 +306,15 @@ export const ROLE_FUNNELS = [
 
 const FUNNELS_BY_KEY = Object.fromEntries(ROLE_FUNNELS.map((f) => [f.key, f]));
 
-/** Ritorna il funnel per chiave (o undefined). */
+/**
+ * Ritorna il funnel per chiave (o undefined), senza i passi che puntano a pagine nascoste
+ * (lib/hidden-pages, 28/11/2026): la guida non manda dove poi si viene rimandati indietro.
+ */
 export function getFunnel(key) {
-  return FUNNELS_BY_KEY[key];
+  const f = FUNNELS_BY_KEY[key];
+  if (!f) return f;
+  const keep = (s) => !s.href || !isHiddenHref(s.href);
+  return { ...f, steps: (f.steps || []).filter(keep), ...(f.checklist ? { checklist: f.checklist.filter(keep) } : {}) };
 }
 
 /**

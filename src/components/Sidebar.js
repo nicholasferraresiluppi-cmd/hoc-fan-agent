@@ -44,6 +44,7 @@ import BrandLockup from "@/components/BrandLockup";
 import WorkspaceSwitch from "@/components/WorkspaceSwitch";
 import { workspaceSections } from "@/lib/workspaces";
 import { restrictedMenu } from "@/lib/restricted-roles";
+import { HIDDEN_PAGES } from "@/lib/hidden-pages";
 
 
 
@@ -233,6 +234,10 @@ const ICON_BY_HREF = new Map([
   ["/admin", LayoutDashboard], ["/admin/alerts", Bell], ["/admin/action-center", Target],
 ]);
 export const iconFor = (href) => ICON_BY_HREF.get(href) || Compass;
+
+// Pagine nascoste (lib/hidden-pages, 28/11/2026): fuori dal menu di tutti, l'admin le ritrova qui in fondo.
+// I gruppi a schede (Allenarsi, Laboratorio Academy, Da seguire…) restano una voce sola.
+const HIDDEN_NAV = collapseItems(HIDDEN_PAGES.map((p) => ({ href: p.href, label: p.label, icon: iconFor(p.href) })), "label");
 
 /** Voci di menu piatte { href, label, group } — per l'analytics d'uso. */
 export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, group: g.label })));
@@ -565,6 +570,21 @@ export default function Sidebar() {
             </div>
           );
         })}
+        {/* Nascoste: solo l'admin, chiuso di partenza */}
+        {me?.admin && (
+          <>
+            <GroupHeader label="Nascoste" isOpen={Boolean(openGroups.Nascoste)} onToggle={() => toggleGroup("Nascoste")} visibleCount={HIDDEN_NAV.length}
+              hasActive={HIDDEN_NAV.some(isItemActive)} />
+            {openGroups.Nascoste && (
+              <div>
+                <div style={{ margin: "0 8px 4px 8px", padding: "0 12px", fontSize: 11, color: CP.textMuted, fontFamily: FONTS.body }}>Tolte dal menu di tutti. Le vedi solo tu.</div>
+                {HIDDEN_NAV.map((item) => (
+                  <NavItem key={item.href} href={item.href} label={item.label} icon={item.icon} isActive={isItemActive(item)} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
         {/* Aiuto: le pagine di orientamento raccolte in fondo (prima 4 voci in cima a ogni menu) */}
         <GroupHeader label="Aiuto" isOpen={Boolean(openGroups.Aiuto)} onToggle={() => toggleGroup("Aiuto")} visibleCount={4}
           hasActive={["/welcome", "/guida", "/cultura", "/grazie"].includes(pathname)} />
