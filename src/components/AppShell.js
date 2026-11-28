@@ -18,6 +18,9 @@ import { usePendingHref } from "@/lib/nav-pending";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { pathAllowed } from "@/lib/restricted-roles";
+import { isHiddenHref, landingFor } from "@/lib/hidden-pages";
+import { canSee } from "@/lib/nav-access";
+import { WORKSPACES } from "@/lib/workspaces";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Menu, X } from "lucide-react";
@@ -75,10 +78,17 @@ export default function AppShell({ children }) {
   // erano già difesi dalle API, ma il lampo dava l'idea del contrario. Con whoami in errore il menu si mostra
   // (il comportamento di prima): meglio un menu che una pagina senza navigazione.
   const meLoading = me === undefined && !meError; // il fetcher dà null se whoami fallisce: allora non si aspetta
-  const allowedHere = pathAllowed(restriction, pathname);
+  // Pagine nascoste (lib/hidden-pages, 28/11/2026): chi non è admin non le apre nemmeno da un link
+  // vecchio, torna alla sua pagina di partenza. Finché whoami non risponde la pagina non si disegna.
+  const hiddenHere = !isAuthRoute(pathname) && !isBareRoute(pathname) && isHiddenHref(pathname) && me !== null && !meError && !me?.admin; // whoami fallito (null): si disegna, come prima
+  const allowedHere = pathAllowed(restriction, pathname) && !hiddenHere;
   useEffect(() => {
-    if (restriction && !allowedHere) router.replace(restriction.home);
-  }, [restriction, allowedHere, router]);
+    if (restriction && !pathAllowed(restriction, pathname)) { router.replace(restriction.home); return; }
+    if (hiddenHere && me) {
+      const allowed = (h) => canSee(h, me.capabilities, me.admin);
+      router.replace(restriction ? restriction.home : landingFor(allowed, WORKSPACES[me.workspace?.id]?.home));
+    }
+  }, [restriction, pathname, hiddenHere, me, router]);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Stile v3 in anteprima: guscio nuovo (barra ⌘K + stato dati, barra da telefono).
   // Senza data-style="v3" nulla di questo viene reso.

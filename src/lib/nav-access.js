@@ -6,6 +6,8 @@
  * rispondevano "non hai il permesso". Aggiungendo una pagina al menu, aggiungila
  * anche qui (senza voce = visibile a tutti).
  */
+import { isHiddenHref } from "./hidden-pages.js";
+
 const SCOPE_RANK = { own: 1, team: 2, all: 3 };
 const all = (cap) => ({ type: "cap", cap, scope: "all" });
 const any = (cap) => ({ type: "cap", cap, scope: "any" });
@@ -44,6 +46,8 @@ export const NAV_ACCESS = {
   "/admin/utilizzo": { type: "admin" },
   // Contabilità (15/10/2026): accesso a parte, NON passa dall'admin (lib/compensi-access)
   "/contabilita": { type: "accounting" },
+  // 28/11/2026: i Conti dell'impresa stanno dietro lo stesso accesso (API: requireAccounting); prima la voce compariva a tutti
+  "/contabilita/quadro": { type: "accounting" },
   // Creator AI (01/11/2026): solo il titolare, più stretto della Contabilità (lib/creator-ai-access)
   "/admin/creator-ai": { type: "owner" },
   // Presenze Discord (03/11/2026): titolare + persone in env HOC_PRESENZE_VIEWER_IDS (lib/presenze-access)
@@ -56,6 +60,9 @@ export const NAV_ACCESS = {
 
 /** La voce `href` funziona per chi ha queste capability? */
 export function canSee(href, caps, isAdmin) {
+  // pagine nascoste (lib/hidden-pages): fuori da menu, hub, ricerca e schede per tutti, admin compreso —
+  // l'admin le ritrova solo nel gruppo «Nascoste» del menu
+  if (isHiddenHref(href)) return false;
   const req = NAV_ACCESS[href];
   if (!req || req.type === "any") return true;
   if (req.type === "accounting") return Boolean(caps?.["accounting.private"]); // prima dell'admin: l'admin qui non basta
